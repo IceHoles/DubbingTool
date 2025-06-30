@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>PublicationWidget</class>
+ <widget class="QWidget" name="PublicationWidget">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>780</width>
+    <height>580</height>
+   </rect>
+  </property>
+  <layout class="QGridLayout" name="gridLayout">
+   <item row="0" column="0">
+    <widget class="QGroupBox" name="groupBox_2">
+     <property name="title">
+      <string>Файлы для Drag-n-Drop</string>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout_2">
+      <item>
+       <widget class="QGroupBox" name="groupBox_4">
+        <property name="title">
+         <string>Постер</string>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_2">
+         <item>
+          <widget class="DraggableLabel" name="posterLabel">
+           <property name="minimumSize">
+            <size>
+             <width>120</width>
+             <height>180</height>
+            </size>
+           </property>
+           <property name="toolTip">
+            <string>Перетащите эту картинку в Telegram или VK</string>
+           </property>
+           <property name="frameShape">
+            <enum>QFrame::StyledPanel</enum>
+           </property>
+           <property name="text">
+            <string>Постер</string>
+           </property>
+           <property name="alignment">
+            <enum>Qt::AlignCenter</enum>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QGroupBox" name="groupBox_5">
+        <property name="title">
+         <string>MKV</string>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_3">
+         <item>
+          <widget class="DraggableLabel" name="mkvFileLabel">
+           <property name="minimumSize">
+            <size>
+             <width>120</width>
+             <height>180</height>
+            </size>
+           </property>
+           <property name="toolTip">
+            <string>Перетащите этот файл в Telegram для отправки MKV</string>
+           </property>
+           <property name="frameShape">
+            <enum>QFrame::StyledPanel</enum>
+           </property>
+           <property name="text">
+            <string>MKV файл</string>
+           </property>
+           <property name="alignment">
+            <enum>Qt::AlignCenter</enum>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QGroupBox" name="groupBox_6">
+        <property name="title">
+         <string>MP4</string>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_4">
+         <item>
+          <widget class="DraggableLabel" name="mp4FileLabel">
+           <property name="minimumSize">
+            <size>
+             <width>120</width>
+             <height>180</height>
+            </size>
+           </property>
+           <property name="toolTip">
+            <string>Перетащите этот файл на сайты для загрузки</string>
+           </property>
+           <property name="frameShape">
+            <enum>QFrame::StyledPanel</enum>
+           </property>
+           <property name="text">
+            <string>MP4 файл</string>
+           </property>
+           <property name="alignment">
+            <enum>Qt::AlignCenter</enum>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item row="0" column="1" rowspan="2">
+    <widget class="QGroupBox" name="groupBox">
+     <property name="title">
+      <string>Тексты постов</string>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout">
+      <item>
+       <widget class="QTabWidget" name="postsTabWidget">
+        <property name="currentIndex">
+         <number>0</number>
+        </property>
+        <widget class="QWidget" name="tab_tg_mp4">
+         <attribute name="title">
+          <string>Telegram (MP4)</string>
+         </attribute>
+         <layout class="QGridLayout" name="gridLayout_2">
+          <item row="0" column="0">
+           <widget class="QTextEdit" name="tgMp4PostEdit"/>
+          </item>
+          <item row="1" column="0">
+           <widget class="QPushButton" name="copyTgMp4Button">
+            <property name="text">
+             <string>Копировать</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+        <widget class="QWidget" name="tab_tg_mkv">
+         <attribute name="title">
+          <string>Telegram (MKV)</string>
+         </attribute>
+         <layout class="QGridLayout" name="gridLayout_3">
+          <item row="0" column="0">
+           <widget class="QTextEdit" name="tgMkvPostEdit"/>
+          </item>
+          <item row="1" column="0">
+           <widget class="QPushButton" name="copyTgMkvButton">
+            <property name="text">
+             <string>Копировать</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+        <widget class="QWidget" name="tab_vk">
+         <attribute name="title">
+          <string>VK</string>
+         </attribute>
+         <layout class="QGridLayout" name="gridLayout_4">
+          <item row="0" column="0">
+           <widget class="QTextEdit" name="vkPostEdit"/>
+          </item>
+          <item row="1" column="0">
+           <widget class="QPushButton" name="copyVkButton">
+            <property name="text">
+             <string>Копировать</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+        <widget class="QWidget" name="tab_vk_comment">
+         <attribute name="title">
+          <string>VK (комментарий)</string>
+         </attribute>
+         <layout class="QGridLayout" name="gridLayout_5">
+          <item row="0" column="0">
+           <widget class="QTextEdit" name="vkCommentEdit"/>
+          </item>
+          <item row="1" column="0">
+           <widget class="QPushButton" name="copyVkCommentButton">
+            <property name="text">
+             <string>Копировать</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item row="1" column="0">
+    <widget class="QGroupBox" name="groupBox_3">
+     <property name="title">
+      <string>Ссылки</string>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_5">
+      <item>
+       <widget class="QPushButton" name="openUploadUrlsButton">
+        <property name="text">
+         <string>Открыть ссылки для загрузки видео</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="Line" name="line">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QFormLayout" name="formLayout">
+        <item row="0" column="0">
+         <widget class="QLabel" name="label">
+          <property name="text">
+           <string>Ссылка Anime365:</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="QLineEdit" name="linkAnime365Edit"/>
+        </item>
+        <item row="1" column="0">
+         <widget class="QLabel" name="label_2">
+          <property name="text">
+           <string>Ссылка Anilib:</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="1">
+         <widget class="QLineEdit" name="linkAnilibEdit"/>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <widget class="QPushButton" name="updatePostsButton">
+        <property name="text">
+         <string>Обновить посты со ссылками</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>DraggableLabel</class>
+   <extends>QLabel</extends>
+   <header>publicationwidget.h</header>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>
