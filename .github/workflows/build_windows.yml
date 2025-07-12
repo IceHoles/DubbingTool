@@ -7,7 +7,7 @@ jobs:
     runs-on: windows-latest
     env:
       QT_VERSION: '6.9.0'
-      PY_EXE_NAME: 'your_prebuilt_tool.exe'  # Замените на имя вашего EXE от PyInstaller
+      PY_EXE_NAME: 'font_finder_wrapper.exe'  # Замените на имя вашего EXE от PyInstaller
 
     steps:
     - name: Checkout repository
