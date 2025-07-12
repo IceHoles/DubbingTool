@@ -1,0 +1,71 @@
+name: Build Windows Executable
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      QT_VERSION: '6.9.0'
+      PY_EXE_NAME: 'font_finder_wrapper.exe'  # Замените на имя вашего EXE от PyInstaller
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # Установка Qt 6.9 с необходимыми компонентами
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        modules: qtbase qttools qtmultimedia qt5compat
+        toolchain: msvc2022  # Для MinGW сборки
+
+    # Сборка проекта через qmake
+    - name: Build with qmake
+
+      run: |
+        # Настройка путей
+        echo "QT_DIR=$QT_DIR" >> $env:GITHUB_ENV
+        echo "PATH=$QT_DIR\bin;$env:PATH" >> $env:GITHUB_ENV
+        
+        run: |
+        qmake -spec win32-msvc "CONFIG+=release" -o Makefile DubbingTool.pro
+  nmake release
+        
+        # Копирование Python EXE (предполагается, что он уже в репозитории)
+        copy ${{ env.PY_EXE_NAME }} release\${{ env.PY_EXE_NAME }}
+
+    # Добавление Qt зависимостей
+    - name: Deploy Qt libraries
+      run: |
+        windeployqt --release --no-translations --compiler-runtime release\DubbingTool.exe
+        
+        # Проверка существования Python EXE
+        if not exist "release\${{ env.PY_EXE_NAME }}" (
+          echo "⚠️ Python EXE not found! Ensure '${{ env.PY_EXE_NAME }}' is in repo root"
+          exit 1
+        )
+
+    # Создание zip-артефакта
+    - name: Package artifacts
+      run: |
+        mkdir DubbingTool_Release
+        copy release\DubbingTool.exe DubbingTool_Release
+        copy release\${{ env.PY_EXE_NAME }} DubbingTool_Release
+        copy release\*.dll DubbingTool_Release
+        
+        # Для файлов .qm (если есть переводы)
+        if exist release\*.qm (
+            copy release\*.qm DubbingTool_Release
+        )
+        
+        # Создание архива
+        Compress-Archive -Path DubbingTool_Release -DestinationPath DubbingTool_Windows.zip
+
+    # Загрузка артефакта
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: DubbingTool_Windows
+        path: DubbingTool_Windows.zip
