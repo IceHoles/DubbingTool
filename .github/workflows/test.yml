@@ -1,0 +1,13 @@
+name: Minimal MSVC Test
+
+on:
+  workflow_dispatch: # Позволяет запускать вручную
+
+jobs:
+  test-job:
+    runs-on: windows-latest
+    steps:
+      - name: Test Microsoft Action
+        uses: microsoft/setup-msvc@v2
+      - name: Success Message
+        run: echo "Action resolved successfully!"
