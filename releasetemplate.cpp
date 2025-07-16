@@ -41,6 +41,8 @@ void ReleaseTemplate::read(const QJsonObject &json)
     director = json["director"].toString();
     soundEngineer = json["soundEngineer"].toString();
     timingAuthor = json["timingAuthor"].toString();
+    signsLocalizer = json["signsLocalizer"].toString(); // <<< НОВОЕ
+    includeSignsLocalizer = json["includeSignsLocalizer"].toBool(false); // <<< НОВОЕ
     releaseBuilder = json["releaseBuilder"].toString();
     targetAudioFormat = json["targetAudioFormat"].toString("aac");
 
@@ -110,6 +112,8 @@ void ReleaseTemplate::write(QJsonObject &json) const
     json["director"] = director;
     json["soundEngineer"] = soundEngineer;
     json["timingAuthor"] = timingAuthor;
+    json["signsLocalizer"] = signsLocalizer; // <<< НОВОЕ
+    json["includeSignsLocalizer"] = includeSignsLocalizer; // <<< НОВОЕ
     json["releaseBuilder"] = releaseBuilder;
     json["cast"] = QJsonArray::fromStringList(cast);
     json["signStyles"] = QJsonArray::fromStringList(signStyles);
