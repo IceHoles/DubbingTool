@@ -1,4 +1,4 @@
-name: Windows CI Build (Manual MSVC Setup)
+name: Windows CI Build (Absolute Paths)
 
 on:
   push:
@@ -21,24 +21,30 @@ jobs:
           arch: 'win64_msvc2019_64'
           cached: 'true'
 
-# ИСПРАВЛЕННЫЙ ШАГ СБОРКИ
-      - name: Build with qmake and jom
+      # ИСПОЛЬЗУЕМ АБСОЛЮТНЫЕ ПУТИ
+      - name: Build Project
         shell: cmd
         env:
-          QT_BIN_PATH: ${{ steps.install-qt.outputs.qtPath }}\bin
+          # Передаем путь к Qt в переменную окружения для удобства
+          QT_PATH: ${{ steps.install-qt.outputs.qtPath }}
         run: |
+          REM Настраиваем компилятор MSVC
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          set PATH=%QT_BIN_PATH%;%PATH%
-          qmake DubbingTool.pro -spec win32-msvc "CONFIG+=release"
-          jom -j%NUMBER_OF_PROCESSORS%
-# ИСПРАВЛЕННЫЙ ШАГ РАЗВЕРТЫВАНИЯ
+
+          REM Запускаем qmake по полному пути
+          %QT_PATH%\bin\qmake.exe DubbingTool.pro -spec win32-msvc "CONFIG+=release"
+
+          REM Запускаем jom по полному пути
+          %QT_PATH%\bin\jom.exe -j%NUMBER_OF_PROCESSORS%
+
+      # ИСПОЛЬЗУЕМ АБСОЛЮТНЫЙ ПУТЬ
       - name: Deploy Qt dependencies
         shell: cmd
         env:
-          QT_BIN_PATH: ${{ steps.install-qt.outputs.qtPath }}\bin
+          QT_PATH: ${{ steps.install-qt.outputs.qtPath }}
         run: |
-          set PATH=%QT_BIN_PATH%;%PATH%
-          windeployqt.exe --release --no-translations --no-opengl-sw --no-svg --no-network --no-xml release/DubbingTool.exe
+          %QT_PATH%\bin\windeployqt.exe --release --no-translations --no-opengl-sw --no-svg --no-network --no-xml release/DubbingTool.exe
+
       - name: Prepare artifact
         shell: bash
         run: |
