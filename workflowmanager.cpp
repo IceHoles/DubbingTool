@@ -9,6 +9,7 @@
 #include <QRegularExpression>
 #include <QSet>
 #include <QHttpMultiPart>
+#include <QEventLoop>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
