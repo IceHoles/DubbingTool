@@ -19,7 +19,7 @@ jobs:
         id: install-qt # Даем id этому шагу, чтобы получить путь
         uses: jurplel/install-qt-action@v3
         with:
-          version: '6.7.2'
+          version: '6.9.0'
           arch: 'win64_msvc2019_64'
           cached: 'true'
 
