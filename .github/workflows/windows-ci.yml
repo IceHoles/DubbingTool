@@ -21,29 +21,24 @@ jobs:
           arch: 'win64_msvc2019_64'
           cached: 'true'
 
-      # ИСПРАВЛЕННЫЙ ШАГ: Настраиваем MSVC вручную, не используя внешний action
+# ИСПРАВЛЕННЫЙ ШАГ СБОРКИ
       - name: Build with qmake and jom
-        shell: cmd # Используем cmd, так как vcvars64.bat - это batch-скрипт
+        shell: cmd
+        env:
+          QT_BIN_PATH: ${{ steps.install-qt.outputs.qtPath }}\bin
         run: |
-          REM Устанавливаем переменные окружения для компилятора MSVC
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-
-          REM Добавляем путь к утилитам Qt (jom, windeployqt) в PATH
-          set PATH=${{ steps.install-qt.outputs.qtPath }}\bin;%PATH%
-
-          REM Собираем проект
+          set PATH=%QT_BIN_PATH%;%PATH%
           qmake DubbingTool.pro -spec win32-msvc "CONFIG+=release"
           jom -j%NUMBER_OF_PROCESSORS%
-
-      # Шаг развертывания зависимостей остается тем же, но ему нужно окружение
+# ИСПРАВЛЕННЫЙ ШАГ РАЗВЕРТЫВАНИЯ
       - name: Deploy Qt dependencies
         shell: cmd
+        env:
+          QT_BIN_PATH: ${{ steps.install-qt.outputs.qtPath }}\bin
         run: |
-          REM Окружение от vcvars64.bat не сохраняется между шагами,
-          REM поэтому нам нужно снова добавить путь к Qt
-          set PATH=${{ steps.install-qt.outputs.qtPath }}\bin;%PATH%
+          set PATH=%QT_BIN_PATH%;%PATH%
           windeployqt.exe --release --no-translations --no-opengl-sw --no-svg --no-network --no-xml release/DubbingTool.exe
-
       - name: Prepare artifact
         shell: bash
         run: |
