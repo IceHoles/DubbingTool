@@ -1,13 +1,13 @@
-name: Minimal MSVC Test
+name: Minimal MSVC Test (Commit Hash)
 
 on:
-  workflow_dispatch: # Позволяет запускать вручную
+  workflow_dispatch:
 
 jobs:
   test-job:
     runs-on: windows-latest
     steps:
-      - name: Test Microsoft Action
-        uses: microsoft/setup-msvc@v2
+      - name: Test Microsoft Action with Commit Hash
+        uses: microsoft/setup-msvc@15454BC3D14828148A57C159291E47528B684615
       - name: Success Message
         run: echo "Action resolved successfully!"
