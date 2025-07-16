@@ -839,7 +839,7 @@ void WorkflowManager::renderMp4()
         emit logMessage("Используются кастомные аргументы для видео: " + m_customRenderArgs);
         args.append(m_customRenderArgs.split(' ', Qt::SkipEmptyParts));
     } else {
-        if (renderPreset == "NVIDIA (hevc_nvenc)") {
+        if (m_renderPreset == "NVIDIA (hevc_nvenc)") {
             emit logMessage("Используется пресет NVIDIA (hevc_nvenc).");
             args << "-c:v" << "hevc_nvenc"
                  << "-preset" << "p7"
