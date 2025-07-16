@@ -839,15 +839,23 @@ void WorkflowManager::renderMp4()
         emit logMessage("Используются кастомные аргументы для видео: " + m_customRenderArgs);
         args.append(m_customRenderArgs.split(' ', Qt::SkipEmptyParts));
     } else {
-        if (m_renderPreset == "NVIDIA (hevc_nvenc)") {
+        if (renderPreset == "NVIDIA (hevc_nvenc)") {
             emit logMessage("Используется пресет NVIDIA (hevc_nvenc).");
-            args << "-c:v" << "hevc_nvenc";
-            args << "-preset" << "p6"
+            args << "-c:v" << "hevc_nvenc"
+                 << "-preset" << "p7"
                  << "-tune" << "hq"
+                 << "-profile:v" << "main"
                  << "-rc" << "vbr"
                  << "-b:v" << "4000k"
-                 << "-maxrate" << "8000k" // Добавим для контроля
-                 << "-bufsize" << "16000k";
+                 << "-minrate" << "4000k"
+                 << "-maxrate" << "8000k"
+                 << "-bufsize" << "16000k"
+                 << "-rc-lookahead" << "32"
+                 << "-spatial-aq" << "1"
+                 << "-aq-strength" << "15"
+                 << "-multipass" << "fullres"
+                 << "-2pass" << "1"
+                 << "-tag:v" << "hvc1"; // Тег для лучшей совместимости с Apple устройствами
         }
         else if (m_renderPreset == "Intel (hevc_qsv)") {
             emit logMessage("Используется пресет Intel (hevc_qsv).");
