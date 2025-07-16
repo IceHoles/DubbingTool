@@ -15,6 +15,7 @@ QMap<QString, PostVersions> PostGenerator::generate(const ReleaseTemplate &t, co
     const QString soundStr = t.soundEngineer;
     const QString subAuthorStr = t.subAuthor;
     const QString timingStr = t.timingAuthor;
+    const QString signsAuthorStr = t.signsAuthor;
     const QString builderStr = t.releaseBuilder;
 
     const QString anilibLink = data.viewLinks.value("Anilib", "");
@@ -32,6 +33,7 @@ QMap<QString, PostVersions> PostGenerator::generate(const ReleaseTemplate &t, co
         markdownPost.replace("%SOUND_ENGINEER%", soundStr);
         markdownPost.replace("%SUB_AUTHOR%", subAuthorStr);
         markdownPost.replace("%TIMING_AUTHOR%", timingStr);
+        markdownPost.replace("%SIGNS_AUTHOR%", signsAuthorStr);
         markdownPost.replace("%RELEASE_BUILDER%", builderStr);
         markdownPost.replace("%LINK_ANILIB%", anilibLink);
         markdownPost.replace("%LINK_ANIME365%", anime365Link);
