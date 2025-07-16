@@ -1,71 +1,80 @@
-name: Build Windows Executable
+# Имя рабочего процесса, которое будет отображаться в GitHub Actions
+name: Windows Release Build
 
-on: [push, pull_request]
+# Триггер для запуска: создание нового тега, начинающегося с 'v'
+on:
+  push:
+    tags:
+      - 'v*'
 
+# Задачи, которые будут выполняться
 jobs:
   build:
+    # Запускаем на последней версии Windows
     runs-on: windows-latest
-    env:
-      QT_VERSION: '6.9.0'
-      PY_EXE_NAME: 'font_finder_wrapper.exe'  # Замените на имя вашего EXE от PyInstaller
 
+    # Шаги выполнения
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      # 1. Клонируем репозиторий
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    # Установка Qt 6.9 с необходимыми компонентами
-    - name: Install Qt
-      uses: jurplel/install-qt-action@v3
-      with:
-        version: ${{ env.QT_VERSION }}
-        modules: qtbase qttools qtmultimedia qt5compat
-        toolchain: msvc2022  # Для MinGW сборки
-
-    # Сборка проекта через qmake
-    - name: Build with qmake
-
-      run: |
-        # Настройка путей
-        echo "QT_DIR=$QT_DIR" >> $env:GITHUB_ENV
-        echo "PATH=$QT_DIR\bin;$env:PATH" >> $env:GITHUB_ENV
-        
+      # 2. Устанавливаем Qt.
+      # Важно: на данный момент (июнь 2024) install-qt-action не поддерживает 6.9.0.
+      # Используем последнюю доступную стабильную версию. Замените на 6.9.0, как только она появится.
+      # Проверить доступные версии можно здесь: https://install-qt-action.is-a.dev/
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: '6.7.2' # <-- ЗАМЕНИТЕ НА '6.9.0', КОГДА СТАНЕТ ДОСТУПНА
+          arch: 'win64_msvc2019_64'
+          cached: 'true' # Использовать кэш для ускорения последующих сборок
+          
+      # 3. Собираем проект с помощью qmake и jom (аналог nmake для параллельной сборки)
+      - name: Build with qmake and jom
+        shell: cmd
         run: |
-        qmake -spec win32-msvc "CONFIG+=release" -o Makefile DubbingTool.pro
-  nmake release
-        
-        # Копирование Python EXE (предполагается, что он уже в репозитории)
-        copy ${{ env.PY_EXE_NAME }} release\${{ env.PY_EXE_NAME }}
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          qmake DubbingTool.pro -spec win32-msvc "CONFIG+=release"
+          jom.exe -j$(nproc)
+          
+      # 4. Собираем все необходимые DLL с помощью windeployqt
+      - name: Deploy Qt dependencies
+        run: |
+          windeployqt.exe --release --no-translations --no-opengl-sw --no-svg --no-network --no-xml release/DubbingTool.exe
+          
+      # 5. Создаем архив с готовым приложением
+      - name: Archive release
+        uses: thefactory/zip-release@v1
+        with:
+          filename: DubbingTool-Windows-x64.zip
+          path: release
+          # Включаем только необходимые файлы
+          include: |
+            DubbingTool.exe
+            *.dll
+            platforms/*.dll
+            styles/*.dll
+            resources.rcc
 
-    # Добавление Qt зависимостей
-    - name: Deploy Qt libraries
-      run: |
-        windeployqt --release --no-translations --compiler-runtime release\DubbingTool.exe
-        
-        # Проверка существования Python EXE
-        if not exist "release\${{ env.PY_EXE_NAME }}" (
-          echo "⚠️ Python EXE not found! Ensure '${{ env.PY_EXE_NAME }}' is in repo root"
-          exit 1
-        )
-
-    # Создание zip-артефакта
-    - name: Package artifacts
-      run: |
-        mkdir DubbingTool_Release
-        copy release\DubbingTool.exe DubbingTool_Release
-        copy release\${{ env.PY_EXE_NAME }} DubbingTool_Release
-        copy release\*.dll DubbingTool_Release
-        
-        # Для файлов .qm (если есть переводы)
-        if exist release\*.qm (
-            copy release\*.qm DubbingTool_Release
-        )
-        
-        # Создание архива
-        Compress-Archive -Path DubbingTool_Release -DestinationPath DubbingTool_Windows.zip
-
-    # Загрузка артефакта
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: DubbingTool_Windows
-        path: DubbingTool_Windows.zip
+      # 6. Создаем релиз на GitHub и прикрепляем к нему архив
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }} # Используем имя тега (например, v1.0.0)
+          release_name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./DubbingTool-Windows-x64.zip
+          asset_name: DubbingTool-Windows-x64.zip
+          asset_content_type: application/zip
