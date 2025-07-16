@@ -1,0 +1,48 @@
+name: Windows CI Build
+
+on:
+  push:
+    branches:
+      - 'main'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Qt
+        id: install-qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: '6.7.2'
+          arch: 'win64_msvc2019_64'
+          cached: 'true'
+
+      - name: Setup MSVC environment
+        uses: microsoft/setup-msvc@v2
+
+      - name: Build with qmake and jom
+        shell: bash
+        run: |
+          export PATH="${{ steps.install-qt.outputs.qtPath }}/bin:$PATH"
+          qmake DubbingTool.pro -spec win32-msvc "CONFIG+=release"
+          jom -j$(nproc)
+
+      - name: Deploy Qt dependencies
+        run: windeployqt.exe --release --no-translations --no-opengl-sw --no-svg --no-network --no-xml release/DubbingTool.exe
+
+      - name: Prepare artifact
+        shell: bash
+        run: |
+          mkdir artifact
+          mv release/* artifact/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Dubbing-Tool-Windows-x64
+          path: artifact
+          retention-days: 7
