@@ -14,14 +14,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Qt
-        id: install-qt # ID нужен, чтобы получить путь
+        id: install-qt
         uses: jurplel/install-qt-action@v3
         with:
-          version: '6.7.2'
+          version: '6.9.0'  # Поменяйте на нужную версию
           arch: 'win64_msvc2019_64'
           cached: 'true'
 
-      # ИСПОЛЬЗУЕМ ПРЯМУЮ ПОДСТАНОВКУ ПУТИ
+      - name: Show Qt path
+        run: echo ${{ steps.install-qt.outputs.qtPath }}
+
       - name: Build Project
         shell: cmd
         run: |
@@ -29,23 +31,19 @@ jobs:
           
           echo "--- Starting build ---"
           
-          REM Используем синтаксис ${{...}} прямо в команде
-          "${{ steps.install-qt.outputs.qtPath }}\bin\qmake.exe" DubbingTool.pro -spec win32-msvc "CONFIG+=release"
-          
-          REM Используем синтаксис ${{...}} прямо в команде
-          "${{ steps.install-qt.outputs.qtPath }}\bin\jom.exe" -j%NUMBER_OF_PROCESSORS%
+          "%qtPath%\bin\qmake.exe" DubbingTool.pro -spec win32-msvc "CONFIG+=release"
+          "%qtPath%\bin\jom.exe" -j%NUMBER_OF_PROCESSORS%
 
-      # ИСПОЛЬЗУЕМ ПРЯМУЮ ПОДСТАНОВКУ ПУТИ
       - name: Deploy Qt dependencies
         shell: cmd
         run: |
-          "${{ steps.install-qt.outputs.qtPath }}\bin\windeployqt.exe" --release --no-translations --no-opengl-sw --no-svg --no-network --no-xml release/DubbingTool.exe
+          "%qtPath%\bin\windeployqt.exe" --release --no-translations --no-opengl-sw --no-svg --no-network --no-xml release/DubbingTool.exe
 
       - name: Prepare artifact
-        shell: bash
+        shell: cmd
         run: |
           mkdir artifact
-          mv release/* artifact/
+          move release\* artifact\
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -53,3 +51,4 @@ jobs:
           name: DubbingTool-Windows-x64
           path: artifact
           retention-days: 7
+          
