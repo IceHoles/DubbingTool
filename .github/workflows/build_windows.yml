@@ -1,11 +1,11 @@
-# Имя рабочего процесса, которое будет отображаться в GitHub Actions
-name: Windows Release Build
+# Имя рабочего процесса
+name: Windows CI Build
 
-# Триггер для запуска: создание нового тега, начинающегося с 'v'
+# Триггер для запуска: каждый push в ветку 'main' (или 'master')
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - 'main' # Замените на 'master', если у вас так называется основная ветка
 
 # Задачи, которые будут выполняться
 jobs:
@@ -19,18 +19,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Устанавливаем Qt.
-      # Важно: на данный момент (июнь 2024) install-qt-action не поддерживает 6.9.0.
-      # Используем последнюю доступную стабильную версию. Замените на 6.9.0, как только она появится.
-      # Проверить доступные версии можно здесь: https://install-qt-action.is-a.dev/
+      # 2. Устанавливаем Qt
       - name: Install Qt
         uses: jurplel/install-qt-action@v3
         with:
           version: '6.7.2' # <-- ЗАМЕНИТЕ НА '6.9.0', КОГДА СТАНЕТ ДОСТУПНА
           arch: 'win64_msvc2019_64'
-          cached: 'true' # Использовать кэш для ускорения последующих сборок
+          cached: 'true'
           
-      # 3. Собираем проект с помощью qmake и jom (аналог nmake для параллельной сборки)
+      # 3. Собираем проект с помощью qmake и jom
       - name: Build with qmake and jom
         shell: cmd
         run: |
@@ -43,38 +40,19 @@ jobs:
         run: |
           windeployqt.exe --release --no-translations --no-opengl-sw --no-svg --no-network --no-xml release/DubbingTool.exe
           
-      # 5. Создаем архив с готовым приложением
-      - name: Archive release
-        uses: thefactory/zip-release@v1
-        with:
-          filename: DubbingTool-Windows-x64.zip
-          path: release
-          # Включаем только необходимые файлы
-          include: |
-            DubbingTool.exe
-            *.dll
-            platforms/*.dll
-            styles/*.dll
-            resources.rcc
+      # 5. Создаем папку для артефакта и перемещаем туда сборку
+      # Это делает структуру архива чище (без папки 'release' внутри)
+      - name: Prepare artifact
+        shell: bash
+        run: |
+          mkdir artifact
+          mv release/* artifact/
 
-      # 6. Создаем релиз на GitHub и прикрепляем к нему архив
-      - name: Create GitHub Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # 6. Загружаем собранное приложение как артефакт
+      # Артефакт будет доступен для скачивания на странице этого запуска Actions
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ github.ref_name }} # Используем имя тега (например, v1.0.0)
-          release_name: Release ${{ github.ref_name }}
-          draft: false
-          prerelease: false
-          
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./DubbingTool-Windows-x64.zip
-          asset_name: DubbingTool-Windows-x64.zip
-          asset_content_type: application/zip
+          name: DubbingTool-Windows-x64 # Имя артефакта
+          path: artifact # Путь к папке с файлами для загрузки
+          retention-days: 7 # Сколько дней хранить артефакт (по умолчанию 90)
