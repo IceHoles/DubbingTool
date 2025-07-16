@@ -275,7 +275,7 @@ QStringList AssProcessor::generateTb(const ReleaseTemplate &t, const QString &st
     }
 
     QString directorLabel = (t.voiceoverType == ReleaseTemplate::VoiceoverType::Voiceover)
-                                ? "Режиссёр закадра: "
+                                ? "Куратор закадра: "
                                 : "Режиссёр дубляжа: ";
     if (!t.director.isEmpty()) tbLines.append(generateDialogueLine(directorLabel + t.director));
     if (!t.soundEngineer.isEmpty()) tbLines.append(generateDialogueLine("Звукорежиссёр: " + t.soundEngineer));
