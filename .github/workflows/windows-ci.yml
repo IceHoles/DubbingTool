@@ -1,4 +1,4 @@
-name: Windows CI Build (Absolute Paths)
+name: Windows CI Build (Direct Path Injection)
 
 on:
   push:
@@ -14,36 +14,32 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Qt
-        id: install-qt
+        id: install-qt # ID нужен, чтобы получить путь
         uses: jurplel/install-qt-action@v3
         with:
           version: '6.7.2'
           arch: 'win64_msvc2019_64'
           cached: 'true'
 
-      # ИСПОЛЬЗУЕМ АБСОЛЮТНЫЕ ПУТИ
+      # ИСПОЛЬЗУЕМ ПРЯМУЮ ПОДСТАНОВКУ ПУТИ
       - name: Build Project
         shell: cmd
-        env:
-          # Передаем путь к Qt в переменную окружения для удобства
-          QT_PATH: ${{ steps.install-qt.outputs.qtPath }}
         run: |
-          REM Настраиваем компилятор MSVC
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          
+          echo "--- Starting build ---"
+          
+          REM Используем синтаксис ${{...}} прямо в команде
+          "${{ steps.install-qt.outputs.qtPath }}\bin\qmake.exe" DubbingTool.pro -spec win32-msvc "CONFIG+=release"
+          
+          REM Используем синтаксис ${{...}} прямо в команде
+          "${{ steps.install-qt.outputs.qtPath }}\bin\jom.exe" -j%NUMBER_OF_PROCESSORS%
 
-          REM Запускаем qmake по полному пути
-          %QT_PATH%\bin\qmake.exe DubbingTool.pro -spec win32-msvc "CONFIG+=release"
-
-          REM Запускаем jom по полному пути
-          %QT_PATH%\bin\jom.exe -j%NUMBER_OF_PROCESSORS%
-
-      # ИСПОЛЬЗУЕМ АБСОЛЮТНЫЙ ПУТЬ
+      # ИСПОЛЬЗУЕМ ПРЯМУЮ ПОДСТАНОВКУ ПУТИ
       - name: Deploy Qt dependencies
         shell: cmd
-        env:
-          QT_PATH: ${{ steps.install-qt.outputs.qtPath }}
         run: |
-          %QT_PATH%\bin\windeployqt.exe --release --no-translations --no-opengl-sw --no-svg --no-network --no-xml release/DubbingTool.exe
+          "${{ steps.install-qt.outputs.qtPath }}\bin\windeployqt.exe" --release --no-translations --no-opengl-sw --no-svg --no-network --no-xml release/DubbingTool.exe
 
       - name: Prepare artifact
         shell: bash
