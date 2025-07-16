@@ -30,23 +30,16 @@ jobs:
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           echo --- Starting build ---
           "%Qt6_DIR%\bin\qmake.exe" DubbingTool.pro -spec win32-msvc "CONFIG+=release"
-          nmake
-    
+          nmake  
 
       - name: Deploy Qt dependencies
         shell: cmd
         run: |
           "%Qt6_DIR%\bin\windeployqt.exe" --release release\DubbingTool.exe
 
-      - name: Prepare artifact
-        shell: cmd
-        run: |
-          mkdir artifact
-          move release\* artifact\
-
-      - name: Upload artifact
+      - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: DubbingTool-Windows-x64
-          path: artifact
-          retention-days: 7
+          name: DubbingTool-Windows-x64-Build 
+          path: release/
+          retention-days: 90
