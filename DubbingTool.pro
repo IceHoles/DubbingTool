@@ -64,7 +64,7 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
 
 win32 {
-    LIBS += -ldwrite -lgdi32 -luser32 -lole32
+    LIBS += dwrite.lib gdi32.lib user32.lib ole32.lib
     RC_FILE = resources.rc
 }
 
