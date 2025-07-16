@@ -21,6 +21,7 @@ jobs:
           arch: 'win64_msvc2019_64'
           cached: 'true'
 
+      # Шаг с правильным отступом
       - name: Setup MSVC environment
         uses: microsoft/setup-msvc@v2
 
@@ -43,6 +44,6 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Dubbing-Tool-Windows-x64
+          name: DubbingTool-Windows-x64
           path: artifact
           retention-days: 7
