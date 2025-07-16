@@ -280,14 +280,23 @@ QStringList AssProcessor::generateTb(const ReleaseTemplate &t, const QString &st
     if (!t.director.isEmpty()) tbLines.append(generateDialogueLine(directorLabel + t.director));
     if (!t.soundEngineer.isEmpty()) tbLines.append(generateDialogueLine("Звукорежиссёр: " + t.soundEngineer));
 
-    if (!t.timingAuthor.isEmpty() && !t.subAuthor.isEmpty()) {
-        tbLines.append(generateDialogueLine(QString("Разметка: %1\\NПеревод сериала на русский язык: %2").arg(t.timingAuthor).arg(t.subAuthor)));
-    } else if (!t.timingAuthor.isEmpty()) {
-        tbLines.append(generateDialogueLine("Разметка: " + t.timingAuthor));
-    } else if (!t.subAuthor.isEmpty()) {
-        tbLines.append(generateDialogueLine("Перевод сериала на русский язык: " + t.subAuthor));
+        // --- НОВЫЙ БЛОК ДЛЯ ГЕНЕРАЦИИ СТРОКИ С АВТОРАМИ ПЕРЕВОДА ---
+    QStringList authorsBlock;
+    if (!t.timingAuthor.isEmpty()) {
+        authorsBlock << QString("Разметка: %1").arg(t.timingAuthor);
+    }
+    if (!t.signsAuthor.isEmpty()) {
+        authorsBlock << QString("Локализация надписей: %1").arg(t.signsAuthor);
+    }
+    if (!t.subAuthor.isEmpty()) {
+        authorsBlock << QString("Перевод сериала на русский язык: %1").arg(t.subAuthor);
     }
 
+    if (!authorsBlock.isEmpty()) {
+        tbLines.append(generateDialogueLine(authorsBlock.join("\\N")));
+    }
+    // --- КОНЕЦ НОВОГО БЛОКА ---
+    
     if (!t.releaseBuilder.isEmpty()) tbLines.append(generateDialogueLine("Сборка релиза: " + t.releaseBuilder));
 
     emit logMessage(QString("Сгенерировано %1 строк ТБ.").arg(tbLines.size()));
