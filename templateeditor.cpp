@@ -50,6 +50,7 @@ void TemplateEditor::setTemplate(const ReleaseTemplate &t)
     ui->directorEdit->setText(t.director);
     ui->soundEngineerEdit->setText(t.soundEngineer);
     ui->timingAuthorEdit->setText(t.timingAuthor);
+    ui->signsAuthorEdit->setText(t.signsAuthor);
     ui->releaseBuilderEdit->setText(t.releaseBuilder);
     ui->targetAudioFormatComboBox->setCurrentText(t.targetAudioFormat);
 
@@ -113,6 +114,7 @@ ReleaseTemplate TemplateEditor::getTemplate() const
     t.director = ui->directorEdit->text().trimmed();
     t.soundEngineer = ui->soundEngineerEdit->text().trimmed();
     t.timingAuthor = ui->timingAuthorEdit->text().trimmed();
+    t.signsAuthor = ui->signsAuthorEdit->text().trimmed();
     t.releaseBuilder = ui->releaseBuilderEdit->text().trimmed();
     t.targetAudioFormat = ui->targetAudioFormatComboBox->currentText();
 
@@ -197,6 +199,7 @@ void TemplateEditor::on_removeTbStyleButton_clicked()
 
 void TemplateEditor::on_tbStylesTable_cellChanged(int row, int column)
 {
+    Q_UNUSED(row);
     if (column == 0) {
         QString currentSelection = ui->defaultTbStyleComboBox->currentText();
         ui->defaultTbStyleComboBox->clear();
@@ -214,7 +217,7 @@ void TemplateEditor::on_helpButton_clicked()
 {
     QDialog *helpDialog = new QDialog(this);
     helpDialog->setWindowTitle("Справка по шаблонам");
-    helpDialog->setMinimumSize(700, 800); // Увеличим высоту для нового контента
+    helpDialog->setMinimumSize(700, 800);
 
     QScrollArea *scrollArea = new QScrollArea(helpDialog);
     scrollArea->setWidgetResizable(true);
@@ -226,7 +229,6 @@ void TemplateEditor::on_helpButton_clicked()
     QVBoxLayout *mainLayout = new QVBoxLayout(scrollWidget);
     scrollWidget->setLayout(mainLayout);
 
-    // --- Функция для создания строк с копируемым кодом ---
     auto addRow = [&](QGridLayout* layout, int row, const QString& code, const QString& description) {
         QLineEdit *codeEdit = new QLineEdit(code);
         codeEdit->setReadOnly(true);
@@ -237,7 +239,6 @@ void TemplateEditor::on_helpButton_clicked()
         layout->addWidget(descLabel, row, 1);
     };
 
-    // --- 1. Секция плейсхолдеров (теперь копируемая) ---
     mainLayout->addWidget(new QLabel("<h3>Доступные плейсхолдеры (можно копировать):</h3>"));
     QWidget* placeholdersWidget = new QWidget();
     QGridLayout* placeholdersLayout = new QGridLayout(placeholdersWidget);
@@ -250,32 +251,42 @@ void TemplateEditor::on_helpButton_clicked()
     addRow(placeholdersLayout, 5, "%SOUND_ENGINEER%", "Звукорежиссёр");
     addRow(placeholdersLayout, 6, "%SUB_AUTHOR%", "Автор перевода");
     addRow(placeholdersLayout, 7, "%TIMING_AUTHOR%", "Разметка (тайминг)");
-    addRow(placeholdersLayout, 8, "%RELEASE_BUILDER%", "Сборка релиза");
-    addRow(placeholdersLayout, 9, "%LINK_ANILIB%", "Ссылка на Anilib");
-    addRow(placeholdersLayout, 10, "%LINK_ANIME365%", "Ссылка на Anime365");
+    addRow(placeholdersLayout, 8, "%SIGNS_AUTHOR%", "Локализация надписей");
+    addRow(placeholdersLayout, 9, "%RELEASE_BUILDER%", "Сборка релиза");
+    addRow(placeholdersLayout, 10, "%LINK_ANILIB%", "Ссылка на Anilib");
+    addRow(placeholdersLayout, 11, "%LINK_ANIME365%", "Ссылка на Anime365");
+    addRow(placeholdersLayout, 12, "%LINK_KODIK%", "Ссылка на Kodik");
     placeholdersLayout->setColumnStretch(0, 1);
     placeholdersLayout->setColumnStretch(1, 1);
     mainLayout->addWidget(placeholdersWidget);
 
-    // --- 2. Секция форматирования Telegram (ИСПРАВЛЕННАЯ) ---
     mainLayout->addWidget(new QLabel("<h3>Форматирование Telegram (стиль MarkdownV2):</h3>"));
     QWidget *formatWidget = new QWidget();
     QGridLayout *gridLayout = new QGridLayout(formatWidget);
     gridLayout->setContentsMargins(0, 0, 0, 0);
-    addRow(gridLayout, 0, "**жирный**", "<b>жирный</b>");
-    addRow(gridLayout, 1, "__курсив__", "<i>курсив</i>");
-    //addRow(gridLayout, 2, "__подчеркнутый__", "<u>подчеркнутый</u>");
-    addRow(gridLayout, 3, "~~зачеркнутый~~", "<s>зачеркнутый</s>");
+    addRow(gridLayout, 0, "*жирный*", "<b>жирный</b>");
+    addRow(gridLayout, 1, "_курсив_", "<i>курсив</i>");
+    addRow(gridLayout, 2, "__подчеркнутый__", "<u>подчеркнутый</u>");
+    addRow(gridLayout, 3, "~зачеркнутый~", "<s>зачеркнутый</s>");
     addRow(gridLayout, 4, "||скрытый текст||", "<span style='background-color: #555; color: #555; padding: 1px 3px; border-radius: 3px;'>скрытый текст</span>");
     addRow(gridLayout, 5, "`моноширинный`", "<code>моноширинный</code>");
     addRow(gridLayout, 6, "[текст ссылки](https://t.me/dublyajnaya)", "<a href=\"https://t.me/dublyajnaya\">текст ссылки</a>");
-    //addRow(gridLayout, 7, ">Цитата", "<blockquote style='border-left: 2px solid #ccc; padding-left: 5px; margin-left: 0; color: #666;'>Цитата</blockquote>");
+    addRow(gridLayout, 7, ">Цитата", "<blockquote style='border-left: 2px solid #ccc; padding-left: 5px; margin-left: 0; color: #666;'>Цитата</blockquote>");
     gridLayout->setColumnStretch(0, 1);
     gridLayout->setColumnStretch(1, 1);
     mainLayout->addWidget(formatWidget);
 
+    QLabel *escapeNoteLabel = new QLabel();
+    escapeNoteLabel->setWordWrap(true);
+    escapeNoteLabel->setTextInteractionFlags(Qt::TextBrowserInteraction);
+    escapeNoteLabel->setText(R"(
+        <h3 style="color: #c0392b;">Важно: Экранирование символов</h3>
+        <p>В синтаксисе MarkdownV2 следующие символы являются специальными: <code>_ * [ ] ( ) ~ ` > # + - = | { } . !</code></p>
+        <p>Если вы хотите использовать их в тексте как обычные символы, а не для форматирования, перед ними нужно поставить обратную косую черту (<code>\</code>).</p>
+        <p><b>Пример:</b> Чтобы написать "Цена: 1.500р.", нужно ввести <code>Цена: 1\.500р\.</code> (точки экранированы, иначе Telegram посчитает это концом предложения и может обрезать форматирование).</p>
+    )");
+    mainLayout->addWidget(escapeNoteLabel);
 
-    // --- 4. Секция VK ---
     QLabel *vkLabel = new QLabel();
     vkLabel->setWordWrap(true);
     vkLabel->setTextInteractionFlags(Qt::TextBrowserInteraction);
@@ -290,11 +301,9 @@ void TemplateEditor::on_helpButton_clicked()
 
     mainLayout->addStretch(1);
 
-    // --- Кнопка OK ---
     QDialogButtonBox *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok, helpDialog);
     connect(buttonBox, &QDialogButtonBox::accepted, helpDialog, &QDialog::accept);
 
-    // --- Финальная компоновка диалога ---
     QVBoxLayout *dialogLayout = new QVBoxLayout(helpDialog);
     dialogLayout->addWidget(scrollArea);
     dialogLayout->addWidget(buttonBox);
