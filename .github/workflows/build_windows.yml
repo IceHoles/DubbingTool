@@ -1,19 +1,14 @@
-# Имя рабочего процесса
 name: Windows CI Build
 
-# Триггер для запуска: каждый push в ветку 'main' (или 'master')
 on:
   push:
     branches:
-      - 'main' # Замените на 'master', если у вас так называется основная ветка
+      - 'main'
 
-# Задачи, которые будут выполняться
 jobs:
   build:
-    # Запускаем на последней версии Windows
     runs-on: windows-latest
 
-    # Шаги выполнения
     steps:
       # 1. Клонируем репозиторий
       - name: Checkout repository
@@ -21,38 +16,47 @@ jobs:
 
       # 2. Устанавливаем Qt
       - name: Install Qt
+        id: install-qt # Даем id этому шагу, чтобы получить путь
         uses: jurplel/install-qt-action@v3
         with:
-          version: '6.7.2' # <-- ЗАМЕНИТЕ НА '6.9.0', КОГДА СТАНЕТ ДОСТУПНА
+          version: '6.7.2'
           arch: 'win64_msvc2019_64'
           cached: 'true'
-          
-      # 3. Собираем проект с помощью qmake и jom
+
+      # 3. Настраиваем окружение MSVC (ВАЖНЫЙ ШАГ)
+      - name: Setup MSVC environment
+        uses: microsoft/setup-msvc@v2
+        with:
+          # Можно указать конкретную версию, но по умолчанию он выберет последнюю подходящую
+          # vs-version: 'latest'
+
+      # 4. Собираем проект
       - name: Build with qmake and jom
-        shell: cmd
+        shell: bash # Используем bash для более удобной работы с переменными окружения
         run: |
-          call "C:\Program Files (x86)\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          qmake DubbingTool.pro -spec win32-msvc "CONFIG+=release"
-          jom.exe -j$(nproc)
+          # Добавляем путь к jom.exe в PATH
+          export PATH="${{ steps.install-qt.outputs.qtPath }}/bin:$PATH"
           
-      # 4. Собираем все необходимые DLL с помощью windeployqt
+          # Запускаем сборку
+          qmake DubbingTool.pro -spec win32-msvc "CONFIG+=release"
+          jom -j$(nproc)
+          
+      # 5. Собираем все необходимые DLL
       - name: Deploy Qt dependencies
         run: |
           windeployqt.exe --release --no-translations --no-opengl-sw --no-svg --no-network --no-xml release/DubbingTool.exe
           
-      # 5. Создаем папку для артефакта и перемещаем туда сборку
-      # Это делает структуру архива чище (без папки 'release' внутри)
+      # 6. Подготавливаем артефакт
       - name: Prepare artifact
         shell: bash
         run: |
           mkdir artifact
           mv release/* artifact/
 
-      # 6. Загружаем собранное приложение как артефакт
-      # Артефакт будет доступен для скачивания на странице этого запуска Actions
+      # 7. Загружаем артефакт
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: DubbingTool-Windows-x64 # Имя артефакта
-          path: artifact # Путь к папке с файлами для загрузки
-          retention-days: 7 # Сколько дней хранить артефакт (по умолчанию 90)
+          name: DubbingTool-Windows-x64
+          path: artifact
+          retention-days: 90
