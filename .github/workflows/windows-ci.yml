@@ -36,7 +36,7 @@ jobs:
       - name: Deploy Qt dependencies
         shell: cmd
         run: |
-          "%Qt6_DIR%\bin\windeployqt.exe" --release --no-translations --no-opengl-sw --no-svg --no-network --no-xml release\DubbingTool.exe
+          "%Qt6_DIR%\bin\windeployqt.exe" --release release\DubbingTool.exe
 
       - name: Prepare artifact
         shell: cmd
