@@ -48,6 +48,7 @@ public:
     QString director;           // Режиссер
     QString soundEngineer;      // Звукорежиссер
     QString timingAuthor;       // Разметка (тайминг)
+    QString signsAuthor;        // <<< НОВОЕ ПОЛЕ: Локализация надписей
     QString releaseBuilder;     // Сборка релиза
 
     enum class VoiceoverType { Dubbing, Voiceover };
