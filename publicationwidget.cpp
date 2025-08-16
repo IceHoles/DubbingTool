@@ -27,7 +27,6 @@ void DraggableLabel::mousePressEvent(QMouseEvent *event)
     }
 }
 
-// Реализация основного виджета
 PublicationWidget::PublicationWidget(QWidget *parent) :
     QWidget(parent),
     ui(new Ui::PublicationWidget)
@@ -37,22 +36,22 @@ PublicationWidget::PublicationWidget(QWidget *parent) :
     // Подключаем кнопки копирования напрямую к данным в m_currentPosts
     connect(ui->copyTgMp4Button, &QPushButton::clicked, this, [this](){
         QApplication::clipboard()->setText(m_currentPosts.value("tg_mp4").markdown);
-        emit logMessage(QString("Пост '%1' скопирован.").arg("Telegram (MP4)"));
+        emit logMessage(QString("Пост '%1' скопирован.").arg("Telegram (MP4)"), LogCategory::APP);
     });
 
     connect(ui->copyTgMkvButton, &QPushButton::clicked, this, [this](){
         QApplication::clipboard()->setText(m_currentPosts.value("tg_mkv").markdown);
-        emit logMessage(QString("Пост '%1' скопирован.").arg("Telegram (MKV)"));
+        emit logMessage(QString("Пост '%1' скопирован.").arg("Telegram (MKV)"), LogCategory::APP);
     });
 
     connect(ui->copyVkButton, &QPushButton::clicked, this, [this](){
         QApplication::clipboard()->setText(m_currentPosts.value("vk").markdown);
-        emit logMessage(QString("Пост '%1' скопирован.").arg("VK"));
+        emit logMessage(QString("Пост '%1' скопирован.").arg("VK"), LogCategory::APP);
     });
 
     connect(ui->copyVkCommentButton, &QPushButton::clicked, this, [this](){
         QApplication::clipboard()->setText(m_currentPosts.value("vk_comment").markdown);
-        emit logMessage(QString("Пост '%1' скопирован.").arg("VK (комментарий)"));
+        emit logMessage(QString("Пост '%1' скопирован.").arg("VK (комментарий)"), LogCategory::APP);
     });
 
     connect(ui->openUploadUrlsButton, &QPushButton::clicked, this, &PublicationWidget::onOpenUploadUrls);
@@ -90,11 +89,11 @@ void PublicationWidget::setFilePaths(const QString &mkvPath, const QString &mp4P
     ui->posterLabel->setFilePath(m_template.posterPath);
 
     ui->mkvFileLabel->setFilePath(mkvPath);
-    if(mkvPath.isEmpty()) ui->mkvFileLabel->setText("MKV (в процессе...)");
+    if (mkvPath.isEmpty()) ui->mkvFileLabel->setText("MKV (в процессе...)");
     else ui->mkvFileLabel->setText("MKV файл");
 
     ui->mp4FileLabel->setFilePath(mp4Path);
-    if(mp4Path.isEmpty()) ui->mp4FileLabel->setText("MP4 (в процессе...)");
+    if (mp4Path.isEmpty()) ui->mp4FileLabel->setText("MP4 (в процессе...)");
     else ui->mp4FileLabel->setText("MP4 файл");
 }
 
@@ -119,7 +118,7 @@ void PublicationWidget::onOpenUploadUrls()
         return;
     }
 
-    emit logMessage("Открытие ссылок для загрузки в браузере...");
+    emit logMessage("Открытие ссылок для загрузки в браузере...", LogCategory::APP);
     for (const QString &urlString : m_template.uploadUrls) {
         QString url = urlString;
         url.replace("%EPISODE_NUMBER%", m_episodeData.episodeNumber);
@@ -132,6 +131,6 @@ void PublicationWidget::onUpdatePosts()
     QMap<QString, QString> links;
     links["Anilib"] = ui->linkAnilibEdit->text();
     links["Anime365"] = ui->linkAnime365Edit->text();
-    // ...
+
     emit postsUpdateRequest(links);
 }

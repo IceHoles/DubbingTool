@@ -3,7 +3,9 @@
 
 #include <QObject>
 #include <QVariantMap>
-#include <QProcess> // <<< ИСПРАВЛЕНИЕ: Добавляем #include для QProcess
+#include <QProcess>
+#include "appsettings.h"
+
 
 class ProcessManager;
 class AssProcessor;
@@ -18,8 +20,11 @@ public:
     void start();
     ProcessManager* getProcessManager() const;
 
+public slots:
+    void cancelOperation();
+
 signals:
-    void logMessage(const QString &message);
+    void logMessage(const QString&, LogCategory);
     void progressUpdated(int percentage, const QString& stageName = "");
     void finished();
 

@@ -5,6 +5,7 @@
 #include <QSet>
 #include <QListWidgetItem>
 
+
 StyleSelectorDialog::StyleSelectorDialog(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::StyleSelectorDialog)
@@ -21,7 +22,7 @@ void StyleSelectorDialog::analyzeFile(const QString &filePath)
 {
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        return; // Можно добавить QMessageBox с ошибкой
+        return;
     }
 
     QSet<QString> foundStyles;
@@ -54,7 +55,6 @@ void StyleSelectorDialog::analyzeFile(const QString &filePath)
         }
     }
 
-    // Заполняем виджеты найденными значениями
     for(const QString &style : foundStyles) {
         QListWidgetItem *item = new QListWidgetItem(style, ui->stylesListWidget);
         item->setFlags(item->flags() | Qt::ItemIsUserCheckable);

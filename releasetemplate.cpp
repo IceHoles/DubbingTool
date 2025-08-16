@@ -28,6 +28,10 @@ void ReleaseTemplate::read(const QJsonObject &json)
 {
     templateName = json["templateName"].toString();
     seriesTitle = json["seriesTitle"].toString();
+    QJsonArray tagsArray = json["releaseTags"].toArray();
+    for (const QJsonValue &value : tagsArray) {
+        releaseTags.append(value.toString());
+    }
     rssUrl = QUrl(json["rssUrl"].toString());
     animationStudio = json["animationStudio"].toString();
     subAuthor = json["subAuthor"].toString();
@@ -37,45 +41,38 @@ void ReleaseTemplate::read(const QJsonObject &json)
     useManualTime = json["useManualTime"].toBool(false);
     generateTb = json["generateTb"].toBool(true);
     createSrtMaster = json["createSrtMaster"].toBool(false);
-
+    isCustomTranslation = json["isCustomTranslation"].toBool(false);
     director = json["director"].toString();
     soundEngineer = json["soundEngineer"].toString();
     timingAuthor = json["timingAuthor"].toString();
     signsAuthor = json["signsAuthor"].toString();
+    translationEditor = json["translationEditor"].toString();
     releaseBuilder = json["releaseBuilder"].toString();
     targetAudioFormat = json["targetAudioFormat"].toString("aac");
+    forceSignStyleRequest = json["forceSignStyleRequest"].toBool(false);
+    pauseForSubEdit = json["pauseForSubEdit"].toBool(false);
 
     QString typeStr = json["voiceoverType"].toString("Dubbing");
     voiceoverType = (typeStr == "Voiceover") ? VoiceoverType::Voiceover : VoiceoverType::Dubbing;
+
+    defaultTbStyleName = json["defaultTbStyleName"].toString("default_1080p");
+    renderPresetName = json["renderPresetName"].toString("NVIDIA (HEVC NVENC)");
+    sourceHasSubtitles = json["sourceHasSubtitles"].toBool(true);
+    seriesTitleForPost = json["seriesTitleForPost"].toString();
+    totalEpisodes = json["totalEpisodes"].toInt();
+    posterPath = json["posterPath"].toString();
 
     QJsonArray castArray = json["cast"].toArray();
     for (const QJsonValue &value : castArray) {
         cast.append(value.toString());
     }
 
-    QJsonArray stylesArray = json["signStyles"].toArray();
-    for (const QJsonValue &value : stylesArray) {
-        signStyles.append(value.toString());
+    substitutions.clear();
+    const QJsonObject substitutionsObj = json["substitutions"].toObject();
+    for (const QString &key : substitutionsObj.keys()) {
+        substitutions.insert(key, substitutionsObj[key].toString());
     }
 
-    tbStyles.clear();
-    QJsonArray tbStylesArray = json["tbStyles"].toArray();
-    for (const QJsonValue &value : tbStylesArray) {
-        TbStyleInfo style;
-        style.read(value.toObject());
-        tbStyles.append(style);
-    }
-    defaultTbStyleName = json["defaultTbStyleName"].toString("default_1080p");
-    sourceHasSubtitles = json["sourceHasSubtitles"].toBool(true);
-
-    // Если после чтения список пуст, добавим дефолтный
-    if (tbStyles.isEmpty()) {
-        tbStyles.append(TbStyleInfo());
-    }
-
-    seriesTitleForPost = json["seriesTitleForPost"].toString();
-    totalEpisodes = json["totalEpisodes"].toInt();
-    posterPath = json["posterPath"].toString();
     postTemplates.clear();
     const QJsonObject postTemplatesObj = json["postTemplates"].toObject();
     for (const QString &key : postTemplatesObj.keys()) {
@@ -98,6 +95,7 @@ void ReleaseTemplate::write(QJsonObject &json) const
 {
     json["templateName"] = templateName;
     json["seriesTitle"] = seriesTitle;
+    json["releaseTags"] = QJsonArray::fromStringList(releaseTags);
     json["rssUrl"] = rssUrl.toString();
     json["animationStudio"] = animationStudio;
     json["subAuthor"] = subAuthor;
@@ -107,31 +105,35 @@ void ReleaseTemplate::write(QJsonObject &json) const
     json["useManualTime"] = useManualTime;
     json["generateTb"] = generateTb;
     json["createSrtMaster"] = createSrtMaster;
-
+    json["isCustomTranslation"] = isCustomTranslation;
     json["director"] = director;
     json["soundEngineer"] = soundEngineer;
     json["timingAuthor"] = timingAuthor;
     json["signsAuthor"] = signsAuthor;
+    json["translationEditor"] = translationEditor;
     json["releaseBuilder"] = releaseBuilder;
     json["cast"] = QJsonArray::fromStringList(cast);
     json["signStyles"] = QJsonArray::fromStringList(signStyles);
     json["targetAudioFormat"] = targetAudioFormat;
+    json["forceSignStyleRequest"] = forceSignStyleRequest;
+    json["pauseForSubEdit"] = pauseForSubEdit;
 
     json["voiceoverType"] = (voiceoverType == VoiceoverType::Voiceover) ? "Voiceover" : "Dubbing";
 
-    QJsonArray tbStylesArray;
-    for (const auto &style : tbStyles) {
-        QJsonObject styleObj;
-        style.write(styleObj);
-        tbStylesArray.append(styleObj);
-    }
-    json["tbStyles"] = tbStylesArray;
     json["defaultTbStyleName"] = defaultTbStyleName;
+    json["renderPresetName"] = renderPresetName;
     json["sourceHasSubtitles"] = sourceHasSubtitles;
-
+    json["isCustomTranslation"] = isCustomTranslation;
     json["seriesTitleForPost"] = seriesTitleForPost;
     json["totalEpisodes"] = totalEpisodes;
     json["posterPath"] = posterPath;
+
+    QJsonObject substitutionsObj;
+    for (auto it = substitutions.constBegin(); it != substitutions.constEnd(); ++it) {
+        substitutionsObj.insert(it.key(), it.value());
+    }
+    json["substitutions"] = substitutionsObj;
+
     QJsonObject postTemplatesObj;
     for (auto it = postTemplates.constBegin(); it != postTemplates.constEnd(); ++it) {
         postTemplatesObj.insert(it.key(), it.value());

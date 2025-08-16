@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>750</width>
-    <height>650</height>
+    <height>750</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -20,7 +20,7 @@
    <item>
     <widget class="QTabWidget" name="tabWidget">
      <property name="currentIndex">
-      <number>0</number>
+      <number>4</number>
      </property>
      <widget class="QWidget" name="tabGeneral">
       <attribute name="title">
@@ -58,136 +58,61 @@
         <widget class="QLineEdit" name="rssUrlEdit"/>
        </item>
        <item row="3" column="0">
+        <widget class="QLabel" name="label_1">
+         <property name="text">
+          <string>Теги релиза (для поиска):</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <widget class="QLineEdit" name="releaseTagsEdit">
+         <property name="placeholderText">
+          <string>например, [Erai-raws], [SubsPlease]</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="0">
         <widget class="QLabel" name="label_4">
          <property name="text">
           <string>Студия анимации:</string>
          </property>
         </widget>
        </item>
-       <item row="3" column="1">
+       <item row="4" column="1">
         <widget class="QLineEdit" name="animationStudioEdit"/>
        </item>
-       <item row="4" column="0">
+       <item row="5" column="0">
         <widget class="QLabel" name="label_5">
          <property name="text">
-          <string>Автор субтитров:</string>
+          <string>Автор перевода:</string>
          </property>
         </widget>
        </item>
-       <item row="4" column="1">
+       <item row="5" column="1">
         <widget class="QLineEdit" name="subAuthorEdit"/>
        </item>
-       <item row="5" column="0">
+       <item row="6" column="0">
         <widget class="QLabel" name="label_17">
          <property name="text">
           <string>Язык оригинала (код):</string>
          </property>
         </widget>
        </item>
-       <item row="5" column="1">
+       <item row="6" column="1">
         <widget class="QLineEdit" name="originalLanguageEdit">
          <property name="text">
           <string>jpn</string>
          </property>
         </widget>
        </item>
-       <item row="6" column="0">
-        <widget class="QLabel" name="label_9">
-         <property name="text">
-          <string>Название главы эндинга:</string>
-         </property>
-        </widget>
-       </item>
-       <item row="6" column="1">
-        <widget class="QLineEdit" name="endingChapterNameEdit">
-         <property name="placeholderText">
-          <string>например, Ending</string>
-         </property>
-        </widget>
-       </item>
        <item row="7" column="0">
-        <widget class="QLabel" name="label_11">
-         <property name="text">
-          <string>Время начала эндинга:</string>
-         </property>
-        </widget>
-       </item>
-       <item row="7" column="1">
-        <layout class="QHBoxLayout" name="horizontalLayout_10">
-         <item>
-          <widget class="QLineEdit" name="endingStartTimeEdit">
-           <property name="placeholderText">
-            <string>например, 0:22:22.26</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QCheckBox" name="useManualTimeCheckBox">
-           <property name="text">
-            <string>Вручную</string>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </item>
-       <item row="8" column="0">
-        <widget class="QLabel" name="label_12">
-         <property name="text">
-          <string>Режиссер дубляжа:</string>
-         </property>
-        </widget>
-       </item>
-       <item row="8" column="1">
-        <widget class="QLineEdit" name="directorEdit"/>
-       </item>
-       <item row="9" column="0">
-        <widget class="QLabel" name="label_13">
-         <property name="text">
-          <string>Звукорежиссер:</string>
-         </property>
-        </widget>
-       </item>
-       <item row="9" column="1">
-        <widget class="QLineEdit" name="soundEngineerEdit"/>
-       </item>
-       <item row="10" column="0">
-        <widget class="QLabel" name="label_14">
-         <property name="text">
-          <string>Разметка:</string>
-         </property>
-        </widget>
-       </item>
-       <item row="10" column="1">
-        <widget class="QLineEdit" name="timingAuthorEdit"/>
-       </item>
-       <item row="11" column="0">
-        <widget class="QLabel" name="label_signs_author">
-         <property name="text">
-        <string>Локализация надписей:</string>
-        </property>
-        </widget>
-       </item>
-      <item row="11" column="1">
-       <widget class="QLineEdit" name="signsAuthorEdit"/>
-      </item>
-       <item row="12" column="0">
-        <widget class="QLabel" name="label_15">
-         <property name="text">
-          <string>Сборка релиза:</string>
-         </property>
-        </widget>
-       </item>
-       <item row="12" column="1">
-        <widget class="QLineEdit" name="releaseBuilderEdit"/>
-       </item>
-       <item row="13" column="0">
         <widget class="QLabel" name="label_17_2">
          <property name="text">
           <string>Формат аудио для сборки:</string>
          </property>
         </widget>
        </item>
-       <item row="13" column="1">
+       <item row="7" column="1">
         <widget class="QComboBox" name="targetAudioFormatComboBox">
          <item>
           <property name="text">
@@ -201,14 +126,14 @@
          </item>
         </widget>
        </item>
-       <item row="14" column="0">
+       <item row="8" column="0">
         <widget class="QLabel" name="label_type">
          <property name="text">
           <string>Тип озвучки:</string>
          </property>
         </widget>
        </item>
-       <item row="14" column="1">
+       <item row="8" column="1">
         <widget class="QComboBox" name="voiceoverTypeComboBox">
          <item>
           <property name="text">
@@ -222,7 +147,17 @@
          </item>
         </widget>
        </item>
-       <item row="15" column="1">
+       <item row="9" column="0">
+        <widget class="QLabel" name="label_18">
+         <property name="text">
+          <string>Пресет рендера MP4:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="9" column="1">
+        <widget class="QComboBox" name="renderPresetComboBox"/>
+       </item>
+       <item row="10" column="0" colspan="2">
         <widget class="QCheckBox" name="createSrtMasterCheckBox">
          <property name="toolTip">
           <string>После основной сборки создать дополнительный MKV с несжатым звуком и SRT-субтитрами (без надписей)</string>
@@ -232,25 +167,45 @@
          </property>
         </widget>
        </item>
+       <item row="11" column="0" colspan="2">
+        <widget class="QCheckBox" name="isCustomTranslationCheckBox">
+         <property name="toolTip">
+          <string>Если перевод выполнен силами команды, поставьте эту галочку. Название дорожки субтитров изменится на '[Дубляжная]'</string>
+         </property>
+         <property name="text">
+          <string>Собственный перевод</string>
+         </property>
+        </widget>
+       </item>
       </layout>
      </widget>
-     <widget class="QWidget" name="tabCast">
+     <widget class="QWidget" name="tabSubtitles">
       <attribute name="title">
-       <string>Каст и стили</string>
+       <string>Субтитры</string>
       </attribute>
-      <layout class="QVBoxLayout" name="verticalLayout_2">
+      <layout class="QVBoxLayout" name="verticalLayout_10" stretch="0,0,0,0,0,0,0,0">
        <item>
-        <widget class="QLabel" name="label_6">
+        <widget class="QCheckBox" name="sourceHasSubtitlesCheckBox">
          <property name="text">
-          <string>Список актеров (каждый с новой строки):</string>
+          <string>В исходном MKV есть дорожка русских субтитров</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
          </property>
         </widget>
        </item>
        <item>
-        <widget class="QPlainTextEdit" name="castEdit"/>
+        <widget class="QCheckBox" name="forceSignStyleRequestCheckBox">
+         <property name="text">
+          <string>Всегда запрашивать стили/актеров для надписей</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
        </item>
        <item>
-        <widget class="Line" name="line">
+        <widget class="Line" name="line_3">
          <property name="orientation">
           <enum>Qt::Orientation::Horizontal</enum>
          </property>
@@ -268,32 +223,112 @@
          <item>
           <widget class="QPlainTextEdit" name="signStylesEdit">
            <property name="sizePolicy">
-            <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+            <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
              <horstretch>3</horstretch>
              <verstretch>0</verstretch>
             </sizepolicy>
+           </property>
+           <property name="maximumSize">
+            <size>
+             <width>16777215</width>
+             <height>200</height>
+            </size>
            </property>
           </widget>
          </item>
          <item>
           <widget class="QPushButton" name="selectStylesButton">
            <property name="text">
-            <string>Выбрать из файла субтитров...</string>
+            <string>Выбрать из файла...</string>
            </property>
           </widget>
          </item>
         </layout>
        </item>
        <item>
-        <widget class="QCheckBox" name="sourceHasSubtitlesCheckBox">
-         <property name="text">
-          <string>В исходном MKV есть дорожка русских субтитров</string>
-         </property>
-         <property name="checked">
-          <bool>true</bool>
+        <widget class="Line" name="line_4">
+         <property name="orientation">
+          <enum>Qt::Orientation::Horizontal</enum>
          </property>
         </widget>
        </item>
+       <item>
+        <widget class="QCheckBox" name="pauseForSubEditCheckBox">
+         <property name="text">
+          <string>Приостанавливать процесс для ручной правки субтитров</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="groupBox">
+         <property name="title">
+          <string>Автоматические замены в тексте субтитров</string>
+         </property>
+         <layout class="QVBoxLayout" name="verticalLayout_9">
+          <item>
+           <widget class="QTableWidget" name="substitutionsTableWidget">
+            <property name="alternatingRowColors">
+             <bool>true</bool>
+            </property>
+            <attribute name="horizontalHeaderVisible">
+             <bool>true</bool>
+            </attribute>
+            <attribute name="horizontalHeaderStretchLastSection">
+             <bool>true</bool>
+            </attribute>
+            <column>
+             <property name="text">
+              <string>Найти</string>
+             </property>
+            </column>
+            <column>
+             <property name="text">
+              <string>Заменить на</string>
+             </property>
+            </column>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_7">
+            <item>
+             <spacer name="horizontalSpacer_3">
+              <property name="orientation">
+               <enum>Qt::Orientation::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+            <item>
+             <widget class="QPushButton" name="addSubstitutionButton">
+              <property name="text">
+               <string>Добавить</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="removeSubstitutionButton">
+              <property name="text">
+               <string>Удалить</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="tabTbCreation">
+      <attribute name="title">
+       <string>Создание ТБ</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout_2">
        <item>
         <widget class="QCheckBox" name="generateTbCheckBox">
          <property name="text">
@@ -304,87 +339,145 @@
          </property>
         </widget>
        </item>
-      </layout>
-     </widget>
-     <widget class="QWidget" name="tabTbStyles">
-      <attribute name="title">
-       <string>Стили ТБ</string>
-      </attribute>
-      <layout class="QVBoxLayout" name="verticalLayout_3">
        <item>
-        <widget class="QTableWidget" name="tbStylesTable">
-         <column>
-          <property name="text">
-           <string>Имя стиля</string>
-          </property>
-         </column>
-         <column>
-          <property name="text">
-           <string>PlayResX</string>
-          </property>
-         </column>
-         <column>
-          <property name="text">
-           <string>Теги</string>
-          </property>
-         </column>
-         <column>
-          <property name="text">
-           <string>Margin L</string>
-          </property>
-         </column>
-         <column>
-          <property name="text">
-           <string>Margin R</string>
-          </property>
-         </column>
-         <column>
-          <property name="text">
-           <string>Margin V</string>
-          </property>
-         </column>
+        <widget class="Line" name="line_2">
+         <property name="orientation">
+          <enum>Qt::Orientation::Horizontal</enum>
+         </property>
         </widget>
        </item>
        <item>
-        <layout class="QHBoxLayout" name="horizontalLayout_4">
-         <item>
-          <widget class="QPushButton" name="addTbStyleButton">
+        <layout class="QFormLayout" name="formLayout_2">
+         <item row="0" column="0">
+          <widget class="QLabel" name="label_9">
            <property name="text">
-            <string>Добавить стиль</string>
+            <string>Название главы эндинга:</string>
            </property>
           </widget>
          </item>
-         <item>
-          <widget class="QPushButton" name="removeTbStyleButton">
-           <property name="text">
-            <string>Удалить выбранный</string>
+         <item row="0" column="1">
+          <widget class="QLineEdit" name="endingChapterNameEdit">
+           <property name="placeholderText">
+            <string>например, Ending</string>
            </property>
           </widget>
          </item>
-         <item>
-          <spacer name="horizontalSpacer">
-           <property name="orientation">
-            <enum>Qt::Orientation::Horizontal</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>40</width>
-             <height>20</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-         <item>
-          <widget class="QLabel" name="label_16">
+         <item row="1" column="0">
+          <widget class="QLabel" name="label_11">
            <property name="text">
-            <string>Стиль по умолчанию:</string>
+            <string>Время начала эндинга:</string>
            </property>
           </widget>
          </item>
-         <item>
+         <item row="1" column="1">
+          <layout class="QHBoxLayout" name="horizontalLayout_10">
+           <item>
+            <widget class="QLineEdit" name="endingStartTimeEdit">
+             <property name="inputMask">
+              <string>0:00:00.000;0</string>
+             </property>
+             <property name="placeholderText">
+              <string>например, 0:22:22.26</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="useManualTimeCheckBox">
+             <property name="text">
+              <string>Вручную</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item row="2" column="0">
+          <widget class="QLabel" name="label_19">
+           <property name="text">
+            <string>Стиль ТБ по умолчанию:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="1">
           <widget class="QComboBox" name="defaultTbStyleComboBox"/>
          </item>
+         <item row="3" column="0">
+          <widget class="QLabel" name="label_12">
+           <property name="text">
+            <string>Режиссер дубляжа:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="3" column="1">
+          <widget class="QLineEdit" name="directorEdit"/>
+         </item>
+         <item row="4" column="0">
+          <widget class="QLabel" name="label_13">
+           <property name="text">
+            <string>Звукорежиссер:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="4" column="1">
+          <widget class="QLineEdit" name="soundEngineerEdit"/>
+         </item>
+         <item row="5" column="0">
+          <widget class="QLabel" name="label_14">
+           <property name="text">
+            <string>Разметка:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="5" column="1">
+          <widget class="QLineEdit" name="timingAuthorEdit"/>
+         </item>
+         <item row="6" column="0">
+          <widget class="QLabel" name="label_signs_author">
+           <property name="text">
+            <string>Локализация надписей:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="6" column="1">
+          <widget class="QLineEdit" name="signsAuthorEdit"/>
+         </item>
+         <item row="7" column="0">
+          <widget class="QLabel" name="label_translation_editor">
+           <property name="text">
+            <string>Редактор перевода:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="7" column="1">
+          <widget class="QLineEdit" name="translationEditorEdit"/>
+         </item>
+         <item row="8" column="0">
+          <widget class="QLabel" name="label_15">
+           <property name="text">
+            <string>Сборка релиза:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="8" column="1">
+          <widget class="QLineEdit" name="releaseBuilderEdit"/>
+         </item>
         </layout>
+       </item>
+       <item>
+        <widget class="Line" name="line">
+         <property name="orientation">
+          <enum>Qt::Orientation::Horizontal</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_6">
+         <property name="text">
+          <string>Список актеров (каждый с новой строки или через запятую):</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPlainTextEdit" name="castEdit"/>
        </item>
       </layout>
      </widget>
@@ -438,7 +531,7 @@
             </widget>
            </item>
            <item>
-            <widget class="QTextEdit" name="postTgMp4Edit"/>
+            <widget class="QPlainTextEdit" name="postTgMp4Edit"/>
            </item>
           </layout>
          </item>
@@ -452,7 +545,7 @@
             </widget>
            </item>
            <item>
-            <widget class="QTextEdit" name="postTgMkvEdit"/>
+            <widget class="QPlainTextEdit" name="postTgMkvEdit"/>
            </item>
           </layout>
          </item>
@@ -470,7 +563,7 @@
             </widget>
            </item>
            <item>
-            <widget class="QTextEdit" name="postVkEdit"/>
+            <widget class="QPlainTextEdit" name="postVkEdit"/>
            </item>
           </layout>
          </item>
@@ -484,7 +577,7 @@
             </widget>
            </item>
            <item>
-            <widget class="QTextEdit" name="postVkCommentEdit"/>
+            <widget class="QPlainTextEdit" name="postVkCommentEdit"/>
            </item>
           </layout>
          </item>
@@ -498,7 +591,7 @@
       </attribute>
       <layout class="QFormLayout" name="formLayout_3">
        <item row="0" column="0">
-        <widget class="QLabel" name="label_18">
+        <widget class="QLabel" name="label_20">
          <property name="text">
           <string>Название для постов:</string>
          </property>
@@ -508,7 +601,7 @@
         <widget class="QLineEdit" name="seriesTitleForPostEdit"/>
        </item>
        <item row="1" column="0">
-        <widget class="QLabel" name="label_19">
+        <widget class="QLabel" name="label_21">
          <property name="text">
           <string>Всего серий в сезоне:</string>
          </property>
@@ -522,7 +615,7 @@
         </widget>
        </item>
        <item row="2" column="0">
-        <widget class="QLabel" name="label_20">
+        <widget class="QLabel" name="label_24">
          <property name="text">
           <string>Путь к постеру:</string>
          </property>
@@ -543,9 +636,10 @@
         </layout>
        </item>
        <item row="3" column="0">
-        <widget class="QLabel" name="label_21">
+        <widget class="QLabel" name="label_25">
          <property name="text">
-          <string>Ссылки для загрузки видео (каждая с новой строки):</string>
+          <string>Ссылки для загрузки видео
+(каждая с новой строки):</string>
          </property>
         </widget>
        </item>
@@ -574,38 +668,5 @@ https://anime-365.ru/upload...</string>
   </layout>
  </widget>
  <resources/>
- <connections>
-  <connection>
-   <sender>buttonBox</sender>
-   <signal>accepted()</signal>
-   <receiver>TemplateEditor</receiver>
-   <slot>accept()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>248</x>
-     <y>254</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>157</x>
-     <y>274</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>buttonBox</sender>
-   <signal>rejected()</signal>
-   <receiver>TemplateEditor</receiver>
-   <slot>reject()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>316</x>
-     <y>260</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>286</x>
-     <y>274</y>
-    </hint>
-   </hints>
-  </connection>
- </connections>
+ <connections/>
 </ui>

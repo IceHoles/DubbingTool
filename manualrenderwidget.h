@@ -5,7 +5,6 @@
 
 namespace Ui {
 class ManualRenderWidget;
-class ManualRenderer;
 }
 
 class ManualRenderWidget : public QWidget
@@ -16,13 +15,21 @@ public:
     explicit ManualRenderWidget(QWidget *parent = nullptr);
     ~ManualRenderWidget();
 
+    QVariantMap getParameters() const;
+
+public slots:
+    void updateRenderPresets();
+    void setRendering(bool rendering);
+
 private slots:
     void on_browseInputButton_clicked();
     void on_browseOutputButton_clicked();
     void on_renderButton_clicked();
+    void updateHardsubOptions();
+    void analyzeMkvForSubtitles(const QString& path);
 
 signals:
-    void renderRequested(const QVariantMap& parameters);
+    void renderRequested();
 
 private:
     Ui::ManualRenderWidget *ui;

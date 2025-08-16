@@ -15,7 +15,8 @@ public:
 
     void startProcess(const QString &program, const QStringList &arguments);
     bool executeAndWait(const QString &program, const QStringList &arguments, QByteArray &output);
-    void killProcess(); // Метод для принудительного завершения
+    void killProcess();
+    bool wasKilled() const;
 
 signals:
     void processOutput(const QString &output);
@@ -30,6 +31,7 @@ private slots:
 private:
     // Храним список всех запущенных этим менеджером процессов
     QList<QProcess*> m_activeProcesses;
+    bool m_wasKilled = false;
 };
 
 #endif // PROCESSMANAGER_H

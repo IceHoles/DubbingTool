@@ -3,14 +3,15 @@
 #include <QFileDialog>
 #include <QListWidgetItem>
 
+
 MissingFilesDialog::MissingFilesDialog(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::MissingFilesDialog)
 {
     ui->setupUi(this);
-    // По умолчанию скрываем обе группы, будем показывать по мере необходимости
     ui->audioGroupBox->setVisible(false);
     ui->fontsGroupBox->setVisible(false);
+    ui->timeGroupBox->setVisible(false);
 }
 
 MissingFilesDialog::~MissingFilesDialog()
@@ -34,7 +35,7 @@ void MissingFilesDialog::setMissingFonts(const QStringList &fontNames)
     ui->fontsListWidget->clear();
     for (const QString &name : fontNames) {
         QListWidgetItem* item = new QListWidgetItem(name);
-        item->setForeground(Qt::red); // Красный цвет для ненайденных
+        item->setForeground(Qt::red);
         ui->fontsListWidget->addItem(item);
     }
 }
@@ -49,9 +50,22 @@ QMap<QString, QString> MissingFilesDialog::getResolvedFonts() const
     return m_resolvedFonts;
 }
 
+void MissingFilesDialog::setTimeInputVisible(bool visible)
+{
+    ui->timeGroupBox->setVisible(visible);
+    if (visible) {
+        ui->timeEdit->setPlaceholderText("H:mm:ss.zzz");
+    }
+}
+
+QString MissingFilesDialog::getTime() const
+{
+    return ui->timeEdit->text();
+}
+
 void MissingFilesDialog::on_browseAudioButton_clicked()
 {
-    QString filePath = QFileDialog::getOpenFileName(this, "Выберите аудиофайл", "", "Аудиофайлы (*.wav *.flac *.aac)");
+    QString filePath = QFileDialog::getOpenFileName(this, "Выберите аудиофайл", "", "Аудиофайлы (*.wav *.flac *.aac *.eac3)");
     if (!filePath.isEmpty()) {
         ui->audioPathEdit->setText(filePath);
     }
@@ -64,7 +78,12 @@ void MissingFilesDialog::on_fontsListWidget_itemDoubleClicked(QListWidgetItem *i
                                                 "Файлы шрифтов (*.ttf *.otf *.ttc);;Все файлы (*)");
     if (!path.isEmpty()) {
         item->setText(fontName + " -> " + path);
-        item->setForeground(Qt::darkGreen); // Зеленый для найденных
+        item->setForeground(Qt::darkGreen);
         m_resolvedFonts[fontName] = path;
     }
+}
+
+void MissingFilesDialog::setAudioPrompt(const QString &text)
+{
+    ui->audioLabel->setText(text);
 }
