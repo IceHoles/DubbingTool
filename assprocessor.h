@@ -4,6 +4,8 @@
 #include <QObject>
 #include <QStringList>
 #include "releasetemplate.h"
+#include "appsettings.h"
+
 
 class AssProcessor : public QObject
 {
@@ -15,13 +17,15 @@ public:
     bool generateTbOnlyFile(const QString &outputPath, const ReleaseTemplate &t, const QString& startTime, int resolutionX = 1920);
     bool processFromTwoSources(const QString &dialoguesInputPath, const QString &signsInputPath, const QString &outputPathBase, const ReleaseTemplate &t, const QString& startTime);
     bool convertToSrt(const QString &inputAssPath, const QString &outputSrtPath, const QStringList &signStyles);
+    bool applySubstitutions(const QString &filePath, const QMap<QString, QString> &substitutions);
+
 signals:
-    void logMessage(const QString &message);
+    void logMessage(const QString&, LogCategory);
 
 private:
     QStringList generateTb(const ReleaseTemplate &t, const QString &startTime, int detectedResX);
-    // Приватный метод для умной балансировки строк
     QString balanceCastLine(const QStringList& actors, bool shouldSort);
+    QString convertAssTagsToSrt(const QString &assText);
 };
 
 #endif // ASSPROCESSOR_H

@@ -18,13 +18,14 @@ public:
     explicit MissingFilesDialog(QWidget *parent = nullptr);
     ~MissingFilesDialog();
 
-    // Функции для настройки диалога перед показом
     void setAudioPathVisible(bool visible);
     void setMissingFonts(const QStringList &fontNames);
+    void setTimeInputVisible(bool visible);
+    void setAudioPrompt(const QString& text);
 
-    // Функции для получения результатов
     QString getAudioPath() const;
     QMap<QString, QString> getResolvedFonts() const;
+    QString getTime() const;
 
 private slots:
     void on_browseAudioButton_clicked();

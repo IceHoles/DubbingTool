@@ -1,6 +1,7 @@
 #include "templateeditor.h"
 #include "ui_templateeditor.h"
 #include "styleselectordialog.h"
+#include "appsettings.h"
 #include <QFileDialog>
 #include <QTableWidgetItem>
 #include <QDialog>
@@ -12,8 +13,33 @@
 #include <QGridLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QRegularExpression>
 #include <QTextDocumentFragment>
+#include <QApplication>
+#include <QClipboard>
+#include <QPropertyAnimation>
 
+
+class ClickableLabel : public QLabel {
+public:
+    explicit ClickableLabel(const QString& text, QWidget* parent = nullptr) : QLabel(text, parent) {
+        setCursor(Qt::PointingHandCursor);
+        setStyleSheet("QLabel { background-color: #2d2d2d; border: 1px solid #ccc; border-radius: 4px; padding: 2px; }");
+        setToolTip("Нажмите, чтобы скопировать");
+    }
+
+protected:
+    void mousePressEvent(QMouseEvent *event) override {
+        QApplication::clipboard()->setText(this->text());
+
+        QPropertyAnimation *animation = new QPropertyAnimation(this, "styleSheet", this);
+        animation->setDuration(500);
+        animation->setStartValue("QLabel { background-color: #4f4f4f; border: 1px solid #5a9e5a; border-radius: 4px; padding: 2px; }"); // Зеленый
+        animation->setEndValue("QLabel { background-color: #2d2d2d; border: 1px solid #ccc; border-radius: 4px; padding: 2px; }");   // Исходный
+
+        QLabel::mousePressEvent(event);
+    }
+};
 
 TemplateEditor::TemplateEditor(QWidget *parent) :
     QDialog(parent),
@@ -21,6 +47,19 @@ TemplateEditor::TemplateEditor(QWidget *parent) :
 {
     ui->setupUi(this);
 
+    connect(ui->addSubstitutionButton, &QPushButton::clicked, this, [this](){
+        int row = ui->substitutionsTableWidget->rowCount();
+        ui->substitutionsTableWidget->insertRow(row);
+        ui->substitutionsTableWidget->setItem(row, 0, new QTableWidgetItem("Текст для поиска"));
+        ui->substitutionsTableWidget->setItem(row, 1, new QTableWidgetItem("Текст для замены"));
+    });
+
+    connect(ui->removeSubstitutionButton, &QPushButton::clicked, this, [this](){
+        int currentRow = ui->substitutionsTableWidget->currentRow();
+        if (currentRow >= 0) {
+            ui->substitutionsTableWidget->removeRow(currentRow);
+        }
+    });
 
     connect(ui->browsePosterButton, &QPushButton::clicked, this, [this](){
         QString path = QFileDialog::getOpenFileName(this, "Выберите файл постера", "", "Изображения (*.png *.jpg *.jpeg *.webp)");
@@ -28,6 +67,9 @@ TemplateEditor::TemplateEditor(QWidget *parent) :
             ui->posterPathEdit->setText(path);
         }
     });
+
+    connect(ui->buttonBox, &QDialogButtonBox::accepted, this, &TemplateEditor::accept);
+    connect(ui->buttonBox, &QDialogButtonBox::rejected, this, &TemplateEditor::reject);
 }
 
 TemplateEditor::~TemplateEditor()
@@ -40,49 +82,54 @@ void TemplateEditor::setTemplate(const ReleaseTemplate &t)
     // Вкладка "Основные"
     ui->templateNameEdit->setText(t.templateName);
     ui->seriesTitleEdit->setText(t.seriesTitle);
+    ui->releaseTagsEdit->setText(t.releaseTags.join(", "));
     ui->rssUrlEdit->setText(t.rssUrl.toString());
     ui->animationStudioEdit->setText(t.animationStudio);
     ui->subAuthorEdit->setText(t.subAuthor);
     ui->originalLanguageEdit->setText(t.originalLanguage);
+    ui->targetAudioFormatComboBox->setCurrentText(t.targetAudioFormat);
+    ui->createSrtMasterCheckBox->setChecked(t.createSrtMaster);
+    ui->isCustomTranslationCheckBox->setChecked(t.isCustomTranslation);
+    ui->renderPresetComboBox->clear();
+    for(const auto& preset : AppSettings::instance().renderPresets()) {
+        ui->renderPresetComboBox->addItem(preset.name);
+    }
+    ui->renderPresetComboBox->setCurrentText(t.renderPresetName);
+
+    // Вкладка "Создание ТБ"
+    ui->generateTbCheckBox->setChecked(t.generateTb);
     ui->endingChapterNameEdit->setText(t.endingChapterName);
     ui->endingStartTimeEdit->setText(t.endingStartTime);
     ui->useManualTimeCheckBox->setChecked(t.useManualTime);
-    ui->directorEdit->setText(t.director);
-    ui->soundEngineerEdit->setText(t.soundEngineer);
-    ui->timingAuthorEdit->setText(t.timingAuthor);
-    ui->signsAuthorEdit->setText(t.signsAuthor);
-    ui->releaseBuilderEdit->setText(t.releaseBuilder);
-    ui->targetAudioFormatComboBox->setCurrentText(t.targetAudioFormat);
-
-    // Вкладка "Каст и стили"
-    ui->castEdit->setPlainText(t.cast.join('\n'));
-    ui->signStylesEdit->setPlainText(t.signStyles.join('\n'));
-    ui->sourceHasSubtitlesCheckBox->setChecked(t.sourceHasSubtitles);
-    ui->generateTbCheckBox->setChecked(t.generateTb);
-    ui->createSrtMasterCheckBox->setChecked(t.createSrtMaster);
-
-    // Вкладка "Стили ТБ"
-    ui->tbStylesTable->setRowCount(0);
-    for (const auto& style : t.tbStyles) {
-        int row = ui->tbStylesTable->rowCount();
-        ui->tbStylesTable->insertRow(row);
-        ui->tbStylesTable->setItem(row, 0, new QTableWidgetItem(style.name));
-        ui->tbStylesTable->setItem(row, 1, new QTableWidgetItem(QString::number(style.resolutionX)));
-        ui->tbStylesTable->setItem(row, 2, new QTableWidgetItem(style.tags));
-        ui->tbStylesTable->setItem(row, 3, new QTableWidgetItem(QString::number(style.marginLeft)));
-        ui->tbStylesTable->setItem(row, 4, new QTableWidgetItem(QString::number(style.marginRight)));
-        ui->tbStylesTable->setItem(row, 5, new QTableWidgetItem(QString::number(style.marginV)));
-    }
     ui->defaultTbStyleComboBox->clear();
-    for(const auto& style : t.tbStyles) {
+    for(const auto& style : AppSettings::instance().tbStyles()) {
         ui->defaultTbStyleComboBox->addItem(style.name);
     }
     ui->defaultTbStyleComboBox->setCurrentText(t.defaultTbStyleName);
-
     if (t.voiceoverType == ReleaseTemplate::VoiceoverType::Voiceover) {
         ui->voiceoverTypeComboBox->setCurrentText("Закадр");
     } else {
         ui->voiceoverTypeComboBox->setCurrentText("Дубляж");
+    }
+    ui->castEdit->setPlainText(t.cast.join(", "));
+    ui->directorEdit->setText(t.director);
+    ui->soundEngineerEdit->setText(t.soundEngineer);
+    ui->timingAuthorEdit->setText(t.timingAuthor);
+    ui->signsAuthorEdit->setText(t.signsAuthor);
+    ui->translationEditorEdit->setText(t.translationEditor);
+    ui->releaseBuilderEdit->setText(t.releaseBuilder);
+
+    // Вкладка "Субтитры"
+    ui->sourceHasSubtitlesCheckBox->setChecked(t.sourceHasSubtitles);
+    ui->forceSignStyleRequestCheckBox->setChecked(t.forceSignStyleRequest);
+    ui->signStylesEdit->setPlainText(t.signStyles.join('\n'));
+    ui->pauseForSubEditCheckBox->setChecked(t.pauseForSubEdit);
+    ui->substitutionsTableWidget->setRowCount(0);
+    for (auto it = t.substitutions.constBegin(); it != t.substitutions.constEnd(); ++it) {
+        int row = ui->substitutionsTableWidget->rowCount();
+        ui->substitutionsTableWidget->insertRow(row);
+        ui->substitutionsTableWidget->setItem(row, 0, new QTableWidgetItem(it.key()));
+        ui->substitutionsTableWidget->setItem(row, 1, new QTableWidgetItem(it.value()));
     }
 
     // Вкладка "Шаблоны постов"
@@ -101,48 +148,55 @@ void TemplateEditor::setTemplate(const ReleaseTemplate &t)
 ReleaseTemplate TemplateEditor::getTemplate() const
 {
     ReleaseTemplate t;
+
     // Вкладка "Основные"
     t.templateName = ui->templateNameEdit->text().trimmed();
     t.seriesTitle = ui->seriesTitleEdit->text().trimmed();
+    QStringList tags = ui->releaseTagsEdit->text().split(',', Qt::SkipEmptyParts);
+    for(QString& tag : tags) {
+        t.releaseTags.append(tag.trimmed());
+    }
     t.rssUrl = QUrl(ui->rssUrlEdit->text().trimmed());
     t.animationStudio = ui->animationStudioEdit->text().trimmed();
     t.subAuthor = ui->subAuthorEdit->text().trimmed();
     t.originalLanguage = ui->originalLanguageEdit->text().trimmed();
+    t.targetAudioFormat = ui->targetAudioFormatComboBox->currentText();
+    t.createSrtMaster = ui->createSrtMasterCheckBox->isChecked();
+    t.isCustomTranslation = ui->isCustomTranslationCheckBox->isChecked();
+    t.renderPresetName = ui->renderPresetComboBox->currentText();
+
+    // Вкладка "Создание ТБ"
+    t.generateTb = ui->generateTbCheckBox->isChecked();
     t.endingChapterName = ui->endingChapterNameEdit->text().trimmed();
     t.endingStartTime = ui->endingStartTimeEdit->text().trimmed();
     t.useManualTime = ui->useManualTimeCheckBox->isChecked();
-    t.director = ui->directorEdit->text().trimmed();
-    t.soundEngineer = ui->soundEngineerEdit->text().trimmed();
-    t.timingAuthor = ui->timingAuthorEdit->text().trimmed();
-    t.signsAuthor = ui->signsAuthorEdit->text().trimmed();
-    t.releaseBuilder = ui->releaseBuilderEdit->text().trimmed();
-    t.targetAudioFormat = ui->targetAudioFormatComboBox->currentText();
-
-    // Вкладка "Каст и стили"
-    t.cast = ui->castEdit->toPlainText().split('\n', Qt::SkipEmptyParts);
-    t.signStyles = ui->signStylesEdit->toPlainText().split('\n', Qt::SkipEmptyParts);
-    t.sourceHasSubtitles = ui->sourceHasSubtitlesCheckBox->isChecked();
-    t.generateTb = ui->generateTbCheckBox->isChecked();
-    t.createSrtMaster = ui->createSrtMasterCheckBox->isChecked();
-
-    // Вкладка "Стили ТБ"
-    t.tbStyles.clear();
-    for(int row = 0; row < ui->tbStylesTable->rowCount(); ++row) {
-        TbStyleInfo style;
-        style.name = ui->tbStylesTable->item(row, 0)->text();
-        style.resolutionX = ui->tbStylesTable->item(row, 1)->text().toInt();
-        style.tags = ui->tbStylesTable->item(row, 2)->text();
-        style.marginLeft = ui->tbStylesTable->item(row, 3)->text().toInt();
-        style.marginRight = ui->tbStylesTable->item(row, 4)->text().toInt();
-        style.marginV = ui->tbStylesTable->item(row, 5)->text().toInt();
-        t.tbStyles.append(style);
-    }
     t.defaultTbStyleName = ui->defaultTbStyleComboBox->currentText();
-
     if (ui->voiceoverTypeComboBox->currentText() == "Закадр") {
         t.voiceoverType = ReleaseTemplate::VoiceoverType::Voiceover;
     } else {
         t.voiceoverType = ReleaseTemplate::VoiceoverType::Dubbing;
+    }
+    QRegularExpression rx("((\\, )|\\,|\\n)");
+    t.cast = ui->castEdit->toPlainText().split(rx, Qt::SkipEmptyParts);
+    t.director = ui->directorEdit->text().trimmed();
+    t.soundEngineer = ui->soundEngineerEdit->text().trimmed();
+    t.timingAuthor = ui->timingAuthorEdit->text().trimmed();
+    t.signsAuthor = ui->signsAuthorEdit->text().trimmed();
+    t.translationEditor = ui->translationEditorEdit->text().trimmed();
+    t.releaseBuilder = ui->releaseBuilderEdit->text().trimmed();
+
+    // Вкладка "Субтитры"
+    t.sourceHasSubtitles = ui->sourceHasSubtitlesCheckBox->isChecked();
+    t.forceSignStyleRequest = ui->forceSignStyleRequestCheckBox->isChecked();
+    t.signStyles = ui->signStylesEdit->toPlainText().split('\n', Qt::SkipEmptyParts);
+    t.pauseForSubEdit = ui->pauseForSubEditCheckBox->isChecked();
+    t.substitutions.clear();
+    for (int row = 0; row < ui->substitutionsTableWidget->rowCount(); ++row) {
+        QString findText = ui->substitutionsTableWidget->item(row, 0)->text();
+        QString replaceText = ui->substitutionsTableWidget->item(row, 1)->text();
+        if (!findText.isEmpty()) {
+            t.substitutions.insert(findText, replaceText);
+        }
     }
 
     // Вкладка "Шаблоны постов"
@@ -164,9 +218,7 @@ ReleaseTemplate TemplateEditor::getTemplate() const
 void TemplateEditor::on_selectStylesButton_clicked()
 {
     QString filePath = QFileDialog::getOpenFileName(this, "Выберите .ass файл для анализа", "", "ASS Subtitles (*.ass)");
-    if (filePath.isEmpty()) {
-        return;
-    }
+    if (filePath.isEmpty()) return;
 
     StyleSelectorDialog dialog(this);
     dialog.analyzeFile(filePath);
@@ -177,138 +229,80 @@ void TemplateEditor::on_selectStylesButton_clicked()
     }
 }
 
-void TemplateEditor::on_addTbStyleButton_clicked()
-{
-    int row = ui->tbStylesTable->rowCount();
-    ui->tbStylesTable->insertRow(row);
-    ui->tbStylesTable->setItem(row, 0, new QTableWidgetItem("Новый стиль"));
-    ui->tbStylesTable->setItem(row, 1, new QTableWidgetItem("1920"));
-    ui->tbStylesTable->setItem(row, 2, new QTableWidgetItem("{\\fad(500,500)...}"));
-    ui->tbStylesTable->setItem(row, 3, new QTableWidgetItem("10"));
-    ui->tbStylesTable->setItem(row, 4, new QTableWidgetItem("30"));
-    ui->tbStylesTable->setItem(row, 5, new QTableWidgetItem("10"));
-}
-
-void TemplateEditor::on_removeTbStyleButton_clicked()
-{
-    int currentRow = ui->tbStylesTable->currentRow();
-    if (currentRow >= 0) {
-        ui->tbStylesTable->removeRow(currentRow);
-    }
-}
-
-void TemplateEditor::on_tbStylesTable_cellChanged(int row, int column)
-{
-    Q_UNUSED(row);
-    if (column == 0) {
-        QString currentSelection = ui->defaultTbStyleComboBox->currentText();
-        ui->defaultTbStyleComboBox->clear();
-        for(int i = 0; i < ui->tbStylesTable->rowCount(); ++i) {
-            ui->defaultTbStyleComboBox->addItem(ui->tbStylesTable->item(i, 0)->text());
-        }
-        int index = ui->defaultTbStyleComboBox->findText(currentSelection);
-        if (index != -1) {
-            ui->defaultTbStyleComboBox->setCurrentIndex(index);
-        }
-    }
-}
-
 void TemplateEditor::on_helpButton_clicked()
 {
-    QDialog *helpDialog = new QDialog(this);
-    helpDialog->setWindowTitle("Справка по шаблонам");
-    helpDialog->setMinimumSize(700, 800);
+    static QDialog* helpDialog = nullptr;
+    if (helpDialog && helpDialog->isVisible()) {
+        helpDialog->activateWindow();
+        return;
+    }
+
+    helpDialog = new QDialog(this);
+    helpDialog->setAttribute(Qt::WA_DeleteOnClose);
+    helpDialog->setWindowTitle("Справка по шаблонам и форматированию");
+    helpDialog->setMinimumSize(500, 800);
 
     QScrollArea *scrollArea = new QScrollArea(helpDialog);
     scrollArea->setWidgetResizable(true);
     scrollArea->setStyleSheet("QScrollArea { border: none; }");
-
     QWidget *scrollWidget = new QWidget();
     scrollArea->setWidget(scrollWidget);
-
     QVBoxLayout *mainLayout = new QVBoxLayout(scrollWidget);
-    scrollWidget->setLayout(mainLayout);
 
     auto addRow = [&](QGridLayout* layout, int row, const QString& code, const QString& description) {
-        QLineEdit *codeEdit = new QLineEdit(code);
-        codeEdit->setReadOnly(true);
-        codeEdit->setFont(QFont("Courier New", 10));
-        QLabel *descLabel = new QLabel(description);
-        descLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
-        layout->addWidget(codeEdit, row, 0);
-        layout->addWidget(descLabel, row, 1);
+        layout->addWidget(new ClickableLabel(code), row, 0);
+        layout->addWidget(new QLabel(description), row, 1);
     };
 
-    mainLayout->addWidget(new QLabel("<h3>Доступные плейсхолдеры (можно копировать):</h3>"));
+    // --- Блок 1: Плейсхолдеры ---
+    mainLayout->addWidget(new QLabel("<h3>Плейсхолдеры (нажмите, чтобы скопировать):</h3>"));
     QWidget* placeholdersWidget = new QWidget();
     QGridLayout* placeholdersLayout = new QGridLayout(placeholdersWidget);
-    placeholdersLayout->setContentsMargins(0,0,0,0);
-    addRow(placeholdersLayout, 0, "%SERIES_TITLE%", "Название сериала");
-    addRow(placeholdersLayout, 1, "%EPISODE_NUMBER%", "Номер серии");
-    addRow(placeholdersLayout, 2, "%TOTAL_EPISODES%", "Всего серий");
-    addRow(placeholdersLayout, 3, "%CAST_LIST%", "Список актёров");
-    addRow(placeholdersLayout, 4, "%DIRECTOR%", "Режиссёр дубляжа");
-    addRow(placeholdersLayout, 5, "%SOUND_ENGINEER%", "Звукорежиссёр");
+    addRow(placeholdersLayout, 0, "%SERIES_TITLE%", "Название сериала для постов");
+    addRow(placeholdersLayout, 1, "%EPISODE_NUMBER%", "Номер текущей серии");
+    addRow(placeholdersLayout, 2, "%TOTAL_EPISODES%", "Общее количество серий");
+    addRow(placeholdersLayout, 3, "%CAST_LIST%", "Список актеров через запятую");
+    addRow(placeholdersLayout, 4, "%DIRECTOR%", "Режиссер дубляжа");
+    addRow(placeholdersLayout, 5, "%SOUND_ENGINEER%", "Звукорежиссер");
     addRow(placeholdersLayout, 6, "%SUB_AUTHOR%", "Автор перевода");
     addRow(placeholdersLayout, 7, "%TIMING_AUTHOR%", "Разметка (тайминг)");
     addRow(placeholdersLayout, 8, "%SIGNS_AUTHOR%", "Локализация надписей");
-    addRow(placeholdersLayout, 9, "%RELEASE_BUILDER%", "Сборка релиза");
-    addRow(placeholdersLayout, 10, "%LINK_ANILIB%", "Ссылка на Anilib");
-    addRow(placeholdersLayout, 11, "%LINK_ANIME365%", "Ссылка на Anime365");
-    addRow(placeholdersLayout, 12, "%LINK_KODIK%", "Ссылка на Kodik");
-    placeholdersLayout->setColumnStretch(0, 1);
+    addRow(placeholdersLayout, 9, "%TRANSLATION_EDITOR%", "Редактор перевода");
+    addRow(placeholdersLayout, 10, "%RELEASE_BUILDER%", "Сборка релиза");
+    addRow(placeholdersLayout, 11, "%LINK_ANILIB%", "Ссылка на Anilib (из панели 'Публикация')");
+    addRow(placeholdersLayout, 12, "%LINK_ANIME365%", "Ссылка на Anime365 (из панели 'Публикация')");
     placeholdersLayout->setColumnStretch(1, 1);
     mainLayout->addWidget(placeholdersWidget);
 
-    mainLayout->addWidget(new QLabel("<h3>Форматирование Telegram (стиль MarkdownV2):</h3>"));
-    QWidget *formatWidget = new QWidget();
-    QGridLayout *gridLayout = new QGridLayout(formatWidget);
-    gridLayout->setContentsMargins(0, 0, 0, 0);
-    addRow(gridLayout, 0, "*жирный*", "<b>жирный</b>");
-    addRow(gridLayout, 1, "_курсив_", "<i>курсив</i>");
-    addRow(gridLayout, 2, "__подчеркнутый__", "<u>подчеркнутый</u>");
-    addRow(gridLayout, 3, "~зачеркнутый~", "<s>зачеркнутый</s>");
-    addRow(gridLayout, 4, "||скрытый текст||", "<span style='background-color: #555; color: #555; padding: 1px 3px; border-radius: 3px;'>скрытый текст</span>");
-    addRow(gridLayout, 5, "`моноширинный`", "<code>моноширинный</code>");
-    addRow(gridLayout, 6, "[текст ссылки](https://t.me/dublyajnaya)", "<a href=\"https://t.me/dublyajnaya\">текст ссылки</a>");
-    addRow(gridLayout, 7, ">Цитата", "<blockquote style='border-left: 2px solid #ccc; padding-left: 5px; margin-left: 0; color: #666;'>Цитата</blockquote>");
-    gridLayout->setColumnStretch(0, 1);
-    gridLayout->setColumnStretch(1, 1);
-    mainLayout->addWidget(formatWidget);
+    mainLayout->addWidget(new QFrame);
 
-    QLabel *escapeNoteLabel = new QLabel();
-    escapeNoteLabel->setWordWrap(true);
-    escapeNoteLabel->setTextInteractionFlags(Qt::TextBrowserInteraction);
-    escapeNoteLabel->setText(R"(
-        <h3 style="color: #c0392b;">Важно: Экранирование символов</h3>
-        <p>В синтаксисе MarkdownV2 следующие символы являются специальными: <code>_ * [ ] ( ) ~ ` > # + - = | { } . !</code></p>
-        <p>Если вы хотите использовать их в тексте как обычные символы, а не для форматирования, перед ними нужно поставить обратную косую черту (<code>\</code>).</p>
-        <p><b>Пример:</b> Чтобы написать "Цена: 1.500р.", нужно ввести <code>Цена: 1\.500р\.</code> (точки экранированы, иначе Telegram посчитает это концом предложения и может обрезать форматирование).</p>
-    )");
-    mainLayout->addWidget(escapeNoteLabel);
+    // --- Блок 2: Форматирование Telegram ---
+    mainLayout->addWidget(new QLabel("<h3>Форматирование Telegram:</h3>"));
+    QWidget *tgWidget = new QWidget();
+    QGridLayout *tgLayout = new QGridLayout(tgWidget);
+    addRow(tgLayout, 0, "**Жирный**", "<b>Жирный текст</b>");
+    addRow(tgLayout, 1, "__Курсив__", "<i>Курсив</i>");
+    addRow(tgLayout, 2, "~~Зачеркнутый~~", "<s>Зачеркнутый текст</s>");
+    addRow(tgLayout, 3, "||Спойлер||", "<span style='background-color: #555; color: #555;'>Спойлер</span>");
+    addRow(tgLayout, 4, "`Моноширинный`", "<code>Моноширинный текст</code>");
+    addRow(tgLayout, 5, "```python\nprint('Hello')\n```", "Блок кода (с указанием языка)");
+    tgLayout->setColumnStretch(1, 1);
+    mainLayout->addWidget(tgWidget);
 
-    QLabel *vkLabel = new QLabel();
-    vkLabel->setWordWrap(true);
-    vkLabel->setTextInteractionFlags(Qt::TextBrowserInteraction);
-    vkLabel->setOpenExternalLinks(true);
-    vkLabel->setText(R"(
-        <h3>Форматирование VK:</h3>
-        <p>VK не поддерживает форматирование при вставке из буфера. Для создания ссылок используйте специальный синтаксис:</p>
-        <ul><li>Пример кода: <code>[%LINK_ANILIB%|Смотреть на Anilib]</code></li></ul>
-        <p>Этот синтаксис преобразуется в кликабельную ссылку при публикации.</p>
-    )");
-    mainLayout->addWidget(vkLabel);
+    mainLayout->addWidget(new QFrame);
+
+    // --- Блок 3: Форматирование VK ---
+    mainLayout->addWidget(new QLabel("<h3>Форматирование VK (для ссылок):</h3>"));
+    QWidget *vkWidget = new QWidget();
+    QGridLayout *vkLayout = new QGridLayout(vkWidget);
+    addRow(vkLayout, 0, "[https://vk.com/dublyajnaya|ТО Дубляжная]", "Ссылка на внешний ресурс");
+    vkLayout->setColumnStretch(1, 1);
+    mainLayout->addWidget(vkWidget);
 
     mainLayout->addStretch(1);
 
-    QDialogButtonBox *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok, helpDialog);
-    connect(buttonBox, &QDialogButtonBox::accepted, helpDialog, &QDialog::accept);
-
     QVBoxLayout *dialogLayout = new QVBoxLayout(helpDialog);
     dialogLayout->addWidget(scrollArea);
-    dialogLayout->addWidget(buttonBox);
     helpDialog->setLayout(dialogLayout);
-
-    helpDialog->exec();
-    delete helpDialog;
+    helpDialog->show();
 }

@@ -1,6 +1,7 @@
 #include "processmanager.h"
 #include <QFileInfo>
 
+
 ProcessManager::ProcessManager(QObject *parent)
     : QObject{parent}
 {
@@ -13,6 +14,7 @@ ProcessManager::~ProcessManager()
 
 void ProcessManager::startProcess(const QString &program, const QStringList &arguments)
 {
+    m_wasKilled = false;
     emit processOutput(QString("Запуск (асинхронный): %1 %2").arg(program, arguments.join(" ")));
 
     QProcess* newProcess = new QProcess(this);
@@ -38,7 +40,6 @@ void ProcessManager::startProcess(const QString &program, const QStringList &arg
     newProcess->start(program, arguments);
 }
 
-// Синхронный метод остается без изменений
 bool ProcessManager::executeAndWait(const QString &program, const QStringList &arguments, QByteArray &output)
 {
     emit processOutput(QString("Запуск (синхронный): %1 %2").arg(program, arguments.join(" ")));
@@ -52,9 +53,17 @@ bool ProcessManager::executeAndWait(const QString &program, const QStringList &a
     }
 
     if (syncProcess.exitStatus() != QProcess::NormalExit || syncProcess.exitCode() != 0) {
-        emit processError("Процесс '" + program + "' завершился с ошибкой.");
-        emit processOutput("STDERR: " + syncProcess.readAllStandardError());
+        QString errorString = QString("Процесс '%1' завершился с ошибкой. Код: %2, Статус: %3.")
+                                  .arg(QFileInfo(program).fileName())
+                                  .arg(syncProcess.exitCode())
+                                  .arg(syncProcess.exitStatus() == QProcess::NormalExit ? "Normal" : "Crash");
+        emit processError(errorString);
+        QByteArray stderrData = syncProcess.readAllStandardError();
+        if (!stderrData.isEmpty()) {
+            emit processError("STDERR: " + QString::fromUtf8(stderrData));
+        }
         return false;
+
     }
 
     output = syncProcess.readAllStandardOutput();
@@ -65,6 +74,8 @@ bool ProcessManager::executeAndWait(const QString &program, const QStringList &a
 void ProcessManager::killProcess()
 {
     if (m_activeProcesses.isEmpty()) return;
+
+    m_wasKilled = true;
 
     emit processOutput(QString("Принудительное завершение %1 дочерних процессов...").arg(m_activeProcesses.count()));
 
@@ -80,6 +91,11 @@ void ProcessManager::killProcess()
             }
         }
     }
+}
+
+bool ProcessManager::wasKilled() const
+{
+    return m_wasKilled;
 }
 
 void ProcessManager::onReadyReadStandardOutput()

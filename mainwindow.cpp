@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "appsettings.h"
 #include "manualassembler.h"
 #include "manualrenderer.h"
 #include "templateeditor.h"
@@ -7,6 +8,8 @@
 #include "postgenerator.h"
 #include "processmanager.h"
 #include "styleselectordialog.h"
+#include "torrentselectordialog.h"
+#include "trackselectordialog.h"
 #include <QThread>
 #include <QDateTime>
 #include <QDir>
@@ -21,17 +24,30 @@
 #include <QIcon>
 
 
+static QString logCategoryToString(LogCategory category)
+{
+    switch (category) {
+    case LogCategory::APP: return "APP";
+    case LogCategory::FFMPEG: return "FFMPEG";
+    case LogCategory::MKVTOOLNIX: return "MKVTOOLNIX";
+    case LogCategory::QBITTORRENT: return "QBITTORRENT";
+    case LogCategory::DEBUG: return "DEBUG";
+    }
+    return "UNKNOWN";
+}
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
+    , m_currentWorker(nullptr)
 {
     ui->setupUi(this);
     setWindowIcon(QIcon(":/icon.png"));
+
     m_manualAssemblyWidget = new ManualAssemblyWidget(this);
     ui->manualTabLayout->addWidget(m_manualAssemblyWidget);
     m_manualRenderWidget = new ManualRenderWidget(this);
     ui->renderTabLayout->addWidget(m_manualRenderWidget);
-
     m_publicationWidget = new PublicationWidget(this);
     ui->mainTabWidget->addTab(m_publicationWidget, "Публикация");
     ui->mainTabWidget->setTabEnabled(ui->mainTabWidget->count() - 1, false);
@@ -39,12 +55,10 @@ MainWindow::MainWindow(QWidget *parent)
     QAction *settingsAction = new QAction("Настройки", this);
     ui->menubar->addAction(settingsAction);
     connect(settingsAction, &QAction::triggered, this, &MainWindow::on_actionSettings_triggered);
-
-    m_manualAssemblyWidget->updateTemplateList(m_templates.keys());
     connect(m_manualAssemblyWidget, &ManualAssemblyWidget::templateDataRequested, this, &MainWindow::onRequestTemplateData);
-    connect(m_manualAssemblyWidget, &ManualAssemblyWidget::assemblyRequested, this, &MainWindow::onManualAssemblyRequested);
 
-    connect(m_manualRenderWidget, &ManualRenderWidget::renderRequested, this, &MainWindow::onManualRenderRequested);
+    connect(m_manualAssemblyWidget, &ManualAssemblyWidget::assemblyRequested, this, &MainWindow::startManualAssembly);
+    connect(m_manualRenderWidget, &ManualRenderWidget::renderRequested, this, &MainWindow::startManualRender);
 
     connect(m_publicationWidget, &PublicationWidget::logMessage, this, &MainWindow::logMessage);
     connect(m_publicationWidget, &PublicationWidget::postsUpdateRequest, this, &MainWindow::onPostsUpdateRequest);
@@ -60,14 +74,24 @@ MainWindow::MainWindow(QWidget *parent)
         logMessage(QString("Загружено %1 шаблонов.").arg(m_templates.count()));
     }
 }
+
 MainWindow::~MainWindow()
 {
     delete ui;
 }
 
-void MainWindow::logMessage(const QString &message)
+void MainWindow::logMessage(const QString &message, LogCategory category)
 {
-    QString timedMessage = QDateTime::currentDateTime().toString("hh:mm:ss") + " - " + message;
+    const auto& enabledCategories = AppSettings::instance().enabledLogCategories();
+    if (!enabledCategories.contains(category)) {
+        return;
+    }
+
+    QString categoryName = logCategoryToString(category);
+    QString timedMessage = QString("[%1] %2 - %3")
+                               .arg(categoryName)
+                               .arg(QDateTime::currentDateTime().toString("hh:mm:ss"))
+                               .arg(message.trimmed());
     ui->logOutput->appendPlainText(timedMessage);
 }
 
@@ -79,7 +103,7 @@ void MainWindow::loadTemplates()
     QDir templatesDir("templates");
     if (!templatesDir.exists()) {
         templatesDir.mkpath(".");
-        logMessage("Создана папка 'templates' для хранения шаблонов.");
+        logMessage("Создана папка 'templates' для хранения шаблонов.", LogCategory::APP);
     }
 
     QStringList filter("*.json");
@@ -88,7 +112,7 @@ void MainWindow::loadTemplates()
     for (const QFileInfo &fileInfo : fileList) {
         QFile file(fileInfo.absoluteFilePath());
         if (!file.open(QIODevice::ReadOnly)) {
-            logMessage("Ошибка: не удалось открыть файл шаблона " + fileInfo.fileName());
+            logMessage("Ошибка: не удалось открыть файл шаблона " + fileInfo.fileName(), LogCategory::APP);
             continue;
         }
 
@@ -113,7 +137,7 @@ void MainWindow::loadTemplates()
 void MainWindow::saveTemplate(const ReleaseTemplate &t)
 {
     if (t.templateName.isEmpty()) {
-        logMessage("Ошибка: имя шаблона не может быть пустым.");
+        logMessage("Ошибка: имя шаблона не может быть пустым.", LogCategory::APP);
         return;
     }
 
@@ -126,7 +150,7 @@ void MainWindow::saveTemplate(const ReleaseTemplate &t)
     QDir templatesDir("templates");
     QFile file(templatesDir.filePath(t.templateName + ".json"));
     if (!file.open(QIODevice::WriteOnly)) {
-        logMessage("Ошибка: не удалось сохранить файл шаблона " + t.templateName);
+        logMessage("Ошибка: не удалось сохранить файл шаблона " + t.templateName, LogCategory::APP);
         return;
     }
 
@@ -136,7 +160,7 @@ void MainWindow::saveTemplate(const ReleaseTemplate &t)
     file.write(QJsonDocument(jsonObj).toJson(QJsonDocument::Indented));
     file.close();
 
-    logMessage("Шаблон '" + t.templateName + "' успешно сохранен.");
+    logMessage("Шаблон '" + t.templateName + "' успешно сохранен.", LogCategory::APP);
     loadTemplates();
 
     int index = ui->templateComboBox->findText(nameToSelect);
@@ -149,8 +173,68 @@ void MainWindow::on_createTemplateButton_clicked()
 {
     m_editingTemplateFileName.clear();
     TemplateEditor editor(this);
+
+    ReleaseTemplate defaultTemplate;
+    defaultTemplate.templateName = "Новый шаблон";
+    defaultTemplate.seriesTitle = "Как в архиве mkv";
+    defaultTemplate.seriesTitleForPost = "Как в постах";
+    defaultTemplate.rssUrl = QUrl("https://example.com/rss.xml");
+    defaultTemplate.animationStudio = "STUDIO";
+    defaultTemplate.subAuthor = "Crunchyroll";
+    defaultTemplate.originalLanguage = "jpn";
+    defaultTemplate.endingChapterName = "Ending Start";
+    defaultTemplate.totalEpisodes = 12;
+
+    defaultTemplate.director = "Режиссер Дубляжа";
+    defaultTemplate.soundEngineer = "Звукорежиссер";
+    defaultTemplate.timingAuthor = "Таймингер";
+    defaultTemplate.releaseBuilder = "Сборщик Релиза";
+    defaultTemplate.cast << "Актер 1" << "Актер 2" << "Актер 3";
+
+    defaultTemplate.postTemplates["tg_mp4"] =
+        "▶️Серия: %EPISODE_NUMBER%/%TOTAL_EPISODES%\n\n"
+        "📌«%SERIES_TITLE%» в дубляже от ТО Дубляжная\n\n"
+        "🎁А также вы можете поддержать наш коллектив копеечкой (https://boosty.to/dubl/single-payment/donation/696237/target?share=target_link)\n💙ВК(https://vk.com/dublyajnaya?from=groups&ref=group_widget&w=app6471849_-216649949)\n💰BOOSTY(https://boosty.to/dubl/single-payment/donation/696237/target?share=target_link)\n\n"
+        "Anime365 (%LINK_ANIME365%)\n\n"
+        "AnimeLib (%LINK_ANILIB%)\n\n"
+        "Архив MKV (https://t.me/+CVpSSg33UwI4MzYy)\n\n"
+        "🎙Роли дублировали:\n%CAST_LIST%\n\n"
+        "📝Режиссёр дубляжа:\n%DIRECTOR%\n\n"
+        "🪄Звукорежиссёр:\n%SOUND_ENGINEER%\n\n"
+        "📚Перевод:\n%SUB_AUTHOR%\n\n"
+        "✏️Разметка:\n%TIMING_AUTHOR%\n\n"
+        "✨Локализация постера:\nКирилл Хоримиев\n\n"
+        "📦Сборка релиза:\n%RELEASE_BUILDER%\n\n"
+        "#Дубрелиз@dublyajnaya #Хештег@dublyajnaya #Дубляж@dublyajnaya";
+    defaultTemplate.postTemplates["tg_mkv"] =
+        "%SERIES_TITLE%\n"
+        "Серия %EPISODE_NUMBER%/%TOTAL_EPISODES%\n"
+        "#Хештег";
+    defaultTemplate.postTemplates["vk"] =
+        "%SERIES_TITLE% в дубляже от ТО Дубляжная\n\n"
+        "Серия: %EPISODE_NUMBER%/%TOTAL_EPISODES%\n\n"
+        "Роли дублировали:\n%CAST_LIST%\n\n"
+        "Режиссёр дубляжа:\n%DIRECTOR%\n\n"
+        "Звукорежиссёр:\n%SOUND_ENGINEER%\n\n"
+        "Перевод:\n%SUB_AUTHOR%\n\n"
+        "️Разметка:\n%TIMING_AUTHOR%\n\n"
+        "Локализация постера:\nКирилл Хоримиев\n\n"
+        "Сборка релиза:\n%RELEASE_BUILDER%\n\n"
+        "#Хештег";
+    defaultTemplate.postTemplates["vk_comment"] =
+        "А также вы можете поддержать наш коллектив на бусти: https://boosty.to/dubl/single-payment/donation/634652\n\n"
+        "ТГ: https://t.me/dublyajnaya\n\n"
+        "Anime365: %LINK_ANIME365%\n"
+        "AnimeLib: %LINK_ANILIB%\n";
+    defaultTemplate.uploadUrls << "https://vk.com/dublyajnaya" << "https://converter.kodik.biz/media-files" << "https://anime-365.ru/" << "https://anilib.me/ru";
+    editor.setTemplate(defaultTemplate);
+
     if (editor.exec() == QDialog::Accepted) {
         ReleaseTemplate newTemplate = editor.getTemplate();
+        if (newTemplate.templateName.isEmpty()) {
+            QMessageBox::warning(&editor, "Ошибка", "Имя шаблона не может быть пустым.");
+            return;
+        }
         saveTemplate(newTemplate);
     }
 }
@@ -159,7 +243,7 @@ void MainWindow::on_editTemplateButton_clicked()
 {
     QString currentName = ui->templateComboBox->currentText();
     if (currentName.isEmpty() || !m_templates.contains(currentName)) {
-        logMessage("Ошибка: выберите существующий шаблон для редактирования.");
+        logMessage("Ошибка: выберите существующий шаблон для редактирования.", LogCategory::APP);
         return;
     }
 
@@ -167,7 +251,6 @@ void MainWindow::on_editTemplateButton_clicked()
 
     TemplateEditor editor(this);
     editor.setTemplate(m_templates.value(currentName));
-
     if (editor.exec() == QDialog::Accepted) {
         ReleaseTemplate updatedTemplate = editor.getTemplate();
         saveTemplate(updatedTemplate);
@@ -178,7 +261,7 @@ void MainWindow::on_deleteTemplateButton_clicked()
 {
     QString currentName = ui->templateComboBox->currentText();
     if (currentName.isEmpty()) {
-        logMessage("Ошибка: нечего удалять.");
+        logMessage("Ошибка: нечего удалять.", LogCategory::APP);
         return;
     }
 
@@ -188,15 +271,23 @@ void MainWindow::on_deleteTemplateButton_clicked()
 
     if (reply == QMessageBox::Yes) {
         QFile::remove("templates/" + currentName + ".json");
-        logMessage("Шаблон '" + currentName + "' удален.");
+        logMessage("Шаблон '" + currentName + "' удален.", LogCategory::APP);
         loadTemplates();
+    }
+}
+
+void MainWindow::on_cancelButton_clicked()
+{
+    if (m_currentWorker) {
+        logMessage("Отправка запроса на отмену...", LogCategory::APP);
+        QMetaObject::invokeMethod(m_currentWorker, "cancelOperation", Qt::QueuedConnection);
     }
 }
 
 void MainWindow::on_startButton_clicked()
 {
-    if (!m_activeProcessManagers.isEmpty()) {
-        logMessage("Другой процесс уже запущен. Дождитесь его завершения.");
+    if (m_currentWorker) {
+        logMessage("Другой процесс уже запущен. Дождитесь его завершения.", LogCategory::APP);
         return;
     }
 
@@ -208,30 +299,49 @@ void MainWindow::on_startButton_clicked()
 
     QString manualMkvPath = ui->mkvPathLineEdit->text();
     if (manualMkvPath.isEmpty() && ui->episodeNumberLineEdit->text().isEmpty()) {
-        logMessage("Ошибка: укажите номер серии для автоматического режима или выберите MKV-файл для ручного.");
+        logMessage("Ошибка: укажите номер серии или выберите MKV-файл.", LogCategory::APP);
         return;
     }
     QString currentName = ui->templateComboBox->currentText();
     if (currentName.isEmpty()) {
-        logMessage("Ошибка: выберите шаблон.");
+        logMessage("Ошибка: выберите шаблон.", LogCategory::APP);
         return;
     }
+
+    switchToCancelMode();
+    setUiEnabled(false);
+
     ReleaseTemplate currentTemplate = m_templates.value(currentName);
-    QString episodeNumber = ui->episodeNumberLineEdit->text();
+    QString episodeNumberStr = ui->episodeNumberLineEdit->text();
+    bool ok;
+    int epNum = episodeNumberStr.toInt(&ok);
+    if (!ok && manualMkvPath.isEmpty()) {
+        logMessage("Ошибка: введенный номер серии не является числом.", LogCategory::APP);
+        return;
+    } else if (ok) {
+        episodeNumberStr = QString::number(epNum);
+    }
+    QString episodeForPost = episodeNumberStr;
+    QString episodeForSearch = QString("%1").arg(epNum, 2, 10, QChar('0'));
+
     QSettings settings("MyCompany", "DubbingTool");
 
-    QThread* thread = new QThread(this);
-    WorkflowManager* workflowManager = new WorkflowManager(currentTemplate, episodeNumber, settings, this);
+    setUiEnabled(false);
 
-    connect(workflowManager, &WorkflowManager::missingFilesRequest, this, &MainWindow::onMissingFilesRequest, Qt::QueuedConnection);
-    connect(this, &MainWindow::missingFilesProvided, workflowManager, [workflowManager](const QString &audioPath, const QMap<QString, QString> &resolvedFonts){
-        workflowManager->resumeWithMissingFiles(audioPath, resolvedFonts);
-    });
-    connect(workflowManager, &WorkflowManager::signStylesRequest, this, &MainWindow::onSignStylesRequest, Qt::QueuedConnection);
-    connect(this, &MainWindow::signStylesProvided, workflowManager, [workflowManager](const QStringList &styles){
-        workflowManager->resumeWithSignStyles(styles);
-    });
+    QThread* thread = new QThread(this);
+    WorkflowManager* workflowManager = new WorkflowManager(currentTemplate, episodeForPost, episodeForSearch, settings, this);
+
+    m_currentWorker = workflowManager; // Сохраняем указатель на текущего воркера
     m_activeProcessManagers.append(workflowManager->getProcessManager());
+    connect(workflowManager, &WorkflowManager::multipleTorrentsFound, this, &MainWindow::onMultipleTorrentsFound, Qt::QueuedConnection);
+    connect(this, &MainWindow::torrentSelected, workflowManager, &WorkflowManager::resumeWithSelectedTorrent);
+    connect(workflowManager, &WorkflowManager::multipleAudioTracksFound, this, &MainWindow::onMultipleAudioTracksFound, Qt::QueuedConnection);
+    connect(this, &MainWindow::audioTrackSelected, workflowManager, &WorkflowManager::resumeWithSelectedAudioTrack);
+    connect(workflowManager, &WorkflowManager::missingFilesRequest, this, &MainWindow::onMissingFilesRequest, Qt::QueuedConnection);
+    connect(this, &MainWindow::missingFilesProvided, workflowManager, &WorkflowManager::resumeWithMissingFiles);
+    connect(workflowManager, &WorkflowManager::signStylesRequest, this, &MainWindow::onSignStylesRequest, Qt::QueuedConnection);
+    connect(this, &MainWindow::signStylesProvided, workflowManager, &WorkflowManager::resumeWithSignStyles);
+    connect(workflowManager, &WorkflowManager::bitrateCheckRequest, this, &MainWindow::onBitrateCheckRequest, Qt::QueuedConnection);
 
     workflowManager->moveToThread(thread);
 
@@ -242,32 +352,17 @@ void MainWindow::on_startButton_clicked()
     } else {
         connect(thread, &QThread::started, workflowManager, &WorkflowManager::start);
     }
+    connect(workflowManager, &WorkflowManager::finished, this, &MainWindow::finishWorkerProcess);
+    connect(workflowManager, &WorkflowManager::workflowAborted, this, &MainWindow::finishWorkerProcess);
 
     connect(workflowManager, &WorkflowManager::postsReady, this, &MainWindow::onPostsReady);
     connect(workflowManager, &WorkflowManager::filesReady, this, &MainWindow::onFilesReady);
-    connect(workflowManager, &WorkflowManager::workflowAborted, this, &MainWindow::onWorkflowAborted);
-
     connect(workflowManager, &WorkflowManager::filesReady, thread, &QThread::quit);
-    connect(workflowManager, &WorkflowManager::workflowAborted, thread, &QThread::quit);
-
-    connect(thread, &QThread::finished, this, [this, workflowManager](){
-        m_activeProcessManagers.removeOne(workflowManager->getProcessManager());
-        logMessage("============ ПРОЦЕСС ЗАВЕРШЕН ============");
-        ui->startButton->setEnabled(true);
-        ui->selectMkvButton->setEnabled(true);
-        ui->selectAudioButton->setEnabled(true);
-        ui->downloadProgressBar->setVisible(false);
-        ui->progressLabel->setVisible(false);
-    });
     connect(thread, &QThread::finished, workflowManager, &WorkflowManager::deleteLater);
     connect(workflowManager, &WorkflowManager::destroyed, thread, &QThread::deleteLater);
-
     connect(workflowManager, &WorkflowManager::logMessage, this, &MainWindow::logMessage);
     connect(workflowManager, &WorkflowManager::progressUpdated, this, &MainWindow::updateProgress);
 
-    ui->startButton->setEnabled(false);
-    ui->selectMkvButton->setEnabled(false);
-    ui->selectAudioButton->setEnabled(false);
     thread->start();
 }
 
@@ -277,13 +372,10 @@ void MainWindow::on_selectMkvButton_clicked()
     if (filePath.isEmpty()) {
         return;
     }
-
-    // Заполняем поле пути
     ui->mkvPathLineEdit->setText(filePath);
 
     if (ui->episodeNumberLineEdit->text().isEmpty()) {
         // Простая регулярка для поиска числа, окруженного пробелами, тире или в конце строки
-        // Это более надежно, чем просто последнее число
         QRegularExpression re(" - (\\d{1,3})[ ._]");
         QRegularExpressionMatch match = re.match(filePath);
 
@@ -296,63 +388,64 @@ void MainWindow::on_selectMkvButton_clicked()
         if (match.hasMatch()) {
             QString episodeNumber = match.captured(1);
             ui->episodeNumberLineEdit->setText(episodeNumber);
-            logMessage("Номер серии был извлечен из имени файла: " + episodeNumber);
+            logMessage("Номер серии был извлечен из имени файла: " + episodeNumber, LogCategory::APP);
         } else {
-            logMessage("Не удалось автоматически извлечь номер серии из имени файла.");
+            logMessage("Не удалось автоматически извлечь номер серии из имени файла.", LogCategory::APP);
         }
     }
 }
 
-// void MainWindow::onWorkflowFinished(const ReleaseTemplate &t, const EpisodeData &data, const QString &mkvPath, const QString &mp4Path)
-// {
-//     logMessage("============ ПРОЦЕСС УСПЕШНО ЗАВЕРШЕН ============");
-
-//     // Сначала показываем панель публикации с полученными данными
-//     showPublicationPanel(t, data, mkvPath, mp4Path);
-
-//     // Затем сбрасываем UI в исходное состояние
-//     ui->startButton->setEnabled(true);
-//     ui->selectMkvButton->setEnabled(true);
-//     ui->selectAudioButton->setEnabled(true);
-
-//     ui->downloadProgressBar->setVisible(false);
-//     ui->progressLabel->setVisible(false);
-//     ui->downloadProgressBar->setValue(0);
-
-//     m_workflowManager = nullptr; // Указатель обнуляется
-// }
+void MainWindow::onMultipleTorrentsFound(const QList<TorrentInfo> &candidates)
+{
+    TorrentSelectorDialog dialog(candidates, this);
+    if (dialog.exec() == QDialog::Accepted) {
+        int selectedIndex = dialog.getSelectedIndex();
+        if (selectedIndex >= 0 && selectedIndex < candidates.size()) {
+            emit torrentSelected(candidates[selectedIndex]);
+        }
+    } else {
+        // Пользователь нажал "Отмена"
+        logMessage("Выбор торрента отменен пользователем. Процесс прерван.", LogCategory::APP);
+        // Нам нужно как-то сказать воркеру, чтобы он завершился
+        // Самый простой способ - эмитировать сигнал с пустым результатом
+        emit torrentSelected({}); // Пустой TorrentInfo будет сигналом к отмене
+    }
+}
 
 void MainWindow::onWorkflowAborted()
 {
-    logMessage("============ ПРОЦЕСС ПРЕРВАН С ОШИБКОЙ ============");
-
-    // // Просто сбрасываем UI в исходное состояние
-    // ui->startButton->setEnabled(true);
-    // ui->selectMkvButton->setEnabled(true);
-    // ui->selectAudioButton->setEnabled(true);
-
-    // ui->downloadProgressBar->setVisible(false);
-    // ui->progressLabel->setVisible(false);
-    // ui->downloadProgressBar->setValue(0);
-
-    // m_workflowManager = nullptr; // Указатель обнуляется
+    logMessage("============ ПРОЦЕСС ПРЕРВАН С ОШИБКОЙ ============", LogCategory::APP);
 }
 
 void MainWindow::on_actionSettings_triggered()
 {
     SettingsDialog dialog(this);
-    dialog.exec();
+    if (dialog.exec() == QDialog::Accepted) {
+        // Пользователь нажал "ОК", и данные уже сохранены на диск.
+        // Теперь нужно обновить данные в работающем приложении.
+
+        // 1. Заново загружаем все настройки из файла в память.
+        emit logMessage("Настройки обновлены. Перезагрузка конфигурации...", LogCategory::APP);
+        AppSettings::instance().load();
+
+        // 2. Обновляем все виджеты, которые зависят от настроек.
+        // Сейчас это только список пресетов в ручном рендере.
+        // В будущем здесь могут быть и другие виджеты.
+        m_manualRenderWidget->updateRenderPresets();
+
+        // Также нужно обновить список пресетов в редакторе шаблонов,
+        // но он и так обновляется каждый раз при открытии, так что это не обязательно.
+        emit logMessage("Конфигурация успешно перезагружена.", LogCategory::APP);
+    }
 }
 
 void MainWindow::updateProgress(int percentage, const QString &stageName)
 {
-    // Показываем элементы, если они скрыты
     if (!ui->downloadProgressBar->isVisible()) {
         ui->downloadProgressBar->setVisible(true);
         ui->progressLabel->setVisible(true);
     }
 
-    // Обновляем текст этапа, если он передан
     if (!stageName.isEmpty()) {
         ui->progressLabel->setText(QString("Текущий этап: %1").arg(stageName));
     }
@@ -361,7 +454,7 @@ void MainWindow::updateProgress(int percentage, const QString &stageName)
         // Отрицательное значение будет сигналом для включения "бегающего" прогресс-бара
         ui->downloadProgressBar->setMinimum(0);
         ui->downloadProgressBar->setMaximum(0);
-        ui->downloadProgressBar->setValue(-1); // Для некоторых стилей это включает анимацию
+        ui->downloadProgressBar->setValue(-1);
     } else {
         ui->downloadProgressBar->setMinimum(0);
         ui->downloadProgressBar->setMaximum(100);
@@ -394,82 +487,72 @@ void MainWindow::onRequestTemplateData(const QString &templateName)
     }
 }
 
-void MainWindow::onManualAssemblyRequested(const QVariantMap &parameters)
+void MainWindow::startManualAssembly()
 {
-    if (!m_activeProcessManagers.isEmpty()) {
-        logMessage("Другой процесс уже запущен. Дождитесь его завершения.");
+    if (m_currentWorker) {
+        logMessage("Другой процесс уже запущен. Дождитесь его завершения.", LogCategory::APP);
         return;
     }
-    logMessage("Запрос на ручную сборку получен...");
-    ui->mainTabWidget->setCurrentIndex(0);
+    logMessage("Запрос на ручную сборку...", LogCategory::APP);
 
-    ManualAssembler *assembler = new ManualAssembler(parameters, nullptr);
-    m_activeProcessManagers.append(assembler->getProcessManager());
+    switchToCancelMode();
+    setUiEnabled(false);
+    ui->mainTabWidget->setCurrentIndex(0); // Переходим на главный таб
 
     QThread* thread = new QThread(this);
-    assembler->moveToThread(thread);
+    ManualAssembler* worker = new ManualAssembler(m_manualAssemblyWidget->getParameters(), nullptr);
 
-    connect(thread, &QThread::started, assembler, &ManualAssembler::start);
-    connect(assembler, &ManualAssembler::finished, thread, &QThread::quit);
+    m_currentWorker = worker;
+    m_activeProcessManagers.append(worker->getProcessManager());
+    worker->moveToThread(thread);
 
-    connect(thread, &QThread::finished, this, [this, assembler](){
-        m_activeProcessManagers.removeOne(assembler->getProcessManager());
-        logMessage("Ручная сборка завершена.");
-        ui->mainTabWidget->setEnabled(true);
-    });
-    connect(thread, &QThread::finished, assembler, &ManualAssembler::deleteLater);
-    connect(assembler, &ManualAssembler::destroyed, thread, &QThread::deleteLater);
-
-    connect(assembler, &ManualAssembler::logMessage, this, &MainWindow::logMessage);
-    connect(assembler, &ManualAssembler::progressUpdated, this, &MainWindow::updateProgress);
+    connect(thread, &QThread::started, worker, &ManualAssembler::start);
+    connect(worker, &ManualAssembler::finished, this, &MainWindow::finishWorkerProcess);
+    connect(worker, &ManualAssembler::logMessage, this, &MainWindow::logMessage);
+    connect(worker, &ManualAssembler::progressUpdated, this, &MainWindow::updateProgress);
+    connect(thread, &QThread::finished, worker, &QObject::deleteLater);
+    connect(worker, &QObject::destroyed, thread, &QObject::deleteLater);
 
     thread->start();
 }
 
-void MainWindow::onManualRenderRequested(const QVariantMap &parameters)
+void MainWindow::startManualRender()
 {
-    if (!m_activeProcessManagers.isEmpty()) {
-        logMessage("Другой процесс уже запущен. Дождитесь его завершения.");
+    if (m_currentWorker) {
+        logMessage("Другой процесс уже запущен. Дождитесь его завершения.", LogCategory::APP);
         return;
     }
-    logMessage("Запрос на ручной рендер получен...");
+    logMessage("Запрос на ручной рендер...", LogCategory::APP);
+
+    switchToCancelMode();
+    setUiEnabled(false);
     ui->mainTabWidget->setCurrentIndex(0);
 
-    ManualRenderer *renderer = new ManualRenderer(parameters, nullptr);
-    m_activeProcessManagers.append(renderer->getProcessManager());
-
     QThread* thread = new QThread(this);
-    renderer->moveToThread(thread);
+    ManualRenderer* worker = new ManualRenderer(m_manualRenderWidget->getParameters(), nullptr);
 
-    connect(thread, &QThread::started, renderer, &ManualRenderer::start);
-    connect(renderer, &ManualRenderer::finished, thread, &QThread::quit);
+    m_currentWorker = worker;
+    m_activeProcessManagers.append(worker->getProcessManager());
+    worker->moveToThread(thread);
 
-    connect(thread, &QThread::finished, this, [this, renderer](){
-        m_activeProcessManagers.removeOne(renderer->getProcessManager());
-        logMessage("Ручной рендер завершен.");
-        ui->mainTabWidget->setEnabled(true);
-        updateProgress(0, "");
-        ui->downloadProgressBar->setVisible(false);
-        ui->progressLabel->setVisible(false);
-    });
-    connect(thread, &QThread::finished, renderer, &ManualRenderer::deleteLater);
-    connect(renderer, &ManualRenderer::destroyed, thread, &QThread::deleteLater);
-
-    connect(renderer, &ManualRenderer::logMessage, this, &MainWindow::logMessage);
-    connect(renderer, &ManualRenderer::progressUpdated, this, [this](int percentage){
-        updateProgress(percentage, "Ручной рендер");
-    });
+    connect(thread, &QThread::started, worker, &ManualRenderer::start);
+    connect(worker, &ManualRenderer::finished, this, &MainWindow::finishWorkerProcess);
+    connect(worker, &ManualRenderer::logMessage, this, &MainWindow::logMessage);
+    connect(worker, &ManualRenderer::progressUpdated, this, [this](int p){ updateProgress(p); });
+    connect(thread, &QThread::finished, worker, &QObject::deleteLater);
+    connect(worker, &QObject::destroyed, thread, &QObject::deleteLater);
+    connect(worker, &ManualRenderer::bitrateCheckRequest, this, &MainWindow::onBitrateCheckRequest, Qt::QueuedConnection);
 
     thread->start();
 }
 
 void MainWindow::onPostsReady(const ReleaseTemplate &t, const EpisodeData &data)
 {
-    logMessage("Данные для постов готовы, открываю панель 'Публикация'.");
+    logMessage("Данные для постов готовы, открываю панель 'Публикация'.", LogCategory::APP);
 
     m_lastTemplate = t;
     m_lastEpisodeData = data;
-    m_lastMkvPath = ""; // Файлы еще не готовы
+    m_lastMkvPath = "";
     m_lastMp4Path = "";
 
     PostGenerator generator;
@@ -486,33 +569,28 @@ void MainWindow::onPostsReady(const ReleaseTemplate &t, const EpisodeData &data)
 
 void MainWindow::onFilesReady(const QString &mkvPath, const QString &mp4Path)
 {
-    logMessage("Файлы готовы, обновляю панель 'Публикация'.");
+    logMessage("Файлы готовы, обновляю панель 'Публикация'.", LogCategory::APP);
     m_lastMkvPath = mkvPath;
     m_lastMp4Path = mp4Path;
 
-    // Обновляем только пути к файлам на уже открытой панели
     m_publicationWidget->setFilePaths(mkvPath, mp4Path);
 }
 
-
-// void MainWindow::showPublicationPanel(const ReleaseTemplate &t, const EpisodeData &data, const QString &mkvPath, const QString &mp4Path)
-// {
-//     m_publicationWidget->setData(t, data, mkvPath, mp4Path);
-
-//     int pubIndex = ui->mainTabWidget->indexOf(m_publicationWidget);
-//     ui->mainTabWidget->setTabEnabled(pubIndex, true);
-//     ui->mainTabWidget->setCurrentIndex(pubIndex);
-// }
-
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-    if (!m_activeProcessManagers.isEmpty()) {
-        logMessage("Закрытие окна, принудительное завершение активных процессов...");
-        // Создаем копию списка, так как он может изменяться во время итерации
-        QList<ProcessManager*> managersToKill = m_activeProcessManagers;
-        for (ProcessManager* manager : managersToKill) {
-            manager->killProcess();
+    AppSettings::instance().save();
+    if (m_currentWorker) {
+        logMessage("Запрошена отмена операции перед закрытием...", LogCategory::APP);
+        QMetaObject::invokeMethod(m_currentWorker, "cancelOperation", Qt::QueuedConnection);
+
+        if (m_currentWorker && m_currentWorker->thread()) {
+            if (!m_currentWorker->thread()->wait(5000)) {
+                logMessage("Поток не завершился штатно, будет прерван принудительно.", LogCategory::APP);
+                m_currentWorker->thread()->terminate();
+            }
         }
+
+        logMessage("Фоновый процесс остановлен.", LogCategory::APP);
     }
     event->accept();
 }
@@ -545,72 +623,149 @@ QString MainWindow::getOverrideSignsPath() const
 
 void MainWindow::onPostsUpdateRequest(const QMap<QString, QString> &viewLinks)
 {
-    logMessage("Обновление постов с новыми ссылками...");
+    logMessage("Обновление постов с новыми ссылками...", LogCategory::APP);
     m_lastEpisodeData.viewLinks = viewLinks;
 
-    // Перегенерируем посты
     PostGenerator generator;
     QMap<QString, PostVersions> postTexts = generator.generate(m_lastTemplate, m_lastEpisodeData);
-
-    // Вызываем тот же метод, чтобы обновить все данные на панели
     m_publicationWidget->updateData(m_lastTemplate, m_lastEpisodeData, postTexts, m_lastMkvPath, m_lastMp4Path);
 
     QMessageBox::information(m_publicationWidget, "Успех", "Тексты постов обновлены.");
 }
 
-void MainWindow::onMissingFilesRequest(const QStringList &missingFonts)
+void MainWindow::onMissingFilesRequest(const QStringList &missingFonts, bool requireWav, bool requireTime)
 {
-    logMessage("Процесс приостановлен: требуются данные от пользователя.");
+    logMessage("Процесс приостановлен: требуются данные от пользователя.", LogCategory::APP);
     MissingFilesDialog dialog(this);
 
     bool audioNeeded = ui->audioPathLineEdit->text().isEmpty();
+    if (requireWav) {
+        audioNeeded = true;
+        dialog.setAudioPrompt("Для SRT-мастера требуется несжатый WAV-файл:");
+    } else {
+        dialog.setAudioPrompt("Не удалось найти русскую аудиодорожку. Укажите путь к ней:");
+    }
+
     dialog.setAudioPathVisible(audioNeeded);
     dialog.setMissingFonts(missingFonts);
+    dialog.setTimeInputVisible(requireTime);
 
     if (dialog.exec() == QDialog::Accepted) {
-        // --- Пользователь нажал "ОК" ---
         QString audioPath = dialog.getAudioPath();
-
-        if (audioNeeded) {
-            if (audioPath.isEmpty()) {
-                // Пользователь не указал обязательное аудио, но нажал ОК.
-                // Это критическая ошибка, прерываем процесс.
-                QMessageBox::critical(this, "Ошибка", "Аудиодорожка является обязательной для продолжения. Сборка прервана.");
-                logMessage("Критическая ошибка: аудиодорожка не была предоставлена. Процесс прерван.");
-                // Отправляем специальный сигнал об отмене.
-                // Путь к аудио "" будет индикатором отмены для WorkflowManager.
-                emit missingFilesProvided("", {});
-                return;
-            }
-            // Сохраняем путь в главном окне
-            ui->audioPathLineEdit->setText(audioPath);
+        QString time = dialog.getTime();
+        ui->audioPathLineEdit->setText(audioPath);
+        // Проверяем, что обязательные поля заполнены
+        if (audioNeeded && audioPath.isEmpty()) {
+            QMessageBox::critical(this, "Ошибка", "Аудиодорожка является обязательной. Сборка прервана.");
+            emit missingFilesProvided("", {}, "");
+            return;
+        }
+        if (requireTime && time.isEmpty()) {
+            QMessageBox::critical(this, "Ошибка", "Время эндинга является обязательным. Сборка прервана.");
+            emit missingFilesProvided("", {}, "");
+            return;
         }
 
-        // Если дошли сюда, то либо аудио не требовалось, либо оно было предоставлено.
-        logMessage("Данные от пользователя получены, возобновление процесса...");
-        emit missingFilesProvided(audioPath, dialog.getResolvedFonts());
+        logMessage("Данные от пользователя получены, возобновление процесса...", LogCategory::APP);
+        emit missingFilesProvided(audioPath, dialog.getResolvedFonts(), time);
 
     } else {
-        // --- Пользователь нажал "Отмена" ---
-        logMessage("Пользователь отменил ввод данных. Процесс прерван.");
-        // Отправляем специальный сигнал об отмене.
-        // Пустой путь к аудио "" будет индикатором отмены.
-        emit missingFilesProvided("", {});
+        logMessage("Пользователь отменил ввод данных. Процесс прерван.", LogCategory::APP);
+        emit missingFilesProvided("", {}, "");
     }
 }
 
 void MainWindow::onSignStylesRequest(const QString &subFilePath)
 {
-    logMessage("Процесс приостановлен: требуется выбрать стили для надписей.");
+    logMessage("Процесс приостановлен: требуется выбрать стили для надписей.", LogCategory::APP);
     StyleSelectorDialog dialog(this);
     dialog.analyzeFile(subFilePath);
 
     if (dialog.exec() == QDialog::Accepted) {
         QStringList selected = dialog.getSelectedStyles();
-        logMessage("Выбранные стили для надписей: " + selected.join(", "));
+        logMessage("Выбранные стили для надписей: " + selected.join(", "), LogCategory::APP);
         emit signStylesProvided(selected);
     } else {
-        logMessage("Выбор стилей отменен. Процесс прерван.");
+        logMessage("Выбор стилей отменен. Процесс прерван.", LogCategory::APP);
         emit signStylesProvided({}); // Пустой список
+    }
+}
+
+void MainWindow::onMultipleAudioTracksFound(const QList<AudioTrackInfo> &candidates)
+{
+    TrackSelectorDialog dialog(candidates, this);
+    if (dialog.exec() == QDialog::Accepted) {
+        emit audioTrackSelected(dialog.getSelectedTrackId());
+    } else {
+        logMessage("Выбор аудиодорожки отменен пользователем. Процесс прерван.", LogCategory::APP);
+        emit audioTrackSelected(-1); // -1 будет сигналом к отмене
+    }
+}
+
+void MainWindow::setUiEnabled(bool enabled)
+{
+    ui->createTemplateButton->setEnabled(enabled);
+    ui->editTemplateButton->setEnabled(enabled);
+    ui->deleteTemplateButton->setEnabled(enabled);
+
+    if (m_manualAssemblyWidget) m_manualAssemblyWidget->findChild<QPushButton*>("assembleButton")->setEnabled(enabled);
+    if (m_manualRenderWidget) m_manualRenderWidget->findChild<QPushButton*>("renderButton")->setEnabled(enabled);
+}
+
+void MainWindow::finishWorkerProcess()
+{
+    logMessage("============ ПРОЦЕСС ЗАВЕРШЕН ============", LogCategory::APP);
+
+    if (m_currentWorker) {
+        if(auto ptr = qobject_cast<WorkflowManager*>(m_currentWorker.data())) m_activeProcessManagers.removeOne(ptr->getProcessManager());
+        else if(auto ptr = qobject_cast<ManualAssembler*>(m_currentWorker.data())) m_activeProcessManagers.removeOne(ptr->getProcessManager());
+        else if(auto ptr = qobject_cast<ManualRenderer*>(m_currentWorker.data())) m_activeProcessManagers.removeOne(ptr->getProcessManager());
+
+        if(m_currentWorker->thread()) m_currentWorker->thread()->quit();
+        m_currentWorker = nullptr;
+    }
+
+    restoreUiAfterFinish();
+}
+
+void MainWindow::switchToCancelMode()
+{
+    ui->startButton->setText("ОТМЕНА");
+    ui->startButton->setStyleSheet("background-color: #d9534f; color: white;");
+    disconnect(ui->startButton, &QPushButton::clicked, this, &MainWindow::on_startButton_clicked);
+    connect(ui->startButton, &QPushButton::clicked, this, &MainWindow::on_cancelButton_clicked);
+}
+
+void MainWindow::restoreUiAfterFinish()
+{
+    ui->startButton->setText("СТАРТ");
+    ui->startButton->setStyleSheet("");
+    disconnect(ui->startButton, &QPushButton::clicked, this, &MainWindow::on_cancelButton_clicked);
+    connect(ui->startButton, &QPushButton::clicked, this, &MainWindow::on_startButton_clicked);
+
+    setUiEnabled(true);
+
+    ui->downloadProgressBar->setVisible(false);
+    ui->progressLabel->setVisible(false);
+}
+
+void MainWindow::onBitrateCheckRequest(const RenderPreset &preset, double actualBitrate)
+{
+    RerenderDialog dialog(preset, actualBitrate, this);
+    bool accepted = (dialog.exec() == QDialog::Accepted);
+
+    // Ответ нужно передать обратно в рабочий поток, где живет воркер
+    if (m_currentWorker) {
+        QString pass1 = accepted ? dialog.getCommandPass1() : "";
+        QString pass2 = accepted ? dialog.getCommandPass2() : "";
+
+        // Находим дочерний RenderHelper и вызываем его слот
+        RenderHelper* helper = m_currentWorker->findChild<RenderHelper*>();
+        if(helper) {
+            QMetaObject::invokeMethod(helper, "onDialogFinished", Qt::QueuedConnection,
+                                      Q_ARG(bool, accepted),
+                                      Q_ARG(QString, pass1),
+                                      Q_ARG(QString, pass2));
+        }
     }
 }

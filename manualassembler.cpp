@@ -27,22 +27,22 @@ ManualAssembler::~ManualAssembler() {}
 
 void ManualAssembler::start()
 {
-    emit logMessage("--- Начало ручной сборки ---");
+    emit logMessage("--- Начало ручной сборки ---", LogCategory::APP);
 
     QString templateName = m_params["templateName"].toString();
     if (templateName.isEmpty()) {
-        emit logMessage("Критическая ошибка: базовый шаблон не был выбран.");
+        emit logMessage("Критическая ошибка: базовый шаблон не был выбран.", LogCategory::APP);
         emit finished();
         return;
     }
 
     QDir templatesDir(QCoreApplication::applicationDirPath());
-    templatesDir.cd("../templates"); // Переходим в папку templates
+    templatesDir.cd("../templates"); //Не самый надёжный способ, но пока оставлю
     QString templatePath = templatesDir.filePath(templateName + ".json");
 
     QFile file(templatePath);
     if (!file.open(QIODevice::ReadOnly)) {
-        emit logMessage("Критическая ошибка: не удалось загрузить шаблон по пути " + templatePath);
+        emit logMessage("Критическая ошибка: не удалось загрузить шаблон по пути " + templatePath, LogCategory::APP);
         emit finished();
         return;
     }
@@ -52,7 +52,7 @@ void ManualAssembler::start()
     t.read(doc.object());
 
     if (m_params["addTb"].toBool()) {
-        emit logMessage("Добавление ТБ в субтитры...");
+        emit logMessage("Добавление ТБ в субтитры...", LogCategory::APP);
 
         ReleaseTemplate tbTemplate = t;
         QString tbStartTime = m_params["tbStartTime"].toString();
@@ -79,16 +79,16 @@ void ManualAssembler::start()
 void ManualAssembler::assemble(const ReleaseTemplate &t)
 {
     m_currentStep = Step::AssemblingMkv;
-    emit logMessage("Сборка MKV файла...");
+    emit logMessage("Сборка MKV файла...", LogCategory::APP);
     emit progressUpdated(-1, "Сборка MKV");
 
     QSettings settings("MyCompany", "DubbingTool");
     QString mkvmergePath = settings.value("paths/mkvmerge", "mkvmerge").toString();
-    m_ffmpegPath = settings.value("paths/ffmpeg", "ffmpeg").toString(); // Загружаем путь к ffmpeg
+    m_ffmpegPath = settings.value("paths/ffmpeg", "ffmpeg").toString();
 
     QString workDir = m_params["workDir"].toString();
     QString outputName = m_params["outputName"].toString();
-    m_finalMkvPath = outputName; // Сохраняем для рендера
+    m_finalMkvPath = outputName;
     QString videoPath = m_params["videoPath"].toString();
     QString originalAudioPath = m_params["originalAudioPath"].toString();
     QString russianAudioPath = m_params["russianAudioPath"].toString();
@@ -96,9 +96,8 @@ void ManualAssembler::assemble(const ReleaseTemplate &t)
     QString signsPath = m_params["signsPath"].toString();
     QStringList fontPaths = m_params["fontPaths"].toStringList();
 
-    // Проверка обязательных полей
     if (outputName.isEmpty()) {
-        emit logMessage("Критическая ошибка: не указан выходной файл.");
+        emit logMessage("Критическая ошибка: не указан выходной файл.", LogCategory::APP);
         emit finished();
         return;
     }
@@ -112,13 +111,13 @@ void ManualAssembler::assemble(const ReleaseTemplate &t)
         if (!videoPath.isEmpty()) {
             fullOutputPath = QDir(QFileInfo(videoPath).path()).filePath(outputName);
         } else {
-            // Если и видео нет, то сохраняем в текущую папку (маловероятно)
+            // Если и видео нет, то сохраняем в текущую папку
             fullOutputPath = outputName;
         }
     }
 
     if (fullOutputPath.isEmpty()) {
-        emit logMessage("Критическая ошибка: не удалось определить путь для сохранения файла.");
+        emit logMessage("Критическая ошибка: не удалось определить путь для сохранения файла.", LogCategory::APP);
         emit finished();
         return;
     }
@@ -139,7 +138,6 @@ void ManualAssembler::assemble(const ReleaseTemplate &t)
         args << "--attach-file" << path;
     }
 
-    // Дорожки
     if (m_params.contains("videoPath") && !m_params.value("videoPath").toString().isEmpty()) {
         args << "--language" << "0:" + t.originalLanguage << "--track-name" << QString("0:Видеоряд [%1]").arg(t.animationStudio) << videoPath;
     }
@@ -158,16 +156,30 @@ void ManualAssembler::assemble(const ReleaseTemplate &t)
     m_processManager->startProcess(mkvmergePath, args);
 }
 
+void ManualAssembler::cancelOperation()
+{
+    emit logMessage("Получена команда на отмену ручной сборки...", LogCategory::APP);
+    if (m_processManager) {
+        m_processManager->killProcess();
+    }
+}
+
 void ManualAssembler::onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
+    if (m_processManager && m_processManager->wasKilled()) {
+        emit logMessage("Ручная сборка отменена пользователем.", LogCategory::APP);
+        emit finished();
+        return;
+    }
+
     if (exitCode != 0 || exitStatus != QProcess::NormalExit) {
-        emit logMessage("Ошибка выполнения дочернего процесса. Рабочий процесс остановлен.");
+        emit logMessage("Ошибка выполнения дочернего процесса. Рабочий процесс остановлен.", LogCategory::APP);
         emit finished();
         return;
     }
 
     if (m_currentStep == Step::AssemblingMkv) {
-        emit logMessage("Ручная сборка MKV успешно завершена.");
+        emit logMessage("Ручная сборка MKV успешно завершена.", LogCategory::APP);
         emit finished();
     }
 }
@@ -175,10 +187,9 @@ void ManualAssembler::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
 void ManualAssembler::onProcessText(const QString &output)
 {
     if (!output.trimmed().isEmpty()) {
-        emit logMessage(output.trimmed());
+        emit logMessage(output.trimmed(), LogCategory::MKVTOOLNIX);
     }
 
-    // Парсим прогресс от mkvmerge
     if (m_currentStep == Step::AssemblingMkv) {
         QRegularExpression re("Progress: (\\d+)%");
         auto it = re.globalMatch(output);

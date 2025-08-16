@@ -6,11 +6,11 @@
 #include <QMimeData>
 #include <QDrag>
 #include <QMap>
-#include "releasetemplate.h" // Включаем, чтобы иметь доступ к шаблону
-#include "postgenerator.h"   // И к структуре EpisodeData
+#include "releasetemplate.h"
+#include "postgenerator.h"
+#include "appsettings.h"
 
 
-// Специальный QLabel с поддержкой Drag
 class DraggableLabel : public QLabel {
     Q_OBJECT
 public:
@@ -33,13 +33,12 @@ public:
     explicit PublicationWidget(QWidget *parent = nullptr);
     ~PublicationWidget();
 
-    // Метод для инициализации панели
     void updateData(const ReleaseTemplate &t, const EpisodeData &data, const QMap<QString, PostVersions>& posts, const QString& mkvPath, const QString& mp4Path);
     void setFilePaths(const QString& mkvPath, const QString& mp4Path);
     void clearData();
 
 signals:
-    void logMessage(const QString& message);
+    void logMessage(const QString&, LogCategory);
     void postsUpdateRequest(const QMap<QString, QString>& viewLinks);
 
 private slots:
@@ -49,7 +48,6 @@ private slots:
 private:
     Ui::PublicationWidget *ui;
 
-    // Храним текущие данные для перегенерации постов
     ReleaseTemplate m_template;
     EpisodeData m_episodeData;
     QMap<QString, PostVersions> m_currentPosts;

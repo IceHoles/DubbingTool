@@ -4,6 +4,7 @@
 #include <QDialog>
 #include <QStringList>
 
+
 namespace Ui {
 class StyleSelectorDialog;
 }

@@ -1,6 +1,7 @@
 #include "manualassemblywidget.h"
 #include "ui_manualassemblywidget.h"
 #include "fontfinder.h"
+#include "appsettings.h"
 #include <QListWidgetItem>
 #include <QColor>
 #include <QFileDialog>
@@ -14,12 +15,8 @@ ManualAssemblyWidget::ManualAssemblyWidget(QWidget *parent) :
 {
     ui->setupUi(this);
     ui->tbGroupBox->setChecked(false);
-
-    // Создаем и настраиваем FontFinder
     m_fontFinder = new FontFinder(this);
     connect(m_fontFinder, &FontFinder::finished, this, &ManualAssemblyWidget::onFontFinderFinished);
-    // Можно также пробросить его логи в главный лог, если нужно
-    //connect(m_fontFinder, &FontFinder::logMessage, main_window_pointer, &MainWindow::logMessage);
 }
 ManualAssemblyWidget::~ManualAssemblyWidget()
 {
@@ -28,7 +25,6 @@ ManualAssemblyWidget::~ManualAssemblyWidget()
 
 void ManualAssemblyWidget::updateTemplateList(const QStringList &templateNames)
 {
-    // Сохраняем текущий выбор, чтобы не сбрасывать его при обновлении
     QString current = ui->templateComboBox->currentText();
 
     // Блокируем сигналы, чтобы избежать лишнего вызова on_templateComboBox_currentIndexChanged
@@ -50,7 +46,6 @@ void ManualAssemblyWidget::updateTemplateList(const QStringList &templateNames)
     }
 }
 
-// Запрашиваем данные шаблона у MainWindow при выборе из списка
 void ManualAssemblyWidget::on_templateComboBox_currentIndexChanged(int index)
 {
     if (index == -1) return;
@@ -58,13 +53,12 @@ void ManualAssemblyWidget::on_templateComboBox_currentIndexChanged(int index)
     emit templateDataRequested(templateName);
 }
 
-// Получаем данные шаблона от MainWindow и заполняем поля по умолчанию
 void ManualAssemblyWidget::onTemplateDataReceived(const ReleaseTemplate &t)
 {
     ui->tbStartTimeEdit->setText(t.endingStartTime);
 
     ui->tbStyleComboBox->clear();
-    for(const auto& style : t.tbStyles) {
+    for(const auto& style : AppSettings::instance().tbStyles()) {
         ui->tbStyleComboBox->addItem(style.name);
     }
     ui->tbStyleComboBox->setCurrentText(t.defaultTbStyleName);
@@ -123,8 +117,6 @@ void ManualAssemblyWidget::on_analyzeSubsButton_clicked()
     // Блокируем кнопку, чтобы не запускать анализ дважды
     ui->analyzeSubsButton->setEnabled(false);
     ui->analyzeSubsButton->setText("Анализ...");
-
-    // Просто запускаем анализ. Результат придет в onFontFinderFinished
     m_fontFinder->findFontsInSubs(filesToAnalyze);
 }
 
@@ -137,38 +129,13 @@ void ManualAssemblyWidget::on_addFontsButton_clicked()
         QListWidgetItem* item = new QListWidgetItem(QFileInfo(path).fileName());
         item->setForeground(Qt::blue);
         item->setText(item->text() + " - добавлен вручную");
-        item->setData(Qt::UserRole, path); // Сохраняем путь
+        item->setData(Qt::UserRole, path);
         ui->fontsListWidget->addItem(item);
     }
 }
 
-void ManualAssemblyWidget::on_assembleButton_clicked()
+QVariantMap ManualAssemblyWidget::getParameters() const
 {
-    if (ui->templateComboBox->currentIndex() == -1) {
-        QMessageBox::warning(this, "Ошибка", "Выберите базовый шаблон для использования метаданных.");
-        return;
-    }
-
-    bool fontsMissing = false;
-    for(int i = 0; i < ui->fontsListWidget->count(); ++i) {
-        QListWidgetItem *item = ui->fontsListWidget->item(i);
-        // Проверяем, что у элемента красный цвет, который мы задаем для ненайденных шрифтов
-        if (item->foreground().color() == Qt::red) {
-            fontsMissing = true;
-            break;
-        }
-    }
-
-    if (fontsMissing) {
-        auto reply = QMessageBox::question(this, "Отсутствуют шрифты",
-                                           "Некоторые шрифты не были найдены в системе (отмечены красным). Субтитры могут отображаться некорректно.\n\n"
-                                           "Вы уверены, что хотите продолжить сборку?",
-                                           QMessageBox::Yes | QMessageBox::No);
-        if (reply == QMessageBox::No) {
-            return; // Пользователь отменил сборку
-        }
-    }
-
     QVariantMap params;
     params["templateName"] = ui->templateComboBox->currentText();
     if (ui->includeVideoCheckBox->isChecked()) {
@@ -203,8 +170,38 @@ void ManualAssemblyWidget::on_assembleButton_clicked()
         }
     }
     params["fontPaths"] = fontPaths;
+    return params;
+}
 
-    emit assemblyRequested(params);
+
+void ManualAssemblyWidget::on_assembleButton_clicked()
+{
+    if (ui->templateComboBox->currentIndex() == -1) {
+        QMessageBox::warning(this, "Ошибка", "Выберите базовый шаблон для использования метаданных.");
+        return;
+    }
+
+    bool fontsMissing = false;
+    for(int i = 0; i < ui->fontsListWidget->count(); ++i) {
+        QListWidgetItem *item = ui->fontsListWidget->item(i);
+        // Проверяем, что у элемента красный цвет, который мы задаем для ненайденных шрифтов
+        if (item->foreground().color() == Qt::red) {
+            fontsMissing = true;
+            break;
+        }
+    }
+
+    if (fontsMissing) {
+        auto reply = QMessageBox::question(this, "Отсутствуют шрифты",
+                                           "Некоторые шрифты не были найдены в системе (отмечены красным). Субтитры могут отображаться некорректно.\n\n"
+                                           "Вы уверены, что хотите продолжить сборку?",
+                                           QMessageBox::Yes | QMessageBox::No);
+        if (reply == QMessageBox::No) {
+            return; // Пользователь отменил сборку
+        }
+    }
+
+    emit assemblyRequested();
 }
 
 void ManualAssemblyWidget::on_browseWorkDirButton_clicked()
@@ -240,4 +237,9 @@ void ManualAssemblyWidget::onFontFinderFinished(const FontFinderResult &result)
     if (ui->fontsListWidget->count() == 0) {
         QMessageBox::warning(this, "Анализ завершен", "Не удалось найти информацию о шрифтах в указанных файлах.");
     }
+}
+
+void ManualAssemblyWidget::setAssembling(bool assembling)
+{
+    ui->assembleButton->setDisabled(assembling);
 }

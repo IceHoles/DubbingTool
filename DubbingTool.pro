@@ -12,6 +12,7 @@ CONFIG += c++17
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    appsettings.cpp \
     assprocessor.cpp \
     fontfinder.cpp \
     main.cpp \
@@ -25,12 +26,17 @@ SOURCES += \
     processmanager.cpp \
     publicationwidget.cpp \
     releasetemplate.cpp \
+    renderhelper.cpp \
+    rerenderdialog.cpp \
     settingsdialog.cpp \
     styleselectordialog.cpp \
     templateeditor.cpp \
+    torrentselectordialog.cpp \
+    trackselectordialog.cpp \
     workflowmanager.cpp
 
 HEADERS += \
+    appsettings.h \
     assprocessor.h \
     fontfinder.h \
     mainwindow.h \
@@ -43,9 +49,13 @@ HEADERS += \
     processmanager.h \
     publicationwidget.h \
     releasetemplate.h \
+    renderhelper.h \
+    rerenderdialog.h \
     settingsdialog.h \
     styleselectordialog.h \
     templateeditor.h \
+    torrentselectordialog.h \
+    trackselectordialog.h \
     workflowmanager.h
 
 FORMS += \
@@ -54,9 +64,12 @@ FORMS += \
     manualrenderwidget.ui \
     missingfilesdialog.ui \
     publicationwidget.ui \
+    rerenderdialog.ui \
     settingsdialog.ui \
     styleselectordialog.ui \
-    templateeditor.ui
+    templateeditor.ui \
+    torrentselectordialog.ui \
+    trackselectordialog.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

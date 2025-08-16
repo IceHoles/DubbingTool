@@ -1,12 +1,13 @@
 #include "manualrenderer.h"
 #include "processmanager.h"
-#include "workflowmanager.h"
+#include "appsettings.h"
 #include <QFileInfo>
 #include <QDir>
-#include <QSettings>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QRegularExpression>
+#include <QProcess>
+
 
 ManualRenderer::ManualRenderer(const QVariantMap &params, QObject *parent)
     : QObject(parent), m_params(params)
@@ -21,117 +22,156 @@ ManualRenderer::~ManualRenderer() {}
 
 void ManualRenderer::start()
 {
-    emit logMessage("--- Начало ручного рендера ---");
+    emit logMessage("--- Начало ручного рендера ---", LogCategory::APP);
 
     QString inputMkv = m_params["inputMkv"].toString();
-    QString outputMp4 = m_params["outputMp4"].toString();
-    QString renderPreset = m_params["renderPreset"].toString();
-    QString extraArgs = m_params["extraArgs"].toString();
+    QString presetName = m_params["renderPresetName"].toString();
 
-    if (inputMkv.isEmpty() || outputMp4.isEmpty()) {
-        emit logMessage("Ошибка: не указан входной или выходной файл.");
+    if (inputMkv.isEmpty() || presetName.isEmpty()) {
+        emit logMessage("Ошибка: не указан входной файл или не выбран пресет рендера.", LogCategory::APP);
         emit finished();
         return;
     }
 
-    // Получаем длительность входного файла для расчета прогресса
-    QSettings settings("MyCompany", "DubbingTool");
-    QString mkvmergePath = settings.value("paths/mkvmerge").toString();
+    // Получаем актуальный пресет из настроек
+    m_preset = AppSettings::instance().findRenderPreset(presetName);
+    if (m_preset.name.isEmpty()) {
+        emit logMessage("Критическая ошибка: пресет рендера '" + presetName + "' не найден в настройках.", LogCategory::APP);
+        emit finished();
+        return;
+    }
+
     QByteArray jsonData;
-    if (m_processManager->executeAndWait(mkvmergePath, {"-J", inputMkv}, jsonData)) {
+    if (m_processManager->executeAndWait(AppSettings::instance().mkvmergePath(), {"-J", inputMkv}, jsonData)) {
         QJsonObject root = QJsonDocument::fromJson(jsonData).object();
         if (root.contains("container")) {
             m_sourceDurationS = root["container"].toObject()["properties"].toObject()["duration"].toDouble() / 1000000000.0;
-            emit logMessage(QString("Длительность входного файла: %1 секунд.").arg(m_sourceDurationS));
         }
     }
-
-    // Формируем команду
-    QString ffmpegPath = settings.value("paths/ffmpeg", "ffmpeg").toString();
-    QStringList args;
-    args << "-y" << "-hide_banner" << "-i" << inputMkv;
-    args << "-map" << "0:v:0" << "-map" << "0:a:m:language:rus";
-
-    if(extraArgs.isEmpty()){
-        QStringList vf_options;
-        QString escapedInputPath = QDir::toNativeSeparators(inputMkv);
-        escapedInputPath.replace(':', "\\:");
-        // Выбираем поток субтитров по метаданным: язык 'rus' и флаг 'forced'
-        vf_options << QString("subtitles='%1':stream_index=s:m:language:rus:forced=1").arg(escapedInputPath);
-        // Рендерим так же, как в WorkflowManager
-       if (renderPreset == "NVIDIA (hevc_nvenc)") {
-            emit logMessage("Используется пресет NVIDIA (hevc_nvenc).");
-            args << "-c:v" << "hevc_nvenc"
-                 << "-preset" << "p7"
-                 << "-tune" << "hq"
-                 << "-profile:v" << "main"
-                 << "-rc" << "vbr"
-                 << "-b:v" << "4000k"
-                 << "-minrate" << "4000k"
-                 << "-maxrate" << "8000k"
-                 << "-bufsize" << "16000k"
-                 << "-rc-lookahead" << "32"
-                 << "-spatial-aq" << "1"
-                 << "-aq-strength" << "15"
-                 << "-multipass" << "fullres"
-                 << "-2pass" << "1"
-                 << "-tag:v" << "hvc1"; // Тег для лучшей совместимости с Apple устройствами
-        }
-        else if (renderPreset == "Intel (hevc_qsv)") {
-            emit logMessage("Используется пресет Intel (hevc_qsv).");
-            // Добавляем опцию format=nv12 в цепочку фильтров
-            // Это может быть необходимо для совместимости QSV
-            if (!vf_options.isEmpty()) {
-                vf_options.last().append(":force_style='PrimaryColour=&H00FFFFFF,BorderStyle=1,Outline=1'");
-            }
-            vf_options << "format=nv12";
-
-            args << "-c:v" << "hevc_qsv";
-            args << "-b:v" << "4000k"
-                 << "-minrate" << "4000k"
-                 << "-maxrate" << "8000k"
-                 << "-bufsize" << "16000k";
-            args << "-tag:v" << "hvc1"; // Тег для лучшей совместимости с Apple устройствами
-        }
-        else { // "CPU (libx265 - медленно)"
-            emit logMessage("Используется пресет CPU (libx265).");
-            args << "-c:v" << "libx265";
-            args << "-preset" << "medium"
-                 << "-crf" << "22"
-                 << "-b:v" << "4000k"
-                 << "-maxrate" << "8000k";
-        }
+    if (m_sourceDurationS == 0) {
+        emit logMessage("Предупреждение: не удалось определить длительность файла. Прогресс не будет отображаться.", LogCategory::APP);
     }
 
-    args << "-c:a" << "aac" << "-b:a" << "256k";
-    // Добавляем дополнительные аргументы пользователя
-    if (!extraArgs.isEmpty()) {
-        args << extraArgs.split(' ', Qt::SkipEmptyParts);
-    }
-
-    args << outputMp4;
-
-    emit logMessage("Запуск ffmpeg с командой: " + ffmpegPath + " " + args.join(" "));
-    emit progressUpdated(0);
-    m_processManager->startProcess(ffmpegPath, args);
+    m_currentStep = Step::Pass1;
+    runPass(m_currentStep);
 }
+
+void ManualRenderer::runPass(Step pass)
+{
+    QString commandTemplate = (pass == Step::Pass1) ? m_preset.commandPass1 : m_preset.commandPass2;
+
+    QStringList args = prepareCommandArguments(commandTemplate);
+    if (args.isEmpty()) {
+        emit logMessage("Ошибка: не удалось подготовить команду для рендера.", LogCategory::APP);
+        emit finished();
+        return;
+    }
+
+    QString program = args.takeFirst();
+
+    emit logMessage(QString("Запуск прохода: ") + program + " " + args.join(" "), LogCategory::APP);
+    m_processManager->startProcess(program, args);
+}
+
+QStringList ManualRenderer::prepareCommandArguments(const QString& commandTemplate)
+{
+    QString processedTemplate = commandTemplate;
+
+    // 1. Подставляем пути
+    QString inputMkv = m_params.value("inputMkv").toString();
+    QString outputMp4 = m_params.value("outputMp4").toString();
+
+    processedTemplate.replace("%INPUT%", inputMkv);
+    processedTemplate.replace("%OUTPUT%", outputMp4);
+
+    // 2. Обрабатываем фильтр субтитров
+    bool useHardsub = m_params.value("useHardsub").toBool();
+
+    if (useHardsub) {
+        QString hardsubMode = m_params.value("hardsubMode").toString();
+        QString filterValue;
+
+        if (hardsubMode == "internal") {
+            int trackIndex = m_params.value("subtitleTrackIndex").toInt();
+            // Формируем specifier 's:<index>', например 's:0' для первой дорожки субтитров
+            filterValue = QString("'%1':si=%2")
+                              .arg(escapePathForFfmpegFilter(inputMkv))
+                              .arg(trackIndex);
+            emit logMessage(QString("Hardsub: используется внутренняя дорожка субтитров #%1.").arg(trackIndex), LogCategory::APP);
+
+        } else { // "external"
+            QString externalPath = m_params.value("externalSubsPath").toString();
+            filterValue = QString("'%1'")
+                              .arg(escapePathForFfmpegFilter(externalPath));
+            emit logMessage(QString("Hardsub: используется внешний файл: %1").arg(externalPath), LogCategory::APP);
+        }
+
+        // Подставляем готовый фильтр в плейсхолдер
+        processedTemplate.replace("%SIGNS%", filterValue);
+
+    } else {
+        // Если hardsub отключен, нужно аккуратно удалить сам плейсхолдер и опцию -vf, если она относится только к нему.
+        // Простой вариант - заменить плейсхолдер на пустую строку, но это может оставить -vf "" в команде.
+        // Надежный вариант:
+        QRegularExpression filterRegex(R"(-vf\s+\"[^\"]*%SIGNS%[^\"]*\")");
+        processedTemplate.remove(filterRegex);
+        emit logMessage("Hardsub отключен. Фильтр субтитров удален из команды.", LogCategory::APP);
+    }
+
+    // 3. Используем QProcess для безопасного разбора готовой строки в список аргументов
+    return QProcess::splitCommand(processedTemplate);
+}
+
+void ManualRenderer::cancelOperation()
+{
+    emit logMessage("Получена команда на отмену ручного рендера...", LogCategory::APP);
+    if (m_processManager) {
+        m_processManager->killProcess();
+    }
+}
+
 
 void ManualRenderer::onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
-    if (exitCode == 0) {
-        emit logMessage("Ручной рендер успешно завершен.");
-        emit progressUpdated(100);
-    } else {
-        emit logMessage("Ручной рендер завершился с ошибкой.");
+    if (m_processManager && m_processManager->wasKilled()) {
+        emit logMessage("Ручной рендер отменен пользователем.", LogCategory::APP);
+        emit finished();
+        return;
     }
-    emit finished();
+
+    if (exitCode != 0 || exitStatus != QProcess::NormalExit) {
+        emit logMessage("Ошибка выполнения дочернего процесса. Рендер остановлен.", LogCategory::APP);
+        emit finished();
+        return;
+    }
+
+    if (m_currentStep == Step::Pass1) {
+        if (m_preset.isTwoPass()) {
+            emit logMessage("Первый проход успешно завершен.", LogCategory::APP);
+            m_currentStep = Step::Pass2;
+            runPass(m_currentStep);
+        } else {
+            emit logMessage("Рендер успешно завершен (один проход).", LogCategory::APP);
+            RenderHelper* helper = new RenderHelper(m_preset, m_params["outputMp4"].toString(), m_processManager, this);
+            connect(helper, &RenderHelper::logMessage, this, &ManualRenderer::logMessage);
+            connect(helper, &RenderHelper::finished, this, &ManualRenderer::onBitrateCheckFinished);
+            connect(helper, &RenderHelper::showDialogRequest, this, &ManualRenderer::bitrateCheckRequest);
+            helper->startCheck();
+        }
+    } else { // Step::Pass2
+        emit logMessage("Второй проход и весь рендер успешно завершены.", LogCategory::APP);
+        RenderHelper* helper = new RenderHelper(m_preset, m_params["outputMp4"].toString(), m_processManager, this);
+        connect(helper, &RenderHelper::logMessage, this, &ManualRenderer::logMessage);
+        connect(helper, &RenderHelper::finished, this, &ManualRenderer::onBitrateCheckFinished);
+        connect(helper, &RenderHelper::showDialogRequest, this, &ManualRenderer::bitrateCheckRequest);
+        helper->startCheck();
+    }
 }
 
 void ManualRenderer::onProcessText(const QString &output)
 {
-    // Логика парсинга прогресса ffmpeg, точно такая же, как в WorkflowManager
     if (!output.trimmed().isEmpty()) {
-        emit logMessage(output.trimmed());
+        emit logMessage(output.trimmed(), LogCategory::FFMPEG);
     }
 
     QRegularExpression re("time=(\\d{2}):(\\d{2}):(\\d{2})\\.(\\d{2})");
@@ -142,12 +182,29 @@ void ManualRenderer::onProcessText(const QString &output)
         int seconds = match.captured(3).toInt();
         double currentTimeS = (hours * 3600) + (minutes * 60) + seconds;
         if (m_sourceDurationS > 0) {
-            int percentage = static_cast<int>((currentTimeS / m_sourceDurationS) * 100);
-            emit progressUpdated(percentage);
+            int basePercentage = 0;
+            if (m_preset.isTwoPass()) {
+                basePercentage = (m_currentStep == Step::Pass1) ? 0 : 50;
+            }
+            int percentage = basePercentage + static_cast<int>((currentTimeS / m_sourceDurationS) * (m_preset.isTwoPass() ? 50 : 100));
+            emit progressUpdated(qMin(100, percentage));
         }
     }
 }
 
 ProcessManager* ManualRenderer::getProcessManager() const {
     return m_processManager;
+}
+
+void ManualRenderer::onBitrateCheckFinished(RerenderDecision decision, const RenderPreset &newPreset)
+{
+    if (decision == RerenderDecision::Rerender) {
+        emit logMessage("Получено решение о перерендере.", LogCategory::APP);
+        m_preset = newPreset;
+        m_currentStep = Step::Pass1;
+        runPass(m_currentStep);
+    } else {
+        emit progressUpdated(100);
+        emit finished();
+    }
 }
