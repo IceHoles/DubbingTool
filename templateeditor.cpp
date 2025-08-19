@@ -99,7 +99,7 @@ void TemplateEditor::setTemplate(const ReleaseTemplate &t)
     // Вкладка "Создание ТБ"
     ui->generateTbCheckBox->setChecked(t.generateTb);
     ui->endingChapterNameEdit->setText(t.endingChapterName);
-    ui->endingStartTimeEdit->setText(t.endingStartTime);
+    ui->endingStartTimeEdit->setTime(QTime::fromString(t.endingStartTime, "H:mm:ss.zzz"));
     ui->useManualTimeCheckBox->setChecked(t.useManualTime);
     ui->defaultTbStyleComboBox->clear();
     for(const auto& style : AppSettings::instance().tbStyles()) {
@@ -168,7 +168,7 @@ ReleaseTemplate TemplateEditor::getTemplate() const
     // Вкладка "Создание ТБ"
     t.generateTb = ui->generateTbCheckBox->isChecked();
     t.endingChapterName = ui->endingChapterNameEdit->text().trimmed();
-    t.endingStartTime = ui->endingStartTimeEdit->text().trimmed();
+    t.endingStartTime = ui->endingStartTimeEdit->time().toString("H:mm:ss.zzz");
     t.useManualTime = ui->useManualTimeCheckBox->isChecked();
     t.defaultTbStyleName = ui->defaultTbStyleComboBox->currentText();
     if (ui->voiceoverTypeComboBox->currentText() == "Закадр") {

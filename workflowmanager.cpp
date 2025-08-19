@@ -889,14 +889,9 @@ void WorkflowManager::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
                 m_assProcessor->applySubstitutions(extractedSubsPath, m_template.substitutions);
 
                 if (m_template.pauseForSubEdit) {
-                    emit logMessage("Процесс приостановлен для ручного редактирования субтитров.", LogCategory::APP);
-                    QMessageBox msgBox;
-                    msgBox.setIcon(QMessageBox::Information);
-                    msgBox.setText("Процесс приостановлен.");
-                    msgBox.setInformativeText(QString("Вы можете отредактировать файл субтитров:\n%1\n\nНажмите 'OK' для продолжения сборки.").arg(QDir::toNativeSeparators(extractedSubsPath)));
-                    msgBox.setStandardButtons(QMessageBox::Ok);
-                    msgBox.exec();
-                    emit logMessage("Редактирование завершено, процесс возобновлен.", LogCategory::APP);
+                    emit logMessage("Процесс приостановлен. Ожидание ручного редактирования субтитров...", LogCategory::APP);
+                    emit pauseForSubEditRequest(extractedSubsPath);
+                    return;
                 }
             }
             processSubtitles();
@@ -1524,7 +1519,6 @@ void WorkflowManager::resumeWithSignStyles(const QStringList &styles)
     }
     m_template.signStyles = styles;
     emit logMessage("Стили для надписей получены. Продолжаем...", LogCategory::APP);
-    m_wasUserInputRequested = false;
     processSubtitles();
 }
 
@@ -1575,19 +1569,17 @@ void WorkflowManager::processSubtitles()
     QString subsToAnalyze;
 
     // Шаг 5.1: Проверяем, нужно ли запрашивать стили
-    if ((m_template.signStyles.isEmpty() || m_template.forceSignStyleRequest) && !m_wasUserInputRequested) {
+    if ((m_template.signStyles.isEmpty() || m_template.forceSignStyleRequest) && !m_wereStylesRequested) {
         if (!m_overrideSubsPath.isEmpty()) subsToAnalyze = m_overrideSubsPath;
-        else if (!m_overrideSignsPath.isEmpty()) subsToAnalyze = m_overrideSignsPath;
         else {
             QString extractedSubs = m_paths->extractedSubs("ass");
             if (QFileInfo::exists(extractedSubs)) subsToAnalyze = extractedSubs;
         }
-
         if (!subsToAnalyze.isEmpty()) {
             emit logMessage("Шаг 5.2: Запрос стилей и актёров для надписей...", LogCategory::APP);
             emit progressUpdated(-1, "Запрос стилей и актёров для разделения субтитров от надписей");
             m_lastStepBeforeRequest = Step::ProcessingSubs;
-            m_wasUserInputRequested = true;
+            m_wereStylesRequested = true;
             emit signStylesRequest(subsToAnalyze);
             return; // Ждем ответа от пользователя
         }
@@ -1604,6 +1596,7 @@ void WorkflowManager::processSubtitles()
     }
 
     // Если мы дошли до сюда, значит, все данные есть, можно запускать обработку
+    m_wereStylesRequested = false;
     runAssProcessing();
 }
 
@@ -1618,19 +1611,33 @@ void WorkflowManager::runAssProcessing()
         emit logMessage("Используется время для ТБ: " + timeForTb, LogCategory::APP);
     }
 
-    if (!timeForTb.isEmpty() && timeForTb.contains('.')) {
-        QStringList parts = timeForTb.split('.');
-        if (parts.size() == 2 && parts[1].length() > 3) {
-            QString original = timeForTb;
-            timeForTb = parts[0] + "." + parts[1].left(3);
-            emit logMessage(QString("Время '%1' было нормализовано до '%2' для совместимости.").arg(original, timeForTb), LogCategory::APP);
-        }
-    }
-
     if (timeForTb.isEmpty()) {
         emit logMessage("КРИТИЧЕСКАЯ ОШИБКА: Время для ТБ не определено. Проверьте имя главы или укажите время вручную в шаблоне.", LogCategory::APP);
         workflowAborted();
         return;
+    }
+
+    QTime tbStartTime = QTime::fromString(timeForTb, "H:mm:ss.zzz");
+    if (tbStartTime.isValid() && m_sourceDurationS > 0) {
+        double tbStartTimeS = tbStartTime.hour() * 3600 + tbStartTime.minute() * 60 + tbStartTime.second() + tbStartTime.msec() / 1000.0;
+        double remainingTimeS = m_sourceDurationS - tbStartTimeS;
+
+        int tbLines = AssProcessor::calculateTbLineCount(m_template);
+        double requiredTimeS = tbLines * 3.0;
+
+        if (remainingTimeS < requiredTimeS) {
+            emit logMessage(QString("ВНИМАНИЕ: Недостаточно времени для ТБ! Требуется: ~%1 сек. Осталось: ~%2 сек.")
+                                .arg(qRound(requiredTimeS)).arg(qRound(remainingTimeS)), LogCategory::APP);
+
+            m_lastStepBeforeRequest = Step::ProcessingSubs;
+            m_wasUserInputRequested = true;
+            emit progressUpdated(-1, "Запрос корректного времени эндинга");
+            emit missingFilesRequest({}, false, true);
+            return;
+        } else {
+            emit logMessage(QString("Проверка времени для ТБ пройдена. Требуется: ~%1 сек. Осталось: ~%2 сек.")
+                                .arg(qRound(requiredTimeS)).arg(qRound(remainingTimeS)), LogCategory::APP);
+        }
     }
 
     QString extractedSubs = m_paths->extractedSubs("ass");
@@ -1790,4 +1797,10 @@ void WorkflowManager::onBitrateCheckFinished(RerenderDecision decision, const Re
     } else {
         finishWorkflow();
     }
+}
+
+void WorkflowManager::resumeAfterSubEdit()
+{
+    emit logMessage("Редактирование завершено, процесс возобновлен.", LogCategory::APP);
+    processSubtitles();
 }

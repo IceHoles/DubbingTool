@@ -55,7 +55,7 @@ void ManualAssemblyWidget::on_templateComboBox_currentIndexChanged(int index)
 
 void ManualAssemblyWidget::onTemplateDataReceived(const ReleaseTemplate &t)
 {
-    ui->tbStartTimeEdit->setText(t.endingStartTime);
+    ui->tbStartTimeEdit->setTime(QTime::fromString(t.endingStartTime, "H:mm:ss.zzz"));
 
     ui->tbStyleComboBox->clear();
     for(const auto& style : AppSettings::instance().tbStyles()) {

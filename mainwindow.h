@@ -51,12 +51,14 @@ public slots:
     void onSignStylesRequest(const QString &subFilePath);
     void onMultipleAudioTracksFound(const QList<AudioTrackInfo> &candidates);
     void onBitrateCheckRequest(const RenderPreset &preset, double actualBitrate);
+    void onPauseForSubEditRequest(const QString &subFilePath);
 
 signals:
     void missingFilesProvided(const QString &audioPath, const QMap<QString, QString> &resolvedFonts, const QString &time);
     void signStylesProvided(const QStringList &styles);
     void torrentSelected(const TorrentInfo &selected);
     void audioTrackSelected(int trackId);
+    void subEditFinished();
 
 protected:
     void closeEvent(QCloseEvent *event) override;

@@ -53,14 +53,11 @@ QMap<QString, QString> MissingFilesDialog::getResolvedFonts() const
 void MissingFilesDialog::setTimeInputVisible(bool visible)
 {
     ui->timeGroupBox->setVisible(visible);
-    if (visible) {
-        ui->timeEdit->setPlaceholderText("H:mm:ss.zzz");
-    }
 }
 
 QString MissingFilesDialog::getTime() const
 {
-    return ui->timeEdit->text();
+    return ui->timeEdit->time().toString("H:mm:ss.zzz");
 }
 
 void MissingFilesDialog::on_browseAudioButton_clicked()
@@ -86,4 +83,9 @@ void MissingFilesDialog::on_fontsListWidget_itemDoubleClicked(QListWidgetItem *i
 void MissingFilesDialog::setAudioPrompt(const QString &text)
 {
     ui->audioLabel->setText(text);
+}
+
+void MissingFilesDialog::setTimePrompt(const QString &text)
+{
+    ui->timeLabel->setText(text);
 }

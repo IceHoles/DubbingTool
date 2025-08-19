@@ -413,22 +413,7 @@ QStringList AssProcessor::generateTb(const ReleaseTemplate &t, const QString &st
         return tbLines;
     }
 
-    QTime currentTime;
-    QRegularExpression timeRegex("(\\d*):(\\d*):(\\d*)\\.?(\\d*)");
-    QRegularExpressionMatch match = timeRegex.match(startTime);
-
-    if (match.hasMatch()) {
-        int h = match.captured(1).toInt();
-        int m = match.captured(2).toInt();
-        int s = match.captured(3).toInt();
-        // Обрабатываем миллисекунды, дополняя нулями справа, если нужно
-        QString msStr = match.captured(4).left(3);
-        while(msStr.length() < 3) {
-            msStr.append('0');
-        }
-        int ms = msStr.toInt();
-        currentTime.setHMS(h, m, s, ms);
-    }
+   QTime currentTime = QTime::fromString(startTime, "H:mm:ss.zzz");
 
     if (!currentTime.isValid()) {
         emit logMessage("Ошибка: неверный формат времени для ТБ: '" + startTime + "'. ТБ не будет сгенерирован.", LogCategory::APP);
@@ -661,7 +646,7 @@ QString AssProcessor::convertAssTagsToSrt(const QString &assText)
             else if (tag == "b0") result.append("</b>");
             else if (tag == "u1") result.append("<u>");
             else if (tag == "u0") result.append("</u>");
-            else if (tag.startsWith("an") && tag.length() == 3 && tag[2].isDigit() && tag[2] != '0') {
+            else if (tag.startsWith("an") && tag.length() == 3 && tag[2].isDigit() && tag[2] != '0' && tag[2] != '2') {
                 // Восстанавливаем оригинальный тег для SRT
                 result.append("{\\" + tag + "}");
             }
@@ -724,8 +709,10 @@ bool AssProcessor::convertToSrt(const QString &inputAssPath, const QString &outp
             // Тег выравнивания
             int alignment = parts[18].trimmed().toInt();
             QString alignmentTag;
-            // Стандартные значения для SRT: 7, 8, 9, 4, 5, 6, 1, 2, 3
-            alignmentTag = QString("{\\an%1}").arg(alignment);
+            if(alignment != 0 && alignment != 2){
+                // Стандартные значения для SRT: 7, 8, 9, 4, 5, 6, 1, 2, 3
+                alignmentTag = QString("{\\an%1}").arg(alignment);
+            }
             styleInfo[styleName] = {formatTags, alignmentTag};
         }
     }
@@ -863,4 +850,39 @@ bool AssProcessor::applySubstitutions(const QString &filePath, const QMap<QStrin
         emit logMessage("Замены не потребовались.", LogCategory::APP);
         return true;
     }
+}
+
+int AssProcessor::calculateTbLineCount(const ReleaseTemplate &t)
+{
+    if (!t.generateTb) {
+        return 0;
+    }
+    int lineCount = 0;
+    lineCount++;
+    if (!t.cast.isEmpty()) {
+        int castSize = t.cast.size();
+        while (castSize > 0) {
+            lineCount++;
+            int chunkSize = 4;
+            if (castSize == 3) {
+                chunkSize = 3;
+            } else if (castSize == 5) {
+                chunkSize = 5;
+            } else if (castSize == 6) {
+                chunkSize = 3;
+            }
+            castSize -= chunkSize;
+        }
+    }
+    if (!t.director.isEmpty()) lineCount++;
+    if (!t.soundEngineer.isEmpty()) lineCount++;
+    bool hasAuthorsBlock = !t.timingAuthor.isEmpty() ||
+                           !t.signsAuthor.isEmpty() ||
+                           !t.translationEditor.isEmpty() ||
+                           !t.subAuthor.isEmpty();
+    if (hasAuthorsBlock) {
+        lineCount++;
+    }
+    if (!t.releaseBuilder.isEmpty()) lineCount++;
+    return lineCount;
 }
