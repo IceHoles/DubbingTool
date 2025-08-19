@@ -372,12 +372,9 @@
          <item row="1" column="1">
           <layout class="QHBoxLayout" name="horizontalLayout_10">
            <item>
-            <widget class="QLineEdit" name="endingStartTimeEdit">
-             <property name="inputMask">
-              <string>0:00:00.000;0</string>
-             </property>
-             <property name="placeholderText">
-              <string>например, 0:22:22.26</string>
+            <widget class="QTimeEdit" name="endingStartTimeEdit">
+             <property name="displayFormat">
+              <string>H:mm:ss.zzz</string>
              </property>
             </widget>
            </item>

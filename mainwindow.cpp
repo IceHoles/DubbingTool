@@ -343,6 +343,9 @@ void MainWindow::on_startButton_clicked()
     connect(this, &MainWindow::signStylesProvided, workflowManager, &WorkflowManager::resumeWithSignStyles);
     connect(workflowManager, &WorkflowManager::bitrateCheckRequest, this, &MainWindow::onBitrateCheckRequest, Qt::QueuedConnection);
 
+    connect(workflowManager, &WorkflowManager::pauseForSubEditRequest, this, &MainWindow::onPauseForSubEditRequest, Qt::QueuedConnection);
+    connect(this, &MainWindow::subEditFinished, workflowManager, &WorkflowManager::resumeAfterSubEdit);
+
     workflowManager->moveToThread(thread);
 
     if (!manualMkvPath.isEmpty()) {
@@ -650,11 +653,14 @@ void MainWindow::onMissingFilesRequest(const QStringList &missingFonts, bool req
     dialog.setMissingFonts(missingFonts);
     dialog.setTimeInputVisible(requireTime);
 
+    if (requireTime && !requireWav && missingFonts.isEmpty()) {
+        dialog.setTimePrompt("Времени для ТБ недостаточно. Укажите более раннее время начала эндинга:");
+    }
+
     if (dialog.exec() == QDialog::Accepted) {
         QString audioPath = dialog.getAudioPath();
         QString time = dialog.getTime();
         ui->audioPathLineEdit->setText(audioPath);
-        // Проверяем, что обязательные поля заполнены
         if (audioNeeded && audioPath.isEmpty()) {
             QMessageBox::critical(this, "Ошибка", "Аудиодорожка является обязательной. Сборка прервана.");
             emit missingFilesProvided("", {}, "");
@@ -768,4 +774,17 @@ void MainWindow::onBitrateCheckRequest(const RenderPreset &preset, double actual
                                       Q_ARG(QString, pass2));
         }
     }
+}
+
+void MainWindow::onPauseForSubEditRequest(const QString &subFilePath)
+{
+    logMessage("Процесс приостановлен для ручного редактирования субтитров.", LogCategory::APP);
+    QMessageBox msgBox(this);
+    msgBox.setIcon(QMessageBox::Information);
+    msgBox.setText("Процесс приостановлен");
+    msgBox.setInformativeText(QString("Вы можете отредактировать файл субтитров:\n%1\n\nНажмите 'OK' для продолжения сборки.").arg(QDir::toNativeSeparators(subFilePath)));
+    msgBox.setStandardButtons(QMessageBox::Ok);
+    msgBox.exec();
+
+    emit subEditFinished();
 }

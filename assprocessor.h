@@ -18,6 +18,7 @@ public:
     bool processFromTwoSources(const QString &dialoguesInputPath, const QString &signsInputPath, const QString &outputPathBase, const ReleaseTemplate &t, const QString& startTime);
     bool convertToSrt(const QString &inputAssPath, const QString &outputSrtPath, const QStringList &signStyles);
     bool applySubstitutions(const QString &filePath, const QMap<QString, QString> &substitutions);
+    static int calculateTbLineCount(const ReleaseTemplate &t);
 
 signals:
     void logMessage(const QString&, LogCategory);

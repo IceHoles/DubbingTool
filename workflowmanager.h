@@ -82,6 +82,7 @@ public slots:
     void resumeWithSelectedTorrent(const TorrentInfo &selected);
     void resumeWithSignStyles(const QStringList &styles);
     void resumeWithSelectedAudioTrack(int trackId);
+    void resumeAfterSubEdit();
 
 signals:
     void logMessage(const QString &message, LogCategory category = LogCategory::APP);
@@ -95,6 +96,7 @@ signals:
     void multipleTorrentsFound(const QList<TorrentInfo> &candidates);
     void multipleAudioTracksFound(const QList<AudioTrackInfo> &candidates);
     void bitrateCheckRequest(const RenderPreset &preset, double actualBitrate);
+    void pauseForSubEditRequest(const QString &subFilePath);
 
 private slots:
     void onRssDownloaded(QNetworkReply *reply);
@@ -195,6 +197,7 @@ private:
     QString m_overrideSignsPath;
 
     bool m_wasUserInputRequested = false;
+    bool m_wereStylesRequested = false;
 
     struct TrackInfo {
         int id = -1;

@@ -22,6 +22,7 @@ public:
     void setMissingFonts(const QStringList &fontNames);
     void setTimeInputVisible(bool visible);
     void setAudioPrompt(const QString& text);
+    void setTimePrompt(const QString& text);
 
     QString getAudioPath() const;
     QMap<QString, QString> getResolvedFonts() const;
