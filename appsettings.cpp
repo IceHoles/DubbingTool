@@ -1,4 +1,4 @@
-#include "appsettings.h"
+    #include "appsettings.h"
 #include <QStandardPaths>
 #include <QDir>
 
@@ -26,6 +26,7 @@ void AppSettings::load() {
     m_mkvextractPath = settings.value("paths/mkvextract", findExecutablePath("mkvextract.exe")).toString();
     m_ffmpegPath = settings.value("paths/ffmpeg", findExecutablePath("ffmpeg.exe")).toString();
     m_qbittorrentPath = settings.value("paths/qbittorrent", findExecutablePath("qbittorrent.exe")).toString();
+    m_nugenAmbPath = settings.value("paths/nugenAmb", "").toString();
     m_deleteTempFiles = settings.value("general/deleteTempFiles", true).toBool();
     m_userFileAction = static_cast<UserFileAction>(settings.value("general/userFileAction", static_cast<int>(UserFileAction::Move)).toInt());
 
@@ -78,6 +79,7 @@ void AppSettings::save() {
     settings.setValue("paths/mkvextract", m_mkvextractPath);
     settings.setValue("paths/ffmpeg", m_ffmpegPath);
     settings.setValue("paths/qbittorrent", m_qbittorrentPath);
+    settings.setValue("paths/nugenAmb", m_nugenAmbPath);
     settings.setValue("general/deleteTempFiles", m_deleteTempFiles);
 
     settings.beginWriteArray("tbStyles");
@@ -173,6 +175,8 @@ QString AppSettings::ffmpegPath() const { return m_ffmpegPath; }
 void AppSettings::setFfmpegPath(const QString &path) { m_ffmpegPath = path; }
 QString AppSettings::qbittorrentPath() const { return m_qbittorrentPath; }
 void AppSettings::setQbittorrentPath(const QString &path) { m_qbittorrentPath = path; }
+QString AppSettings::nugenAmbPath() const { return m_nugenAmbPath; }
+void AppSettings::setNugenAmbPath(const QString &path) { m_nugenAmbPath = path; }
 bool AppSettings::deleteTempFiles() const { return m_deleteTempFiles; }
 void AppSettings::setDeleteTempFiles(bool enabled) { m_deleteTempFiles = enabled; }
 UserFileAction AppSettings::userFileAction() const { return m_userFileAction; }

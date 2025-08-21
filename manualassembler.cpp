@@ -2,13 +2,12 @@
 #include "processmanager.h"
 #include "assprocessor.h"
 #include "releasetemplate.h"
-#include "workflowmanager.h"
+#include "appsettings.h"
 #include <QFileInfo>
 #include <QDir>
-#include <QSettings>
-#include <QFile>
 #include <QJsonDocument>
-#include <QCoreApplication>
+#include <QFile>
+#include <QTimer>
 
 
 ManualAssembler::ManualAssembler(const QVariantMap &params, QObject *parent)
@@ -16,6 +15,7 @@ ManualAssembler::ManualAssembler(const QVariantMap &params, QObject *parent)
 {
     m_processManager = new ProcessManager(this);
     m_assProcessor = new AssProcessor(this);
+    m_progressTimer = new QTimer(this);
 
     connect(m_processManager, &ProcessManager::processOutput, this, &ManualAssembler::onProcessText);
     connect(m_processManager, &ProcessManager::processStdErr, this, &ManualAssembler::onProcessText);
@@ -28,73 +28,146 @@ ManualAssembler::~ManualAssembler() {}
 void ManualAssembler::start()
 {
     emit logMessage("--- Начало ручной сборки ---", LogCategory::APP);
+    m_currentStep = Step::Idle;
 
-    QString templateName = m_params["templateName"].toString();
-    if (templateName.isEmpty()) {
-        emit logMessage("Критическая ошибка: базовый шаблон не был выбран.", LogCategory::APP);
-        emit finished();
+    if (m_params["normalizeAudio"].toBool()) {
+        normalizeAudio();
+    } else if (m_params["convertAudio"].toBool()) {
+        convertAudio();
+    } else {
+        processSubtitlesAndAssemble();
+    }
+}
+
+void ManualAssembler::normalizeAudio()
+{
+    m_currentStep = Step::NormalizingAudio;
+    emit logMessage("Шаг 1: Нормализация аудио...", LogCategory::APP);
+    emit progressUpdated(-1, "Нормализация аудио");
+
+    QString nugenPath = AppSettings::instance().nugenAmbPath();
+    QString audioPath = m_params["russianAudioPath"].toString();
+
+    if (nugenPath.isEmpty() || !audioPath.endsWith(".wav", Qt::CaseInsensitive)) {
+        emit logMessage("Нормализация пропущена (не указан путь к NUGEN или файл не .wav).", LogCategory::APP);
+        if (m_params["convertAudio"].toBool()) convertAudio();
+        else processSubtitlesAndAssemble();
         return;
     }
 
-    QDir templatesDir(QCoreApplication::applicationDirPath());
-    templatesDir.cd("../templates"); //Не самый надёжный способ, но пока оставлю
-    QString templatePath = templatesDir.filePath(templateName + ".json");
+    QFileInfo nugenInfo(nugenPath);
+    QString ambCmdPath = nugenInfo.dir().filePath("AMBCmd.exe");
+    emit progressUpdated(-1, "Запуск NUGEN Audio AMB");
 
-    QFile file(templatePath);
-    if (!file.open(QIODevice::ReadOnly)) {
-        emit logMessage("Критическая ошибка: не удалось загрузить шаблон по пути " + templatePath, LogCategory::APP);
-        emit finished();
+    if (!QFileInfo::exists(ambCmdPath)) {
+        emit logMessage("Ошибка: AMBCmd.exe не найден. Нормализация пропущена.", LogCategory::APP);
+        if (m_params["convertAudio"].toBool()) convertAudio();
+        else processSubtitlesAndAssemble();
         return;
     }
 
-    QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
-    ReleaseTemplate t;
-    t.read(doc.object());
+    QProcess::startDetached(nugenPath);
+    QTimer::singleShot(3000, this, [this, ambCmdPath, audioPath](){
+        m_processManager->startProcess(ambCmdPath, {"-a", audioPath});
+        emit progressUpdated(-1, "Нормализация аудиофайла");
+    });
+}
 
-    if (m_params["addTb"].toBool()) {
+void ManualAssembler::convertAudio()
+{
+    m_currentStep = Step::ConvertingAudio;
+    emit logMessage("Шаг 2: Конвертация аудио...", LogCategory::APP);
+
+    QString audioPath = m_params["russianAudioPath"].toString();
+    QString targetFormat = m_params.value("convertAudioFormat", "aac").toString();
+
+    if (audioPath.endsWith("." + targetFormat, Qt::CaseInsensitive)) {
+        emit logMessage("Аудио уже в нужном формате, конвертация пропущена.", LogCategory::APP);
+        processSubtitlesAndAssemble();
+        return;
+    }
+
+    emit logMessage("Определение длительности аудиофайла...", LogCategory::APP);
+    QByteArray jsonData;
+    QFileInfo ffmpegInfo(AppSettings::instance().ffmpegPath());
+    QString ffprobePath = QDir(ffmpegInfo.absolutePath()).filePath("ffprobe.exe");
+    QStringList ffprobeArgs = {"-v", "error", "-show_format", "-print_format", "json", audioPath};
+
+    m_sourceAudioDurationS = 0.0;
+    if (m_processManager->executeAndWait(ffprobePath, ffprobeArgs, jsonData) && !jsonData.isEmpty()) {
+        QJsonObject format = QJsonDocument::fromJson(jsonData).object()["format"].toObject();
+        m_sourceAudioDurationS = format["duration"].toString().toDouble();
+        emit logMessage(QString("Длительность: %1 секунд.").arg(m_sourceAudioDurationS), LogCategory::APP);
+    } else {
+        emit logMessage("Предупреждение: не удалось определить длительность аудио. Прогресс не будет отображаться.", LogCategory::APP);
+    }
+
+    emit progressUpdated(0, "Конвертация аудио");
+    QString newAudioPath = QFileInfo(audioPath).dir().filePath(QFileInfo(audioPath).baseName() + "_converted." + targetFormat);
+    m_params["russianAudioPath"] = newAudioPath;
+
+    m_progressLogPath = QDir::temp().filePath("dt_manual_audio_progress.log");
+    QFile::remove(m_progressLogPath);
+
+    QStringList args;
+    args << "-y" << "-i" << audioPath;
+    if (targetFormat == "aac") args << "-c:a" << "aac" << "-b:a" << "256k";
+    else if (targetFormat == "flac") args << "-c:a" << "flac";
+    args << "-progress" << QDir::toNativeSeparators(m_progressLogPath) << newAudioPath;
+
+    if (m_sourceAudioDurationS > 0) {
+        connect(m_progressTimer, &QTimer::timeout, this, &ManualAssembler::onConversionProgress);
+        m_progressTimer->start(500);
+    }
+
+    m_processManager->startProcess(AppSettings::instance().ffmpegPath(), args);
+}
+
+void ManualAssembler::processSubtitlesAndAssemble()
+{
+    if (!m_params["isManualMode"].toBool() && m_params["addTb"].toBool()) {
         emit logMessage("Добавление ТБ в субтитры...", LogCategory::APP);
 
-        ReleaseTemplate tbTemplate = t;
+        ReleaseTemplate t;
+        QFile file("templates/" + m_params["templateName"].toString() + ".json");
+        if (file.open(QIODevice::ReadOnly)) {
+            t.read(QJsonDocument::fromJson(file.readAll()).object());
+        } else {
+            emit logMessage("Ошибка: не удалось загрузить шаблон для генерации ТБ.", LogCategory::APP);
+            assemble();
+            return;
+        }
+
         QString tbStartTime = m_params["tbStartTime"].toString();
-        tbTemplate.defaultTbStyleName = m_params["tbStyleName"].toString();
+        t.defaultTbStyleName = m_params["tbStyleName"].toString();
 
         QString subsPath = m_params.value("subtitlesPath").toString();
         if (!subsPath.isEmpty()) {
-            QString newSubsPath = QFileInfo(subsPath).path() + "/" + QFileInfo(subsPath).baseName() + "_with_tb.ass";
-            m_assProcessor->processExistingFile(subsPath, newSubsPath, tbTemplate, tbStartTime);
-            m_params["subtitlesPath"] = newSubsPath;
+            QString newSubsPathBase = QFileInfo(subsPath).dir().filePath(QFileInfo(subsPath).baseName() + "_with_tb");
+            m_assProcessor->processExistingFile(subsPath, newSubsPathBase, t, tbStartTime);
+            m_params["subtitlesPath"] = newSubsPathBase + "_full.ass";
         }
 
         QString signsPath = m_params.value("signsPath").toString();
         if (!signsPath.isEmpty()) {
-            QString newSignsPath = QFileInfo(signsPath).path() + "/" + QFileInfo(signsPath).baseName() + "_with_tb.ass";
-            m_assProcessor->processExistingFile(signsPath, newSignsPath, tbTemplate, tbStartTime);
-            m_params["signsPath"] = newSignsPath;
+            QString newSignsPathBase = QFileInfo(signsPath).dir().filePath(QFileInfo(signsPath).baseName() + "_with_tb");
+            m_assProcessor->processExistingFile(signsPath, newSignsPathBase, t, tbStartTime);
+            m_params["signsPath"] = newSignsPathBase + "_signs.ass";
         }
     }
 
-    assemble(t);
+    assemble();
 }
 
-void ManualAssembler::assemble(const ReleaseTemplate &t)
+void ManualAssembler::assemble()
 {
     m_currentStep = Step::AssemblingMkv;
     emit logMessage("Сборка MKV файла...", LogCategory::APP);
     emit progressUpdated(-1, "Сборка MKV");
 
-    QSettings settings("MyCompany", "DubbingTool");
-    QString mkvmergePath = settings.value("paths/mkvmerge", "mkvmerge").toString();
-    m_ffmpegPath = settings.value("paths/ffmpeg", "ffmpeg").toString();
-
+    QString mkvmergePath = AppSettings::instance().mkvmergePath();
     QString workDir = m_params["workDir"].toString();
     QString outputName = m_params["outputName"].toString();
-    m_finalMkvPath = outputName;
-    QString videoPath = m_params["videoPath"].toString();
-    QString originalAudioPath = m_params["originalAudioPath"].toString();
-    QString russianAudioPath = m_params["russianAudioPath"].toString();
-    QString subtitlesPath = m_params["subtitlesPath"].toString();
-    QString signsPath = m_params["signsPath"].toString();
-    QStringList fontPaths = m_params["fontPaths"].toStringList();
 
     if (outputName.isEmpty()) {
         emit logMessage("Критическая ошибка: не указан выходной файл.", LogCategory::APP);
@@ -106,12 +179,10 @@ void ManualAssembler::assemble(const ReleaseTemplate &t)
     if (!workDir.isEmpty()) {
         fullOutputPath = QDir(workDir).filePath(outputName);
     } else {
-        // Если рабочая папка не указана, сохраняем рядом с видеофайлом
         QString videoPath = m_params["videoPath"].toString();
         if (!videoPath.isEmpty()) {
             fullOutputPath = QDir(QFileInfo(videoPath).path()).filePath(outputName);
         } else {
-            // Если и видео нет, то сохраняем в текущую папку
             fullOutputPath = outputName;
         }
     }
@@ -123,11 +194,11 @@ void ManualAssembler::assemble(const ReleaseTemplate &t)
     }
 
     m_finalMkvPath = fullOutputPath;
-
     QStringList args;
     args << "-o" << fullOutputPath;
 
     // Шрифты
+    QStringList fontPaths = m_params["fontPaths"].toStringList();
     for(const QString& path : fontPaths) {
         args << "--attachment-name" << QFileInfo(path).fileName();
         QString mimeType = "application/octet-stream";
@@ -138,30 +209,28 @@ void ManualAssembler::assemble(const ReleaseTemplate &t)
         args << "--attach-file" << path;
     }
 
-    if (m_params.contains("videoPath") && !m_params.value("videoPath").toString().isEmpty()) {
-        args << "--language" << "0:" + t.originalLanguage << "--track-name" << QString("0:Видеоряд [%1]").arg(t.animationStudio) << videoPath;
+    // Дорожки
+    if (m_params["isManualMode"].toBool()) {
+        QString studio = m_params["studio"].toString();
+        QString lang = m_params["language"].toString();
+        QString subAuthor = m_params["subAuthor"].toString();
+        if (m_params.contains("videoPath")) args << "--language" << "0:" + lang << "--track-name" << QString("0:Видеоряд [%1]").arg(studio) << m_params["videoPath"].toString();
+        if (m_params.contains("russianAudioPath")) args << "--default-track-flag" << "0:yes" << "--language" << "0:rus" << "--track-name" << "0:Русский [Дубляжная]" << m_params["russianAudioPath"].toString();
+        if (m_params.contains("originalAudioPath")) args << "--language" << "0:" + lang << "--track-name" << QString("0:Оригинал [%1]").arg(studio) << m_params["originalAudioPath"].toString();
+        if (m_params.contains("signsPath")) args << "--forced-display-flag" << "0:yes" << "--default-track-flag" << "0:yes" << "--language" << "0:rus" << "--track-name" << QString("0:Надписи [%1]").arg(subAuthor) << m_params["signsPath"].toString();
+        if (m_params.contains("subtitlesPath")) args << "--language" << "0:rus" << "--track-name" << QString("0:Субтитры [%1]").arg(subAuthor) << m_params["subtitlesPath"].toString();
+    } else {
+        ReleaseTemplate t;
+        QFile file("templates/" + m_params["templateName"].toString() + ".json");
+        if (file.open(QIODevice::ReadOnly)) t.read(QJsonDocument::fromJson(file.readAll()).object());
+        if (m_params.contains("videoPath")) args << "--language" << "0:" + t.originalLanguage << "--track-name" << QString("0:Видеоряд [%1]").arg(t.animationStudio) << m_params["videoPath"].toString();
+        if (m_params.contains("russianAudioPath")) args << "--default-track-flag" << "0:yes" << "--language" << "0:rus" << "--track-name" << "0:Русский [Дубляжная]" << m_params["russianAudioPath"].toString();
+        if (m_params.contains("originalAudioPath")) args << "--language" << "0:" + t.originalLanguage << "--track-name" << QString("0:Оригинал [%1]").arg(t.animationStudio) << m_params["originalAudioPath"].toString();
+        if (m_params.contains("signsPath")) args << "--forced-display-flag" << "0:yes" << "--default-track-flag" << "0:yes" << "--language" << "0:rus" << "--track-name" << QString("0:Надписи [%1]").arg(t.subAuthor) << m_params["signsPath"].toString();
+        if (m_params.contains("subtitlesPath")) args << "--language" << "0:rus" << "--track-name" << QString("0:Субтитры [%1]").arg(t.subAuthor) << m_params["subtitlesPath"].toString();
     }
-    if (m_params.contains("russianAudioPath") && !m_params.value("russianAudioPath").toString().isEmpty()) {
-        args << "--default-track-flag" << "0:yes" << "--language" << "0:rus" << "--track-name" << "0:Русский [Дубляжная]" << russianAudioPath;
-    }
-    if (m_params.contains("originalAudioPath") && !m_params.value("originalAudioPath").toString().isEmpty()) {
-        args << "--language" << "0:" + t.originalLanguage << "--track-name" << QString("0:Оригинал [%1]").arg(t.animationStudio) << originalAudioPath;
-    }
-    if (m_params.contains("signsPath") && !m_params.value("signsPath").toString().isEmpty()) {
-        args << "--forced-display-flag" << "0:yes" << "--default-track-flag" << "0:yes" << "--language" << "0:rus" << "--track-name" << QString("0:Надписи [%1]").arg(t.subAuthor) << signsPath;
-    }
-    if (m_params.contains("subtitlesPath") && !m_params.value("subtitlesPath").toString().isEmpty()) {
-        args << "--language" << "0:rus" << "--track-name" << QString("0:Субтитры [%1]").arg(t.subAuthor) << subtitlesPath;
-    }
-    m_processManager->startProcess(mkvmergePath, args);
-}
 
-void ManualAssembler::cancelOperation()
-{
-    emit logMessage("Получена команда на отмену ручной сборки...", LogCategory::APP);
-    if (m_processManager) {
-        m_processManager->killProcess();
-    }
+    m_processManager->startProcess(mkvmergePath, args);
 }
 
 void ManualAssembler::onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus)
@@ -178,7 +247,32 @@ void ManualAssembler::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
         return;
     }
 
-    if (m_currentStep == Step::AssemblingMkv) {
+    if (m_currentStep == Step::NormalizingAudio) {
+        emit logMessage("Нормализация аудио завершена.", LogCategory::APP);
+
+        QFileInfo audioInfo(m_params["russianAudioPath"].toString());
+        QString normalizedPath = audioInfo.dir().filePath(audioInfo.baseName() + "_corrected.wav");
+        if (QFileInfo::exists(normalizedPath)) {
+            emit logMessage("Найден нормализованный файл, он будет использован для сборки.", LogCategory::APP);
+            m_params["russianAudioPath"] = normalizedPath;
+        } else {
+            emit logMessage("ПРЕДУПРЕЖДЕНИЕ: Нормализованный файл не найден. Будет использован исходный.", LogCategory::APP);
+        }
+
+        if (m_params["convertAudio"].toBool()) {
+            convertAudio();
+        } else {
+            processSubtitlesAndAssemble();
+        }
+    }
+    else if (m_currentStep == Step::ConvertingAudio) {
+        m_progressTimer->stop();
+        disconnect(m_progressTimer, &QTimer::timeout, this, &ManualAssembler::onConversionProgress);
+        QFile::remove(m_progressLogPath);
+        emit logMessage("Конвертация аудио завершена.", LogCategory::APP);
+        processSubtitlesAndAssemble();
+    }
+    else if (m_currentStep == Step::AssemblingMkv) {
         emit logMessage("Ручная сборка MKV успешно завершена.", LogCategory::APP);
         emit finished();
     }
@@ -187,7 +281,8 @@ void ManualAssembler::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
 void ManualAssembler::onProcessText(const QString &output)
 {
     if (!output.trimmed().isEmpty()) {
-        emit logMessage(output.trimmed(), LogCategory::MKVTOOLNIX);
+        LogCategory category = (m_currentStep == Step::ConvertingAudio) ? LogCategory::FFMPEG : LogCategory::MKVTOOLNIX;
+        emit logMessage(output.trimmed(), category);
     }
 
     if (m_currentStep == Step::AssemblingMkv) {
@@ -198,6 +293,60 @@ void ManualAssembler::onProcessText(const QString &output)
             int percentage = match.captured(1).toInt();
             emit progressUpdated(percentage, "Сборка MKV");
         }
+    }
+}
+
+// void ManualAssembler::onConversionProgress()
+// {
+//     QFile progressFile(m_progressLogPath);
+//     if (!progressFile.open(QIODevice::ReadOnly)) return;
+
+//     QTextStream in(&progressFile);
+//     QString logContent = in.readAll();
+//     progressFile.close();
+
+//     int lastPos = logContent.lastIndexOf("out_time_us=");
+//     if (lastPos == -1) return;
+
+//     QString timeUsStr = logContent.mid(lastPos + 12);
+//     qint64 currentTimeUs = timeUsStr.toLongLong();
+
+//     if (m_sourceAudioDurationS > 0) {
+//         double totalUs = m_sourceAudioDurationS * 1000000.0;
+//         int percentage = (currentTimeUs * 100)/ totalUs;
+//         emit progressUpdated(percentage, "Конвертация аудио");
+//     }
+// }
+void ManualAssembler::onConversionProgress()
+{
+    QFile progressFile(m_progressLogPath);
+    if (!progressFile.open(QIODevice::ReadOnly)) return;
+
+    QTextStream in(&progressFile);
+    qint64 totalDurationUs = 0;
+    qint64 currentTimeUs = 0;
+
+    totalDurationUs = m_sourceAudioDurationS * 1000000;
+
+    while(!in.atEnd()) {
+        QString line = in.readLine();
+        if (line.startsWith("out_time_us=")) {
+            currentTimeUs = line.split('=').last().toLongLong();
+        }
+    }
+    progressFile.close();
+
+    if (totalDurationUs > 0) {
+        int percentage = (currentTimeUs * 100) / totalDurationUs;
+        emit progressUpdated(percentage, "Конвертация аудио");
+    }
+}
+
+void ManualAssembler::cancelOperation()
+{
+    emit logMessage("Получена команда на отмену ручной сборки...", LogCategory::APP);
+    if (m_processManager) {
+        m_processManager->killProcess();
     }
 }
 

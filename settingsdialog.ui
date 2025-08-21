@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>750</width>
-    <height>627</height>
+    <height>661</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -20,7 +20,7 @@
    <item>
     <widget class="QTabWidget" name="mainTabWidget">
      <property name="currentIndex">
-      <number>2</number>
+      <number>0</number>
      </property>
      <widget class="QWidget" name="tabPaths">
       <attribute name="title">
@@ -156,6 +156,23 @@
           </item>
           <item row="3" column="2">
            <widget class="QPushButton" name="browseQbittorrentButton">
+            <property name="text">
+             <string>Обзор...</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="0">
+           <widget class="QLabel" name="nugenAmbPathLabel">
+            <property name="text">
+             <string>Путь к NUGEN Audio AMB.exe:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="1">
+           <widget class="QLineEdit" name="nugenAmbPathEdit"/>
+          </item>
+          <item row="4" column="2">
+           <widget class="QPushButton" name="browseNugenAmbButton">
             <property name="text">
              <string>Обзор...</string>
             </property>

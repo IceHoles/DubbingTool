@@ -337,8 +337,8 @@ void MainWindow::on_startButton_clicked()
     connect(this, &MainWindow::torrentSelected, workflowManager, &WorkflowManager::resumeWithSelectedTorrent);
     connect(workflowManager, &WorkflowManager::multipleAudioTracksFound, this, &MainWindow::onMultipleAudioTracksFound, Qt::QueuedConnection);
     connect(this, &MainWindow::audioTrackSelected, workflowManager, &WorkflowManager::resumeWithSelectedAudioTrack);
-    connect(workflowManager, &WorkflowManager::missingFilesRequest, this, &MainWindow::onMissingFilesRequest, Qt::QueuedConnection);
-    connect(this, &MainWindow::missingFilesProvided, workflowManager, &WorkflowManager::resumeWithMissingFiles);
+    connect(workflowManager, &WorkflowManager::userInputRequired, this, &MainWindow::onUserInputRequired, Qt::QueuedConnection);
+    connect(this, &MainWindow::userInputProvided, workflowManager, &WorkflowManager::resumeWithUserInput);
     connect(workflowManager, &WorkflowManager::signStylesRequest, this, &MainWindow::onSignStylesRequest, Qt::QueuedConnection);
     connect(this, &MainWindow::signStylesProvided, workflowManager, &WorkflowManager::resumeWithSignStyles);
     connect(workflowManager, &WorkflowManager::bitrateCheckRequest, this, &MainWindow::onBitrateCheckRequest, Qt::QueuedConnection);
@@ -359,8 +359,8 @@ void MainWindow::on_startButton_clicked()
     connect(workflowManager, &WorkflowManager::workflowAborted, this, &MainWindow::finishWorkerProcess);
 
     connect(workflowManager, &WorkflowManager::postsReady, this, &MainWindow::onPostsReady);
+    connect(workflowManager, &WorkflowManager::mkvFileReady, this, &MainWindow::onMkvFileReady);
     connect(workflowManager, &WorkflowManager::filesReady, this, &MainWindow::onFilesReady);
-    connect(workflowManager, &WorkflowManager::filesReady, thread, &QThread::quit);
     connect(thread, &QThread::finished, workflowManager, &WorkflowManager::deleteLater);
     connect(workflowManager, &WorkflowManager::destroyed, thread, &QThread::deleteLater);
     connect(workflowManager, &WorkflowManager::logMessage, this, &MainWindow::logMessage);
@@ -569,6 +569,12 @@ void MainWindow::onPostsReady(const ReleaseTemplate &t, const EpisodeData &data)
     }
 }
 
+void MainWindow::onMkvFileReady(const QString &mkvPath)
+{
+    logMessage("MKV файл готов, обновляю панель 'Публикация'.", LogCategory::APP);
+    m_lastMkvPath = mkvPath;
+    m_publicationWidget->setFilePaths(mkvPath, m_lastMp4Path); // m_lastMp4Path пока пуст
+}
 
 void MainWindow::onFilesReady(const QString &mkvPath, const QString &mp4Path)
 {
@@ -624,6 +630,11 @@ QString MainWindow::getOverrideSignsPath() const
     return ui->overrideSignsPathEdit->text();
 }
 
+bool MainWindow::isNormalizationEnabled() const
+{
+    return ui->normalizeAudioCheckBox->isChecked();
+}
+
 void MainWindow::onPostsUpdateRequest(const QMap<QString, QString> &viewLinks)
 {
     logMessage("Обновление постов с новыми ссылками...", LogCategory::APP);
@@ -636,48 +647,48 @@ void MainWindow::onPostsUpdateRequest(const QMap<QString, QString> &viewLinks)
     QMessageBox::information(m_publicationWidget, "Успех", "Тексты постов обновлены.");
 }
 
-void MainWindow::onMissingFilesRequest(const QStringList &missingFonts, bool requireWav, bool requireTime)
+void MainWindow::onUserInputRequired(const UserInputRequest &request)
 {
     logMessage("Процесс приостановлен: требуются данные от пользователя.", LogCategory::APP);
     MissingFilesDialog dialog(this);
 
-    bool audioNeeded = ui->audioPathLineEdit->text().isEmpty();
-    if (requireWav) {
-        audioNeeded = true;
-        dialog.setAudioPrompt("Для SRT-мастера требуется несжатый WAV-файл:");
-    } else {
+    dialog.setAudioPathVisible(request.audioFileRequired);
+    if (ui->audioPathLineEdit->text().isEmpty()) {
         dialog.setAudioPrompt("Не удалось найти русскую аудиодорожку. Укажите путь к ней:");
+    } else if (request.isWavRequired) {
+        dialog.setAudioPrompt("Для SRT-мастера требуется несжатый WAV-файл:");
     }
 
-    dialog.setAudioPathVisible(audioNeeded);
-    dialog.setMissingFonts(missingFonts);
-    dialog.setTimeInputVisible(requireTime);
+    dialog.setMissingFonts(request.missingFonts);
 
-    if (requireTime && !requireWav && missingFonts.isEmpty()) {
-        dialog.setTimePrompt("Времени для ТБ недостаточно. Укажите более раннее время начала эндинга:");
+    dialog.setTimeInputVisible(request.tbTimeRequired);
+    if (request.tbTimeRequired) {
+        dialog.setTimePrompt(request.tbTimeReason);
     }
 
     if (dialog.exec() == QDialog::Accepted) {
-        QString audioPath = dialog.getAudioPath();
-        QString time = dialog.getTime();
-        ui->audioPathLineEdit->setText(audioPath);
-        if (audioNeeded && audioPath.isEmpty()) {
+        UserInputResponse response;
+        response.audioPath = dialog.getAudioPath();
+        response.resolvedFonts = dialog.getResolvedFonts();
+        response.time = dialog.getTime();
+
+        if (request.audioFileRequired && response.audioPath.isEmpty()) {
             QMessageBox::critical(this, "Ошибка", "Аудиодорожка является обязательной. Сборка прервана.");
-            emit missingFilesProvided("", {}, "");
+            emit userInputProvided({});
             return;
         }
-        if (requireTime && time.isEmpty()) {
+        if (request.tbTimeRequired && response.time == "0:00:00.000") {
             QMessageBox::critical(this, "Ошибка", "Время эндинга является обязательным. Сборка прервана.");
-            emit missingFilesProvided("", {}, "");
+            emit userInputProvided({});
             return;
         }
 
         logMessage("Данные от пользователя получены, возобновление процесса...", LogCategory::APP);
-        emit missingFilesProvided(audioPath, dialog.getResolvedFonts(), time);
+        emit userInputProvided(response);
 
     } else {
         logMessage("Пользователь отменил ввод данных. Процесс прерван.", LogCategory::APP);
-        emit missingFilesProvided("", {}, "");
+        emit userInputProvided({});
     }
 }
 

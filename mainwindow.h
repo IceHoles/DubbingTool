@@ -38,14 +38,16 @@ public:
     QString getManualMkvPath() const;
     QString getOverrideSubsPath() const;
     QString getOverrideSignsPath() const;
+    bool isNormalizationEnabled() const;
 
 public slots:
     void logMessage(const QString &message, LogCategory category = LogCategory::APP);
     void onMultipleTorrentsFound(const QList<TorrentInfo> &candidates);
     void onRequestTemplateData(const QString& templateName);
     void onWorkflowAborted();
-    void onMissingFilesRequest(const QStringList &missingFonts, bool requireWav, bool requireTime);
+    void onUserInputRequired(const UserInputRequest &request);
     void onPostsReady(const ReleaseTemplate &t, const EpisodeData &data);
+    void onMkvFileReady(const QString &mkvPath);
     void onFilesReady(const QString &mkvPath, const QString &mp4Path);
     void onPostsUpdateRequest(const QMap<QString, QString>& viewLinks);
     void onSignStylesRequest(const QString &subFilePath);
@@ -54,7 +56,7 @@ public slots:
     void onPauseForSubEditRequest(const QString &subFilePath);
 
 signals:
-    void missingFilesProvided(const QString &audioPath, const QMap<QString, QString> &resolvedFonts, const QString &time);
+    void userInputProvided(const UserInputResponse &response);
     void signStylesProvided(const QStringList &styles);
     void torrentSelected(const TorrentInfo &selected);
     void audioTrackSelected(int trackId);

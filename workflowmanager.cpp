@@ -46,6 +46,7 @@ WorkflowManager::WorkflowManager(ReleaseTemplate t, const QString &episodeNumber
     m_customRenderArgs = settings.value("render/custom_args", "").toString();
     m_overrideSubsPath = m_mainWindow->getOverrideSubsPath();
     m_overrideSignsPath = m_mainWindow->getOverrideSignsPath();
+    m_isNormalizationEnabled = m_mainWindow->isNormalizationEnabled();
 
     m_netManager = new QNetworkAccessManager(this);
     m_hashFindTimer = new QTimer(this);
@@ -165,7 +166,9 @@ void WorkflowManager::parseRssAndDownload(const QByteArray &rssData)
         emit workflowAborted();
     } else if (candidates.size() == 1) {
         emit logMessage("Найден один подходящий торрент. Начинаем скачивание...", LogCategory::APP);
-        startDownload(candidates.first().magnetLink);
+        m_magnetLink = candidates.first().magnetLink;
+        m_torrentHash = getInfohashFromMagnet(m_magnetLink);
+        checkExistingTorrents();
     } else {
         emit logMessage(QString("Найдено %1 подходящих торрентов. Требуется выбор пользователя...").arg(candidates.size()), LogCategory::APP);
         emit multipleTorrentsFound(candidates);
@@ -181,7 +184,20 @@ void WorkflowManager::resumeWithSelectedTorrent(const TorrentInfo &selected)
     }
 
     emit logMessage("Пользователь выбрал: " + selected.title, LogCategory::APP);
-    startDownload(selected.magnetLink);
+    m_magnetLink = selected.magnetLink;
+    m_torrentHash = getInfohashFromMagnet(m_magnetLink);
+    checkExistingTorrents();
+}
+
+QString WorkflowManager::getInfohashFromMagnet(const QString &magnetLink) const
+{
+    // Regex для поиска infohash v1 (40 hex-символов) или v2 (64 hex-символа)
+    QRegularExpression re("xt=urn:(?:btih|btmh):([a-fA-F0-9]{40,64})");
+    QRegularExpressionMatch match = re.match(magnetLink);
+    if (match.hasMatch()) {
+        return match.captured(1).toLower();
+    }
+    return QString();
 }
 
 void WorkflowManager::startDownload(const QString &magnetLink)
@@ -271,7 +287,7 @@ void WorkflowManager::onLoginFinished(QNetworkReply *reply)
         }
         if (sidFound) {
             emit logMessage("Аутентификация успешна. Проверка статуса в клиенте...", LogCategory::QBITTORRENT);
-            checkExistingTorrents();
+            downloadRss();
         } else {
             emit logMessage("Ошибка: SID cookie не получен. Проверьте логин/пароль в настройках.", LogCategory::QBITTORRENT);
             emit workflowAborted();
@@ -291,7 +307,7 @@ void WorkflowManager::checkExistingTorrents()
     request.setHeader(QNetworkRequest::CookieHeader, QVariant::fromValue(m_cookies));
 
     QNetworkReply *reply = m_netManager->get(request);
-    connect(reply, &QNetworkReply::finished, this, [this, reply](){ onTorrentListForCheckReceived(reply); });
+    connect(reply, &QNetworkReply::finished, this, [this, reply](){ onTorrentListForHashCheckReceived(reply); });
 }
 
 void WorkflowManager::addTorrent(const QString &magnetLink)
@@ -398,67 +414,66 @@ void WorkflowManager::onTorrentListReceived(QNetworkReply *reply)
     reply->deleteLater();
 }
 
-void WorkflowManager::onTorrentListForCheckReceived(QNetworkReply *reply)
+void WorkflowManager::onTorrentListForHashCheckReceived(QNetworkReply *reply)
 {
     if (reply->error() != QNetworkReply::NoError) {
         emit logMessage("Ошибка сети при проверке торрентов: " + reply->errorString(), LogCategory::QBITTORRENT);
         emit logMessage("Не удалось проверить статус, переход к скачиванию нового.", LogCategory::APP);
-        downloadRss();
+        startDownload(m_magnetLink);
         reply->deleteLater();
         return;
     }
 
     QJsonArray torrents = QJsonDocument::fromJson(reply->readAll()).array();
-    QString absoluteSavePath = QDir(m_savePath).absolutePath();
     QJsonObject foundTorrent;
-
-    // Ищем торрент в клиенте
     for (const QJsonValue &value : torrents) {
         QJsonObject torrent = value.toObject();
-        if (QDir(torrent["save_path"].toString()).absolutePath() == absoluteSavePath) {
+        if (torrent["hash"].toString() == m_torrentHash) {
             foundTorrent = torrent;
             break;
         }
     }
 
-    // --- Сценарий А: Торрент НАЙДЕН в клиенте ---
+    // --- Сценарий А: Торрент НАЙДЕН в клиенте по хешу ---
     if (!foundTorrent.isEmpty()) {
-        m_torrentHash = foundTorrent["hash"].toString();
         double progress = foundTorrent["progress"].toDouble();
-        emit logMessage(QString("Торрент найден в клиенте (прогресс: %1%).").arg(progress * 100, 0, 'f', 1), LogCategory::APP);
+        QString state = foundTorrent["state"].toString();
+        emit logMessage(QString("Торрент уже существует в клиенте (Состояние: %1, Прогресс: %2%).")
+                            .arg(state).arg(progress * 100, 0, 'f', 1), LogCategory::APP);
 
-        // Ищем .mkv файл на диске
-        QString mkvPath = findMkvFileInSavePath();
-
-        if (mkvPath.isEmpty()) {
-            // Файла на диске нет
-            emit logMessage("Файл на диске отсутствует! Удаляем старый торрент и начинаем скачивание заново.", LogCategory::APP);
+        if (state == "missingFiles" || state == "error") {
+            emit logMessage("Состояние торрента проблемное. Удаляем его из клиента (без файлов) и начинаем скачивание заново.", LogCategory::APP);
             deleteTorrentAndRedownload();
-        } else {
-            // Файл на диске есть
-            m_mkvFilePath = mkvPath;
-            if (progress >= 1.0) {
-                emit logMessage("Торрент скачан. Переходим к обработке.", LogCategory::APP);
-                getMkvInfo();
+            reply->deleteLater();
+            return;
+        }
+
+        if (progress >= 1.0) {
+            emit logMessage("Торрент уже скачан. Переходим к обработке.", LogCategory::APP);
+            m_savePath = foundTorrent["save_path"].toString();
+            m_mkvFilePath = findMkvFileInSavePath();
+            if (m_mkvFilePath.isEmpty()) {
+                emit logMessage("Ошибка: торрент скачан, но MKV-файл не найден в его папке. Проверьте содержимое: " + m_savePath, LogCategory::APP);
+                emit workflowAborted();
             } else {
-                emit logMessage("Торрент не докачан. Возобновляем отслеживание.", LogCategory::APP);
-                startPolling();
+                getMkvInfo();
             }
+        } else {
+            emit logMessage("Торрент не докачан. Возобновляем отслеживание.", LogCategory::APP);
+            startPolling();
         }
 
         // --- Сценарий Б: Торрент НЕ НАЙДЕН в клиенте ---
     } else {
-        emit logMessage("Торрент не найден в клиенте. Проверяем диск...", LogCategory::APP);
-        QString mkvPath = findMkvFileInSavePath();
-        if (!mkvPath.isEmpty()) {
-            // Файл есть, а торрента нет - считаем готовым
-            m_mkvFilePath = mkvPath;
+        emit logMessage("Торрент не найден в клиенте. Проверяем диск (в целевой папке)...", LogCategory::APP);
+        m_savePath = m_paths->sourcesPath;
+        m_mkvFilePath = findMkvFileInSavePath();
+        if (!m_mkvFilePath.isEmpty()) {
             emit logMessage("Найден готовый файл на диске. Переходим к обработке.", LogCategory::APP);
             getMkvInfo();
         } else {
-            // Ни в клиенте, ни на диске ничего нет - качаем
-            emit logMessage("Ничего не найдено. Переходим к скачиванию.", LogCategory::APP);
-            downloadRss();
+            emit logMessage("Ничего не найдено. Начинаем скачивание.", LogCategory::APP);
+            startDownload(m_magnetLink);
         }
     }
 
@@ -505,7 +520,7 @@ void WorkflowManager::onTorrentDeleted(QNetworkReply *reply)
     } else {
         emit logMessage("Не удалось удалить старый торрент: " + reply->errorString(), LogCategory::QBITTORRENT);
     }
-    downloadRss();
+    startDownload(m_magnetLink);
     reply->deleteLater();
 }
 
@@ -630,7 +645,8 @@ void WorkflowManager::getMkvInfo()
         languageAliases["zho"] = "zh";
         languageAliases["chi"] = "zh";
         languageAliases["cmn"] = "zh";
-        languageAliases["jpn"] = "jp";
+        languageAliases["jpn"] = "ja";
+        languageAliases["jp"]  = "ja";
         languageAliases["eng"] = "en";
 
         m_foundAudioTracks.clear();
@@ -887,12 +903,40 @@ void WorkflowManager::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
             QString extractedSubsPath = m_paths->extractedSubs("ass");
             if (QFileInfo::exists(extractedSubsPath)) {
                 m_assProcessor->applySubstitutions(extractedSubsPath, m_template.substitutions);
-
                 if (m_template.pauseForSubEdit) {
                     emit logMessage("Процесс приостановлен. Ожидание ручного редактирования субтитров...", LogCategory::APP);
                     emit pauseForSubEditRequest(extractedSubsPath);
                     return;
                 }
+            }
+            audioPreparation();
+            break;
+        }
+        case Step::_NormalizingAudio:
+        {
+            emit logMessage("Нормализация аудио завершена.", LogCategory::APP);
+            if (m_didLaunchNugen) {
+                emit logMessage("Закрытие NUGEN Audio AMB...", LogCategory::APP);
+                QProcess::execute("taskkill", {"/F", "/IM", "NUGEN Audio AMB.exe", "/T"});
+                m_didLaunchNugen = false;
+            }
+
+            QString originalPath = (m_lastStepBeforeRequest == Step::AssemblingSrtMaster) ? m_wavForSrtMasterPath : m_mainRuAudioPath;
+            QFileInfo originalInfo(originalPath);
+            QString normalizedPath = originalInfo.dir().filePath(originalInfo.baseName() + "_corrected.wav");
+
+            if (QFileInfo::exists(normalizedPath)) {
+                emit logMessage("Найден нормализованный файл: " + normalizedPath, LogCategory::APP);
+                if(m_lastStepBeforeRequest == Step::AssemblingSrtMaster) {
+                    m_wavForSrtMasterPath = normalizedPath;
+                } else {
+                    m_mainRuAudioPath = normalizedPath;
+                    m_mainWindow->findChild<QLineEdit*>("audioPathLineEdit")->setText(m_mainRuAudioPath);
+                }
+                m_wasNormalizationPerformed = true;
+            } else {
+                emit logMessage("ОШИБКА: Нормализованный файл не найден.", LogCategory::APP);
+                emit workflowAborted();
             }
             processSubtitles();
             break;
@@ -924,6 +968,8 @@ void WorkflowManager::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
                 if(videoRemoved) emit logMessage(" -> Временное видео удалено: " + videoPath, LogCategory::APP);
                 if(audioRemoved) emit logMessage(" -> Временное аудио удалено: " + audioPath, LogCategory::APP);
             }
+
+            emit mkvFileReady(m_finalMkvPath);
             renderMp4();
             break;
         }
@@ -974,16 +1020,116 @@ void WorkflowManager::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
 void WorkflowManager::finishWorkflow()
 {
     emit logMessage("Все шаги автоматического процесса выполнены.", LogCategory::APP);
+    emit filesReady(m_finalMkvPath, m_outputMp4Path);
     // Сигнал workflowAborted теперь используется только для ошибок или принудительной отмены.
     // Для штатного завершения используем сигнал finished.
     // В MainWindow слот finishWorkerProcess обрабатывает оба.
     emit finished({}, {}, "", "");
 }
 
+void WorkflowManager::audioPreparation()
+{
+    m_currentStep = Step::AudioPreparation;
+
+    UserInputRequest request;
+    if (m_mainRuAudioPath.isEmpty()) {
+        request.audioFileRequired = true;
+    }
+
+    bool mainAudioIsWav = m_mainRuAudioPath.endsWith(".wav", Qt::CaseInsensitive);
+    if (m_template.createSrtMaster && !mainAudioIsWav && m_wavForSrtMasterPath.isEmpty()) {
+        request.audioFileRequired = true;
+        request.isWavRequired = true;
+    }
+
+    QString timeForTb;
+    if (m_template.useManualTime) {
+        timeForTb = m_template.endingStartTime;
+        emit logMessage("Используется время для ТБ, указанное вручную: " + timeForTb, LogCategory::APP);
+    } else if (!m_parsedEndingTime.isEmpty()) {
+        timeForTb = m_parsedEndingTime;
+        emit logMessage("Используется время для ТБ: " + timeForTb, LogCategory::APP);
+    }
+
+    if (timeForTb.isEmpty()) {
+        request.tbTimeRequired = true;
+        request.tbTimeReason = "Время эндинга не определено. Укажите его вручную.";
+    } else {
+        QTime tbStartTime = QTime::fromString(timeForTb, "H:mm:ss.zzz");
+        if (tbStartTime.isValid() && m_sourceDurationS > 0) {
+            double tbStartTimeS = tbStartTime.hour() * 3600 + tbStartTime.minute() * 60 + tbStartTime.second() + tbStartTime.msec() / 1000.0;
+            double remainingTimeS = m_sourceDurationS - tbStartTimeS;
+            int tbLines = AssProcessor::calculateTbLineCount(m_template);
+            double requiredTimeS = tbLines * 3.0;
+
+            if (remainingTimeS < requiredTimeS) {
+                request.tbTimeRequired = true;
+                request.tbTimeReason = QString("Недостаточно времени для ТБ! Требуется: ~%1 сек. Осталось: ~%2 сек.").arg(qRound(requiredTimeS)).arg(qRound(remainingTimeS));
+            } else {
+                emit logMessage(QString("Проверка времени для ТБ пройдена. Требуется: ~%1 сек. Осталось: ~%2 сек.").arg(qRound(requiredTimeS)).arg(qRound(remainingTimeS)), LogCategory::APP);
+            }
+        }
+    }
+
+    if (request.isValid()) {
+        emit logMessage("Недостаточно аудиоданных. Запрос у пользователя...", LogCategory::APP);
+        m_lastStepBeforeRequest = Step::AudioPreparation;
+        emit userInputRequired(request);
+        return;
+    }
+
+    if (!m_isNormalizationEnabled || m_wasNormalizationPerformed) {
+        processSubtitles();
+        return;
+    }
+
+    QString nugenPath = AppSettings::instance().nugenAmbPath();
+    if (nugenPath.isEmpty()) {
+        processSubtitles();
+        return;
+    }
+
+    QString targetWavPath;
+    if (!m_wavForSrtMasterPath.isEmpty()) {
+        targetWavPath = m_wavForSrtMasterPath;
+        m_lastStepBeforeRequest = Step::AssemblingSrtMaster;
+    } else if (mainAudioIsWav) {
+        targetWavPath = m_mainRuAudioPath;
+        m_lastStepBeforeRequest = Step::AudioPreparation;
+    }
+
+    if (targetWavPath.isEmpty()) {
+        processSubtitles();
+        return;
+    }
+    emit logMessage("Шаг 5: Подготовка аудио...", LogCategory::APP);
+
+    m_currentStep = Step::_NormalizingAudio;
+    QFileInfo nugenInfo(nugenPath);
+    QString ambCmdPath = nugenInfo.dir().filePath("AMBCmd.exe");
+
+    if (!QFileInfo::exists(ambCmdPath)) {
+        emit logMessage("Ошибка: AMBCmd.exe не найден. Шаг нормализации пропущен.", LogCategory::APP);
+        processSubtitles();
+        return;
+    }
+
+    emit logMessage("Запуск GUI NUGEN AMB в фоновом режиме...", LogCategory::APP);
+    emit progressUpdated(-1, "Запуск NUGEN Audio AMB");
+    QProcess::startDetached(nugenPath);
+    m_didLaunchNugen = true;
+
+    QTimer::singleShot(3000, this, [this, ambCmdPath, targetWavPath](){
+        emit logMessage("Запуск AMBCmd для обработки файла: " + targetWavPath, LogCategory::APP);
+        m_processManager->startProcess(ambCmdPath, {"-a", targetWavPath});
+        emit progressUpdated(-1, "Нормализация аудиофайла");
+    });
+}
+
 void WorkflowManager::findFontsInProcessedSubs()
 {
     m_currentStep = Step::FindingFonts;
-    emit logMessage("Шаг 6: Поиск шрифтов в обработанных субтитрах...", LogCategory::APP);
+    emit logMessage("Шаг 7: Поиск шрифтов в обработанных субтитрах...", LogCategory::APP);
     emit progressUpdated(-1, "Поиск шрифтов");
 
     QStringList subFilesToCheck;
@@ -1006,19 +1152,11 @@ void WorkflowManager::findFontsInProcessedSubs()
 
 void WorkflowManager::convertAudioIfNeeded()
 {
-    emit logMessage("Шаг 7: Проверка и конвертация аудио...", LogCategory::APP);
-
+    emit logMessage("Шаг 8: Проверка и конвертация аудио...", LogCategory::APP);
+    
     if (m_mainRuAudioPath.isEmpty()) {
-        if (m_wasUserInputRequested) {
-            emit logMessage("Критическая ошибка: не указан путь к русской аудиодорожке. Сборка невозможна.", LogCategory::APP);
-            emit workflowAborted();
-            return;
-        }
-        emit logMessage("Русская аудиодорожка не указана. Запрос данных у пользователя...", LogCategory::APP);
-        emit progressUpdated(-1, "Запрос аудиодорожки у пользователя");
-        m_lastStepBeforeRequest = Step::ConvertingAudio;
-        m_wasUserInputRequested = true;
-        emit missingFilesRequest({});
+        emit logMessage("КРИТИЧЕСКАЯ ОШИБКА: Аудиофайл отсутствует на шаге конвертации.", LogCategory::APP);
+        emit workflowAborted();
         return;
     }
 
@@ -1089,7 +1227,7 @@ void WorkflowManager::onAudioConversionProgress()
 
 void WorkflowManager::assembleMkv(const QString &russianAudioPath)
 {
-    emit logMessage("Шаг 8: Проверка компонентов для сборки MKV...", LogCategory::APP);
+    emit logMessage("Шаг 9: Проверка компонентов для сборки MKV...", LogCategory::APP);
     m_currentStep = Step::AssemblingMkv;
 
     QString videoPath = m_paths->extractedVideo(m_videoTrack.extension);
@@ -1098,12 +1236,18 @@ void WorkflowManager::assembleMkv(const QString &russianAudioPath)
     QString signsPath = m_paths->processedSignsSubs();
 
 
-    if (!m_fontResult.notFoundFontNames.isEmpty() && !m_wasUserInputRequested) {
-        emit logMessage("Обнаружены недостающие шрифты, запрашиваем у пользователя...", LogCategory::APP);
-        emit progressUpdated(-1, "Запрос шрифтов у пользователя");
-        m_wasUserInputRequested = true;
-        m_lastStepBeforeRequest = m_currentStep;
-        emit missingFilesRequest(m_fontResult.notFoundFontNames);
+    UserInputRequest request;
+    if (!m_fontResult.notFoundFontNames.isEmpty()) {
+        request.missingFonts = m_fontResult.notFoundFontNames;
+    }
+    if (m_mainRuAudioPath.isEmpty()) {
+        request.audioFileRequired = true;
+    }
+
+    if (request.isValid()) {
+        emit logMessage("Недостаточно файлов для сборки MKV. Запрос у пользователя...", LogCategory::APP);
+        m_lastStepBeforeRequest = Step::AssemblingMkv;
+        emit userInputRequired(request);
         return;
     }
 
@@ -1173,7 +1317,7 @@ void WorkflowManager::assembleMkv(const QString &russianAudioPath)
 
 void WorkflowManager::renderMp4()
 {
-    emit logMessage("Шаг 9: Рендер финального MP4 файла...", LogCategory::APP);
+    emit logMessage("Шаг 10: Рендер финального MP4 файла...", LogCategory::APP);
     emit progressUpdated(-1, "Рендер MP4");
     m_renderPreset = AppSettings::instance().findRenderPreset(m_template.renderPresetName);
     if (m_renderPreset.name.isEmpty()) {
@@ -1391,26 +1535,7 @@ void WorkflowManager::convertToSrtAndAssembleMaster()
     QString outputSrtPath = m_paths->masterSrt();
     m_assProcessor->convertToSrt(sourceAss, outputSrtPath, m_template.signStyles);
 
-    // 3. Проверяем наличие несжатого WAV
-    bool wavIsMissing;
-    // Проверяем, есть ли у нас уже путь к .wav, который был предоставлен ранее
-    if (!m_wavForSrtMasterPath.isEmpty() && m_wavForSrtMasterPath.endsWith(".wav", Qt::CaseInsensitive)) {
-        wavIsMissing = false;
-    } else {
-        // Если нет, проверяем основной путь, вдруг пользователь сразу указал .wav
-        wavIsMissing = m_mainRuAudioPath.isEmpty() || !m_mainRuAudioPath.endsWith(".wav", Qt::CaseInsensitive);
-    }
-
-    if (wavIsMissing && !m_wasUserInputRequested) {
-        emit logMessage("Для сборки SRT-мастера требуется WAV файл. Запрос данных у пользователя...", LogCategory::APP);
-        emit progressUpdated(-1, "Запрос .WAV файла для сборки мастер-копии");
-        m_wasUserInputRequested = true;
-        m_lastStepBeforeRequest = m_currentStep;
-        emit missingFilesRequest({}, true);
-        return;
-    }
-
-    // 4. Собираем MKV
+    // 3. Собираем MKV
     QStringList args;
     QString outputMkvPath = m_paths->masterMkv(QString("[DUB x TVOЁ] %1 - %2.mkv").arg(m_template.seriesTitle, m_episodeNumberForSearch));
     args << "-o" << outputMkvPath;
@@ -1457,56 +1582,50 @@ QString WorkflowManager::getExtensionForCodec(const QString &codecId)
     return "bin";
 }
 
-void WorkflowManager::resumeWithMissingFiles(const QString &audioPath, const QMap<QString, QString> &resolvedFonts, const QString &time)
+void WorkflowManager::resumeWithUserInput(const UserInputResponse &response)
 {
-    bool wasMainAudioRequested = m_mainRuAudioPath.isEmpty();
-    bool wasTimeRequested = m_parsedEndingTime.isEmpty();
-    bool wasWavForSrtMasterRequested = (m_lastStepBeforeRequest == Step::AssemblingSrtMaster && m_wavForSrtMasterPath.isEmpty());
-
-    if (audioPath.isEmpty() && resolvedFonts.isEmpty() && time.isEmpty() && (wasMainAudioRequested || wasTimeRequested || wasWavForSrtMasterRequested)) {
+    if (!response.isValid()) {
         emit logMessage("Процесс прерван пользователем в диалоге выбора файлов.", LogCategory::APP);
         emit workflowAborted();
         return;
     }
 
-    if (!audioPath.isEmpty()) {
+    m_wasUserInputRequested = false;
+    emit logMessage("Данные от пользователя получены. Возобновление работы...", LogCategory::APP);
+
+    if (!response.audioPath.isEmpty()) {
         emit logMessage("Пользователь предоставил аудиофайл. Обработка...", LogCategory::APP);
-        QString newAudioPath = handleUserFile(audioPath, m_paths->ruAudioPath);
+        QString newAudioPath = handleUserFile(response.audioPath, m_paths->ruAudioPath);
         if (!newAudioPath.isEmpty()) {
-            if (wasWavForSrtMasterRequested) {
-                m_wavForSrtMasterPath = newAudioPath;
-                emit logMessage("Аудиофайл (.wav для мастера) сохранен по пути: " + m_wavForSrtMasterPath, LogCategory::APP);
-            } else {
+            if (m_mainRuAudioPath.isEmpty()) {
                 m_mainRuAudioPath = newAudioPath;
-                if (auto mainWin = qobject_cast<MainWindow*>(parent())) {
-                    mainWin->findChild<QLineEdit*>("audioPathLineEdit")->setText(m_mainRuAudioPath);
-                }
-                emit logMessage("Аудиофайл перемещен в: " + m_mainRuAudioPath, LogCategory::APP);
+                m_mainWindow->findChild<QLineEdit*>("audioPathLineEdit")->setText(m_mainRuAudioPath);
+            } else {
+                m_wavForSrtMasterPath = newAudioPath;
             }
-        } else {
-            m_mainRuAudioPath = audioPath; // Фоллбэк, если обработка не удалась
-            emit logMessage("ПРЕДУПРЕЖДЕНИЕ: не удалось обработать аудиофайл. Будет использован оригинальный путь.", LogCategory::APP);
         }
+    } else if (m_lastStepBeforeRequest == Step::AudioPreparation && m_template.createSrtMaster && !m_mainRuAudioPath.endsWith(".wav")) {
+        emit logMessage("WAV для мастер-копии не предоставлен. Сборка мастер-копии отменена.", LogCategory::APP);
+        m_template.createSrtMaster = false;
     }
-    if (!time.isEmpty()) m_parsedEndingTime = time;
-    if (!resolvedFonts.isEmpty()) {
-        for (auto it = resolvedFonts.constBegin(); it != resolvedFonts.constEnd(); ++it) {
+
+    if (!response.time.isEmpty() && response.time != "0:00:00.000") {
+        m_parsedEndingTime = response.time;
+    }
+
+    if (!response.resolvedFonts.isEmpty()) {
+        for (auto it = response.resolvedFonts.constBegin(); it != response.resolvedFonts.constEnd(); ++it) {
             m_fontResult.foundFonts.append({it.value(), it.key()});
             m_fontResult.notFoundFontNames.removeOne(it.key());
         }
     }
 
-    m_wasUserInputRequested = false;
-    emit logMessage("Данные от пользователя получены. Возобновление работы...", LogCategory::APP);
-
-    if        (m_lastStepBeforeRequest == Step::ProcessingSubs) {
+    if        (m_lastStepBeforeRequest == Step::AudioPreparation) {
+        audioPreparation();
+    } else if (m_lastStepBeforeRequest == Step::ProcessingSubs) {
         processSubtitles();
     } else if (m_lastStepBeforeRequest == Step::AssemblingMkv) {
         assembleMkv(m_mainRuAudioPath);
-    } else if (m_lastStepBeforeRequest == Step::AssemblingSrtMaster) {
-        convertToSrtAndAssembleMaster();
-    } else if (m_lastStepBeforeRequest == Step::ConvertingAudio) {
-        convertAudioIfNeeded();
     }
 }
 
@@ -1519,6 +1638,7 @@ void WorkflowManager::resumeWithSignStyles(const QStringList &styles)
     }
     m_template.signStyles = styles;
     emit logMessage("Стили для надписей получены. Продолжаем...", LogCategory::APP);
+    m_wasUserInputRequested = false;
     processSubtitles();
 }
 
@@ -1563,12 +1683,10 @@ void WorkflowManager::resumeWithSelectedAudioTrack(int trackId)
 
 void WorkflowManager::processSubtitles()
 {
-    emit logMessage("Шаг 5: Обработка субтитров...", LogCategory::APP);
+    emit logMessage("Шаг 6: Обработка субтитров...", LogCategory::APP);
     m_currentStep = Step::ProcessingSubs;
 
     QString subsToAnalyze;
-
-    // Шаг 5.1: Проверяем, нужно ли запрашивать стили
     if ((m_template.signStyles.isEmpty() || m_template.forceSignStyleRequest) && !m_wereStylesRequested) {
         if (!m_overrideSubsPath.isEmpty()) subsToAnalyze = m_overrideSubsPath;
         else {
@@ -1576,70 +1694,20 @@ void WorkflowManager::processSubtitles()
             if (QFileInfo::exists(extractedSubs)) subsToAnalyze = extractedSubs;
         }
         if (!subsToAnalyze.isEmpty()) {
-            emit logMessage("Шаг 5.2: Запрос стилей и актёров для надписей...", LogCategory::APP);
+            emit logMessage("Шаг 6.2: Запрос стилей и актёров для надписей...", LogCategory::APP);
             emit progressUpdated(-1, "Запрос стилей и актёров для разделения субтитров от надписей");
             m_lastStepBeforeRequest = Step::ProcessingSubs;
             m_wereStylesRequested = true;
             emit signStylesRequest(subsToAnalyze);
-            return; // Ждем ответа от пользователя
+            return;
         }
     }
 
-    // Шаг 5.3: Проверяем, нужно ли запрашивать время
-    if (m_parsedEndingTime.isEmpty() && !m_template.useManualTime && !m_wasUserInputRequested) {
-        emit logMessage("Время эндинга не найдено. Запрос данных у пользователя...", LogCategory::APP);
-        m_lastStepBeforeRequest = Step::ProcessingSubs;
-        m_wasUserInputRequested = true;
-        emit progressUpdated(-1, "Запрос времени эндинга");
-        emit missingFilesRequest({}, false, true);
-        return; // Ждем ответа от пользователя
-    }
-
-    // Если мы дошли до сюда, значит, все данные есть, можно запускать обработку
-    m_wereStylesRequested = false;
     runAssProcessing();
 }
 
 void WorkflowManager::runAssProcessing()
 {
-    QString timeForTb;
-    if (m_template.useManualTime) {
-        timeForTb = m_template.endingStartTime;
-        emit logMessage("Используется время для ТБ, указанное вручную: " + timeForTb, LogCategory::APP);
-    } else if (!m_parsedEndingTime.isEmpty()) {
-        timeForTb = m_parsedEndingTime;
-        emit logMessage("Используется время для ТБ: " + timeForTb, LogCategory::APP);
-    }
-
-    if (timeForTb.isEmpty()) {
-        emit logMessage("КРИТИЧЕСКАЯ ОШИБКА: Время для ТБ не определено. Проверьте имя главы или укажите время вручную в шаблоне.", LogCategory::APP);
-        workflowAborted();
-        return;
-    }
-
-    QTime tbStartTime = QTime::fromString(timeForTb, "H:mm:ss.zzz");
-    if (tbStartTime.isValid() && m_sourceDurationS > 0) {
-        double tbStartTimeS = tbStartTime.hour() * 3600 + tbStartTime.minute() * 60 + tbStartTime.second() + tbStartTime.msec() / 1000.0;
-        double remainingTimeS = m_sourceDurationS - tbStartTimeS;
-
-        int tbLines = AssProcessor::calculateTbLineCount(m_template);
-        double requiredTimeS = tbLines * 3.0;
-
-        if (remainingTimeS < requiredTimeS) {
-            emit logMessage(QString("ВНИМАНИЕ: Недостаточно времени для ТБ! Требуется: ~%1 сек. Осталось: ~%2 сек.")
-                                .arg(qRound(requiredTimeS)).arg(qRound(remainingTimeS)), LogCategory::APP);
-
-            m_lastStepBeforeRequest = Step::ProcessingSubs;
-            m_wasUserInputRequested = true;
-            emit progressUpdated(-1, "Запрос корректного времени эндинга");
-            emit missingFilesRequest({}, false, true);
-            return;
-        } else {
-            emit logMessage(QString("Проверка времени для ТБ пройдена. Требуется: ~%1 сек. Осталось: ~%2 сек.")
-                                .arg(qRound(requiredTimeS)).arg(qRound(remainingTimeS)), LogCategory::APP);
-        }
-    }
-
     QString extractedSubs = m_paths->extractedSubs("ass");
     QString overrideSubs = m_overrideSubsPath;
     QString overrideSigns = m_overrideSignsPath;
@@ -1652,26 +1720,26 @@ void WorkflowManager::runAssProcessing()
     bool success = false;
     if (hasOverrideSubs && hasOverrideSigns) {
         emit logMessage("Сценарий: используются свои субтитры для диалогов и свои надписи для надписей.", LogCategory::APP);
-        success = m_assProcessor->processFromTwoSources(overrideSubs, overrideSigns, outputFileBase, m_template, timeForTb);
+        success = m_assProcessor->processFromTwoSources(overrideSubs, overrideSigns, outputFileBase, m_template, m_parsedEndingTime);
     } else if (hasOverrideSubs) {
         emit logMessage("Сценарий: используются свои субтитры. Файл будет разделен на диалоги и надписи.", LogCategory::APP);
-        success = m_assProcessor->processExistingFile(overrideSubs, outputFileBase, m_template, timeForTb);
+        success = m_assProcessor->processExistingFile(overrideSubs, outputFileBase, m_template, m_parsedEndingTime);
     } else if (hasOverrideSigns) {
         if (hasExtracted) {
             emit logMessage("Сценарий: используются извлеченные субтитры для диалогов и свои надписи.", LogCategory::APP);
-            success = m_assProcessor->processFromTwoSources(extractedSubs, overrideSigns, outputFileBase, m_template, timeForTb);
+            success = m_assProcessor->processFromTwoSources(extractedSubs, overrideSigns, outputFileBase, m_template, m_parsedEndingTime);
         } else {
             emit logMessage("Сценарий: извлеченных субтитров нет, используются только свои надписи.", LogCategory::APP);
-            success = m_assProcessor->processExistingFile(overrideSigns, outputFileBase, m_template, timeForTb);
+            success = m_assProcessor->processExistingFile(overrideSigns, outputFileBase, m_template, m_parsedEndingTime);
         }
     } else {
         if (hasExtracted) {
             emit logMessage("Сценарий: используются извлеченные субтитры. Файл будет разделен.", LogCategory::APP);
-            success = m_assProcessor->processExistingFile(extractedSubs, outputFileBase, m_template, timeForTb);
+            success = m_assProcessor->processExistingFile(extractedSubs, outputFileBase, m_template, m_parsedEndingTime);
         } else {
             emit logMessage("Сценарий: субтитры не найдены и не указаны. Генерируем только ТБ.", LogCategory::APP);
             QString outputPath = m_paths->processedSignsSubs();
-            success = m_assProcessor->generateTbOnlyFile(outputPath, m_template, timeForTb);
+            success = m_assProcessor->generateTbOnlyFile(outputPath, m_template, m_parsedEndingTime);
         }
     }
 
@@ -1687,6 +1755,7 @@ void WorkflowManager::runAssProcessing()
     data.episodeNumber = m_episodeNumberForPost;
     data.cast = m_template.cast;
     emit postsReady(m_template, data);
+    m_wereStylesRequested = false;
 
     findFontsInProcessedSubs();
 }

@@ -64,6 +64,8 @@ public:
     void setFfmpegPath(const QString &path);
     QString qbittorrentPath() const;
     void setQbittorrentPath(const QString &path);
+    QString nugenAmbPath() const;
+    void setNugenAmbPath(const QString &path);
     bool deleteTempFiles() const;
     void setDeleteTempFiles(bool enabled);
     UserFileAction userFileAction() const;
@@ -86,6 +88,7 @@ private:
     QString m_mkvextractPath;
     QString m_ffmpegPath;
     QString m_qbittorrentPath;
+    QString m_nugenAmbPath;
     bool m_deleteTempFiles;
     UserFileAction m_userFileAction;
     QList<TbStyleInfo> m_tbStyles;

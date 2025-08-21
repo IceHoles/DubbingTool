@@ -32,6 +32,7 @@ void SettingsDialog::loadSettings()
     ui->mkvExtractPathEdit->setText(settings.mkvextractPath());
     ui->ffmpegPathEdit->setText(settings.ffmpegPath());
     ui->qbittorrentPathEdit->setText(settings.qbittorrentPath());
+    ui->nugenAmbPathEdit->setText(settings.nugenAmbPath());
     ui->deleteTempFilesCheckBox->setChecked(settings.deleteTempFiles());
     ui->userFileActionComboBox->setCurrentIndex(static_cast<int>(settings.userFileAction()));
 
@@ -80,6 +81,7 @@ void SettingsDialog::accept()
     settings.setMkvextractPath(ui->mkvExtractPathEdit->text());
     settings.setFfmpegPath(ui->ffmpegPathEdit->text());
     settings.setQbittorrentPath(ui->qbittorrentPathEdit->text());
+    settings.setNugenAmbPath(ui->nugenAmbPathEdit->text());
     settings.setDeleteTempFiles(ui->deleteTempFilesCheckBox->isChecked());
     settings.setUserFileAction(static_cast<UserFileAction>(ui->userFileActionComboBox->currentIndex()));
 
@@ -129,6 +131,12 @@ void SettingsDialog::on_browseQbittorrentButton_clicked()
 {
     QString filePath = QFileDialog::getOpenFileName(this, "Выберите qbittorrent.exe", "", "Исполняемые файлы (*.exe)");
     if (!filePath.isEmpty()) ui->qbittorrentPathEdit->setText(filePath);
+}
+
+void SettingsDialog::on_browseNugenAmbButton_clicked()
+{
+    QString filePath = QFileDialog::getOpenFileName(this, "Выберите NUGEN Audio AMB.exe", "", "Исполняемые файлы (*.exe)");
+    if (!filePath.isEmpty()) ui->nugenAmbPathEdit->setText(filePath);
 }
 
 void SettingsDialog::on_addTbStyleButton_clicked()
