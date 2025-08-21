@@ -7,6 +7,7 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QVariantMap>
+#include <QStyle>
 
 
 ManualAssemblyWidget::ManualAssemblyWidget(QWidget *parent) :
@@ -14,13 +15,47 @@ ManualAssemblyWidget::ManualAssemblyWidget(QWidget *parent) :
     ui(new Ui::ManualAssemblyWidget)
 {
     ui->setupUi(this);
-    ui->tbGroupBox->setChecked(false);
+
     m_fontFinder = new FontFinder(this);
     connect(m_fontFinder, &FontFinder::finished, this, &ManualAssemblyWidget::onFontFinderFinished);
+
+    m_templateModeIcon = this->style()->standardIcon(QStyle::SP_FileDialogListView);
+    m_manualModeIcon = this->style()->standardIcon(QStyle::SP_FileDialogDetailedView);
+
+    connect(ui->modeSwitchButton, &QToolButton::toggled, this, &ManualAssemblyWidget::onModeSwitched);
+    connect(ui->convertAudioCheckBox, &QCheckBox::toggled, ui->convertAudioFormatComboBox, &QComboBox::setVisible);
+    ui->modeSwitchButton->setChecked(false);
+    onModeSwitched(false);
+    ui->convertAudioFormatComboBox->setVisible(ui->convertAudioCheckBox->isChecked());
 }
+
 ManualAssemblyWidget::~ManualAssemblyWidget()
 {
     delete ui;
+}
+
+void ManualAssemblyWidget::onModeSwitched(bool isManualMode)
+{
+    updateUiState(isManualMode);
+}
+
+void ManualAssemblyWidget::updateUiState(bool isManualMode)
+{
+    ui->templateLabel->setVisible(!isManualMode);
+    ui->templateComboBox->setVisible(!isManualMode);
+    ui->modeSwitchSpacer->changeSize(isManualMode ? 40 : 0, 20, isManualMode ? QSizePolicy::Expanding : QSizePolicy::Fixed);
+
+    ui->pagesWidget->setCurrentIndex(isManualMode ? 1 : 0); // 0 = pageTemplate, 1 = pageManual
+
+    if (isManualMode) {
+        ui->modeSwitchButton->setIcon(m_manualModeIcon);
+        ui->modeSwitchButton->setText("Ручной режим");
+        ui->modeSwitchButton->setToolTip("Переключить в режим по шаблону");
+    } else {
+        ui->modeSwitchButton->setIcon(m_templateModeIcon);
+        ui->modeSwitchButton->setText("Режим по шаблону");
+        ui->modeSwitchButton->setToolTip("Переключить в ручной режим");
+    }
 }
 
 void ManualAssemblyWidget::updateTemplateList(const QStringList &templateNames)
@@ -137,42 +172,51 @@ void ManualAssemblyWidget::on_addFontsButton_clicked()
 QVariantMap ManualAssemblyWidget::getParameters() const
 {
     QVariantMap params;
-    params["templateName"] = ui->templateComboBox->currentText();
-    if (ui->includeVideoCheckBox->isChecked()) {
-        params["videoPath"] = ui->videoPathEdit->text();
+    bool isManualMode = ui->modeSwitchButton->isChecked();
+    params["isManualMode"] = isManualMode;
+
+    if (ui->includeVideoCheckBox->isChecked()) params["videoPath"] = ui->videoPathEdit->text();
+    if (ui->includeOriginalAudioCheckBox->isChecked()) params["originalAudioPath"] = ui->originalAudioPathEdit->text();
+    if (ui->includeRussianAudioCheckBox->isChecked()) params["russianAudioPath"] = ui->russianAudioPathEdit->text();
+    if (ui->includeSubtitlesCheckBox->isChecked()) params["subtitlesPath"] = ui->subtitlesPathEdit->text();
+    if (ui->includeSignsCheckBox->isChecked()) params["signsPath"] = ui->signsPathEdit->text();
+
+    params["normalizeAudio"] = ui->normalizeAudioCheckBox->isChecked();
+    params["convertAudio"] = ui->convertAudioCheckBox->isChecked();
+
+    if (params["convertAudio"].toBool()) {
+        if (ui->convertAudioFormatComboBox->currentText() == "в AAC") {
+            params["convertAudioFormat"] = "aac";
+        } else {
+            params["convertAudioFormat"] = "flac";
+        }
     }
-    if (ui->includeOriginalAudioCheckBox->isChecked()) {
-        params["originalAudioPath"] = ui->originalAudioPathEdit->text();
-    }
-    if (ui->includeRussianAudioCheckBox->isChecked()) {
-        params["russianAudioPath"] = ui->russianAudioPathEdit->text();
-    }
-    if (ui->includeSubtitlesCheckBox->isChecked()) {
-        params["subtitlesPath"] = ui->subtitlesPathEdit->text();
-    }
-    if (ui->includeSignsCheckBox->isChecked()) {
-        params["signsPath"] = ui->signsPathEdit->text();
-    }
+
     params["workDir"] = ui->workDirEdit->text();
     params["outputName"] = ui->outputFileNameEdit->text();
-
-    params["addTb"] = ui->tbGroupBox->isChecked();
-    if (ui->tbGroupBox->isChecked()) {
-        params["tbStartTime"] = ui->tbStartTimeEdit->text();
-        params["tbStyleName"] = ui->tbStyleComboBox->currentText();
-    }
 
     QStringList fontPaths;
     for(int i = 0; i < ui->fontsListWidget->count(); ++i) {
         QString path = ui->fontsListWidget->item(i)->data(Qt::UserRole).toString();
-        if (!path.isEmpty()) {
-            fontPaths.append(path);
-        }
+        if (!path.isEmpty()) fontPaths.append(path);
     }
     params["fontPaths"] = fontPaths;
+
+    if (isManualMode) {
+        params["studio"] = ui->studioEdit->text();
+        params["language"] = ui->languageEdit->text();
+        params["subAuthor"] = ui->subAuthorEdit->text();
+    } else {
+        params["templateName"] = ui->templateComboBox->currentText();
+        params["addTb"] = ui->tbGroupBox->isChecked();
+        if (ui->tbGroupBox->isChecked()) {
+            params["tbStartTime"] = ui->tbStartTimeEdit->time().toString("H:mm:ss.zzz");
+            params["tbStyleName"] = ui->tbStyleComboBox->currentText();
+        }
+    }
+
     return params;
 }
-
 
 void ManualAssemblyWidget::on_assembleButton_clicked()
 {

@@ -34,7 +34,7 @@ public slots:
 signals:
     void logMessage(const QString&, LogCategory);
     void finished();
-    void progressUpdated(int percentage);
+    void progressUpdated(int percentage, const QString& stageName = "");
     void bitrateCheckRequest(const RenderPreset &preset, double actualBitrate);
 
 private slots:

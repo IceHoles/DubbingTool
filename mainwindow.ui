@@ -28,6 +28,13 @@
         <item row="0" column="0" colspan="2">
          <layout class="QHBoxLayout" name="horizontalLayout">
           <item>
+           <widget class="QLabel" name="label_template">
+            <property name="text">
+             <string>Шаблон:</string>
+            </property>
+           </widget>
+          </item>
+          <item>
            <widget class="QComboBox" name="templateComboBox">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
@@ -61,33 +68,27 @@
          </layout>
         </item>
         <item row="1" column="0" colspan="2">
-         <layout class="QHBoxLayout" name="horizontalLayout_2">
+         <layout class="QHBoxLayout" name="horizontalLayout_4">
           <item>
-           <widget class="QLabel" name="label">
+           <widget class="QLabel" name="label_3">
             <property name="text">
-             <string>Номер серии:</string>
+             <string>Исходный MKV:</string>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="episodeNumberLineEdit">
+           <widget class="QLineEdit" name="mkvPathLineEdit">
             <property name="placeholderText">
-             <string>например, 11 (можно оставить пустым в ручном режиме)</string>
+             <string>Выберите .mkv файл</string>
             </property>
            </widget>
           </item>
           <item>
-           <spacer name="horizontalSpacer">
-            <property name="orientation">
-             <enum>Qt::Orientation::Horizontal</enum>
+           <widget class="QPushButton" name="selectMkvButton">
+            <property name="text">
+             <string>Обзор...</string>
             </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>40</width>
-              <height>20</height>
-             </size>
-            </property>
-           </spacer>
+           </widget>
           </item>
          </layout>
         </item>
@@ -96,7 +97,7 @@
           <item>
            <widget class="QLabel" name="label_2">
             <property name="text">
-             <string>Русская аудиодорожка:</string>
+             <string>Русское аудио:</string>
             </property>
            </widget>
           </item>
@@ -117,31 +118,46 @@
          </layout>
         </item>
         <item row="3" column="0" colspan="2">
-         <layout class="QHBoxLayout" name="horizontalLayout_4">
+         <layout class="QHBoxLayout" name="horizontalLayout">
           <item>
-           <widget class="QLabel" name="label_3">
+           <widget class="QLabel" name="label">
             <property name="text">
-             <string>Оригинальный MKV:</string>
+             <string>Номер серии:</string>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="mkvPathLineEdit">
+           <widget class="QLineEdit" name="episodeNumberLineEdit">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+              <horstretch>1</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>16777215</width>
+              <height>16777215</height>
+             </size>
+            </property>
             <property name="placeholderText">
-             <string>Выберите .mkv файл</string>
+             <string>Оставьте пустым при работе с указанным .mkv файлом</string>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QPushButton" name="selectMkvButton">
+           <widget class="QCheckBox" name="normalizeAudioCheckBox">
+            <property name="toolTip">
+             <string>Если указан путь к NUGEN AMB и предоставлен WAV файл, выполнить нормализацию аудио.</string>
+            </property>
             <property name="text">
-             <string>Обзор...</string>
+             <string>Нормализовать аудио</string>
             </property>
            </widget>
           </item>
          </layout>
         </item>
-        <item row="4" column="0" colspan="1">
+        <item row="4" column="0">
          <layout class="QHBoxLayout" name="horizontalLayout_5">
           <item>
            <widget class="QLabel" name="label_41">
@@ -166,7 +182,7 @@
           </item>
          </layout>
         </item>
-        <item row="4" column="1" colspan="1">
+        <item row="4" column="1">
          <layout class="QHBoxLayout" name="horizontalLayout_51">
           <item>
            <widget class="QLabel" name="label_44">

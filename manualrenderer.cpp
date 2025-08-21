@@ -187,7 +187,7 @@ void ManualRenderer::onProcessText(const QString &output)
                 basePercentage = (m_currentStep == Step::Pass1) ? 0 : 50;
             }
             int percentage = basePercentage + static_cast<int>((currentTimeS / m_sourceDurationS) * (m_preset.isTwoPass() ? 50 : 100));
-            emit progressUpdated(qMin(100, percentage));
+            emit progressUpdated(qMin(100, percentage), "Рендер MP4");
         }
     }
 }
@@ -204,7 +204,7 @@ void ManualRenderer::onBitrateCheckFinished(RerenderDecision decision, const Ren
         m_currentStep = Step::Pass1;
         runPass(m_currentStep);
     } else {
-        emit progressUpdated(100);
+        emit progressUpdated(100, "Рендер MP4");
         emit finished();
     }
 }

@@ -35,10 +35,14 @@ private slots:
     void on_templateComboBox_currentIndexChanged(int index);
     void on_browseWorkDirButton_clicked();
     void onFontFinderFinished(const FontFinderResult& result);
+    void onModeSwitched(bool isManualMode);
 
 private:
     void browseForFile(QLineEdit *lineEdit, const QString &caption, const QString &filter);
+    void updateUiState(bool isManualMode);
     FontFinder* m_fontFinder;
+    QIcon m_templateModeIcon;
+    QIcon m_manualModeIcon;
 
     Ui::ManualAssemblyWidget *ui;
 signals:

@@ -26,6 +26,28 @@ class AssProcessor;
 class MainWindow;
 class ProcessManager;
 
+struct UserInputRequest {
+    bool audioFileRequired = false;
+    bool isWavRequired = false;
+    QStringList missingFonts;
+    bool tbTimeRequired = false;
+    QString tbTimeReason;
+
+    bool isValid() const {
+        return audioFileRequired || !missingFonts.isEmpty() || tbTimeRequired;
+    }
+};
+
+struct UserInputResponse {
+    QString audioPath;
+    QMap<QString, QString> resolvedFonts;
+    QString time;
+
+    bool isValid() const {
+        return !audioPath.isEmpty() || !resolvedFonts.isEmpty() || !time.isEmpty();
+    }
+};
+
 struct PathManager {
     QString basePath;
     QString sourcesPath;
@@ -78,19 +100,20 @@ public:
 
 public slots:
     void cancelOperation();
-    void resumeWithMissingFiles(const QString &audioPath, const QMap<QString, QString> &resolvedFonts, const QString &time);
+    void resumeWithUserInput(const UserInputResponse &response);
     void resumeWithSelectedTorrent(const TorrentInfo &selected);
     void resumeWithSignStyles(const QStringList &styles);
     void resumeWithSelectedAudioTrack(int trackId);
     void resumeAfterSubEdit();
-
+    
 signals:
     void logMessage(const QString &message, LogCategory category = LogCategory::APP);
     void postsReady(const ReleaseTemplate &t, const EpisodeData &data);
+    void mkvFileReady(const QString &mkvPath);
     void filesReady(const QString &mkvPath, const QString &mp4Path);
     void finished(const ReleaseTemplate &t, const EpisodeData &data, const QString &mkvPath, const QString &mp4Path);
     void workflowAborted();
-    void missingFilesRequest(const QStringList &missingFonts, bool requireWav = false, bool requireTime = false);
+    void userInputRequired(const UserInputRequest &request);
     void progressUpdated(int percentage, const QString& stageName = "");
     void signStylesRequest(const QString &subFilePath);
     void multipleTorrentsFound(const QList<TorrentInfo> &candidates);
@@ -104,7 +127,7 @@ private slots:
     void onTorrentAdded(QNetworkReply *reply);
     void onTorrentDeleted(QNetworkReply *reply);
     void onTorrentListReceived(QNetworkReply *reply);
-    void onTorrentListForCheckReceived(QNetworkReply *reply);
+    void onTorrentListForHashCheckReceived(QNetworkReply *reply);
     void onPollingTimerTimeout();
     void onTorrentProgressReceived(QNetworkReply *reply);
     void onTorrentFilesReceived(QNetworkReply *reply);
@@ -123,6 +146,7 @@ private:
                       GettingMkvInfo,
                       ExtractingAttachments,
                       ExtractingTracks,
+                      AudioPreparation,
                       ProcessingSubs,
                       FindingFonts,
                       ConvertingToSrt,
@@ -130,7 +154,8 @@ private:
                       ConvertingAudio,
                       AssemblingMkv,
                       RenderingMp4Pass1,
-                      RenderingMp4Pass2
+                      RenderingMp4Pass2,
+                      _NormalizingAudio
     };
 
     enum class ProcessingSubStep {
@@ -160,6 +185,7 @@ private:
     QString parseChaptersWithMkvExtract();
     void extractTracks();
     void extractAttachments(const QJsonArray &attachments);
+    void audioPreparation();
     void convertAudioIfNeeded();
     void convertToSrtAndAssembleMaster();
     void assembleMkv(const QString &m_finalAudioPath);
@@ -174,6 +200,7 @@ private:
     QStringList prepareCommandArguments(const QString &commandTemplate);
     QString getExtensionForCodec(const QString& codecId);
     QString handleUserFile(const QString& sourcePath, const QString& destDir, const QString& newName = "");
+    QString getInfohashFromMagnet(const QString& magnetLink) const;
 
     MainWindow *m_mainWindow; // Указатель на главный класс UI
     ReleaseTemplate m_template;
@@ -198,6 +225,9 @@ private:
 
     bool m_wasUserInputRequested = false;
     bool m_wereStylesRequested = false;
+    bool m_isNormalizationEnabled = false;
+    bool m_didLaunchNugen = false;
+    bool m_wasNormalizationPerformed = false;
 
     struct TrackInfo {
         int id = -1;
