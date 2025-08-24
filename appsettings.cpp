@@ -28,7 +28,7 @@ void AppSettings::load() {
     m_qbittorrentPath = settings.value("paths/qbittorrent", findExecutablePath("qbittorrent.exe")).toString();
     m_nugenAmbPath = settings.value("paths/nugenAmb", "").toString();
     m_deleteTempFiles = settings.value("general/deleteTempFiles", true).toBool();
-    m_userFileAction = static_cast<UserFileAction>(settings.value("general/userFileAction", static_cast<int>(UserFileAction::Move)).toInt());
+    m_userFileAction = static_cast<UserFileAction>(settings.value("general/userFileAction", static_cast<int>(UserFileAction::UseOriginalPath)).toInt());
 
     m_tbStyles.clear();
     int tbStylesCount = settings.beginReadArray("tbStyles");
@@ -81,6 +81,7 @@ void AppSettings::save() {
     settings.setValue("paths/qbittorrent", m_qbittorrentPath);
     settings.setValue("paths/nugenAmb", m_nugenAmbPath);
     settings.setValue("general/deleteTempFiles", m_deleteTempFiles);
+    settings.setValue("general/userFileAction", static_cast<int>(m_userFileAction));
 
     settings.beginWriteArray("tbStyles");
     for (int i = 0; i < m_tbStyles.size(); ++i) {
@@ -126,7 +127,7 @@ void AppSettings::loadDefaults() {
         // %SIGNS% - экранированный путь к файлу с надписями для фильтра subtitles
 
         nvenc.name = "NVIDIA (hevc_nvenc, 1-проход)";
-        nvenc.commandPass1 = "ffmpeg -y -hide_banner -i \"%INPUT%\" -vf \"subtitles=%SIGNS%\" -c:v hevc_nvenc -preset p7 -tune hq -rc vbr -b:v 4000k -maxrate 8000k -c:a aac -b:a 256k -map 0:v:0 -map 0:a:m:language:rus -tag:v hvc1 -map_metadata -1 -movflags +faststart \"%OUTPUT%\"";
+        nvenc.commandPass1 = "ffmpeg -y -hide_banner -i \"%INPUT%\" -vf \"subtitles=%SIGNS%\" -c:v hevc_nvenc -preset p7 -tune hq -profile:v main -rc vbr -b:v 4M -minrate 4M -maxrate 8M -bufsize 16M -rc-lookahead 32 -spatial-aq 1 -aq-strength 15 -multipass 2 -2pass 1 -c:a aac -b:a 256k -map 0:v:0 -map 0:a:m:language:rus -tag:v hvc1 -map_metadata -1 -movflags +faststart \"%OUTPUT%\"";
         nvenc.targetBitrateKbps = 4000;
         cpu_2pass.name = "CPU (libx265, 2-прохода)";
         cpu_2pass.commandPass1 = "ffmpeg -y -hide_banner -i \"%INPUT%\" -vf \"subtitles=%SIGNS%\" -c:v libx265 -b:v 4000k -preset medium -x265-params pass=1 -an -f mp4 NUL"; // Для Windows, для Linux /dev/null

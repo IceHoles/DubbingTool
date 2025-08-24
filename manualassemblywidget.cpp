@@ -111,12 +111,12 @@ void ManualAssemblyWidget::browseForFile(QLineEdit *lineEdit, const QString &cap
 
 void ManualAssemblyWidget::on_browseVideo_clicked()
 {
-    browseForFile(ui->videoPathEdit, "Выберите видеофайл", "Видеофайлы (*.h264 *.hevc *.mkv *.mp4);;Все файлы (*)");
+    browseForFile(ui->videoPathEdit, "Выберите видеофайл", "Видеофайлы (*.h264 *.hevc *.mkv *.mp4 *.avc);;Все файлы (*)");
 }
 
 void ManualAssemblyWidget::on_browseOriginalAudio_clicked()
 {
-    browseForFile(ui->originalAudioPathEdit, "Выберите оригинальную аудиодорожку", "Аудиофайлы (*.aac *.ac3 *.eac3 *.flac *.opus);;Все файлы (*)");
+    browseForFile(ui->originalAudioPathEdit, "Выберите оригинальную аудиодорожку", "Аудиофайлы (*.aac *.ac3 *.eac3 *.flac *.wav *.opus);;Все файлы (*)");
 }
 
 void ManualAssemblyWidget::on_browseRussianAudio_clicked()
@@ -162,7 +162,7 @@ void ManualAssemblyWidget::on_addFontsButton_clicked()
 
     for(const QString& path : paths) {
         QListWidgetItem* item = new QListWidgetItem(QFileInfo(path).fileName());
-        item->setForeground(Qt::blue);
+        item->setForeground(Qt::magenta);
         item->setText(item->text() + " - добавлен вручную");
         item->setData(Qt::UserRole, path);
         ui->fontsListWidget->addItem(item);

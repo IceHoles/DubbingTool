@@ -6,9 +6,15 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>550</width>
-    <height>459</height>
+    <width>500</width>
+    <height>460</height>
    </rect>
+  </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
   </property>
   <property name="windowTitle">
    <string>Требуется ввод данных</string>
@@ -91,11 +97,11 @@
       <item row="1" column="0" colspan="2">
        <layout class="QHBoxLayout" name="horizontalLayout">
         <item>
-        <widget class="QTimeEdit" name="timeEdit">
-         <property name="displayFormat">
-          <string>H:mm:ss.zzz</string>
-         </property>
-        </widget>
+         <widget class="QTimeEdit" name="timeEdit">
+          <property name="displayFormat">
+           <string>H:mm:ss.zzz</string>
+          </property>
+         </widget>
         </item>
        </layout>
       </item>

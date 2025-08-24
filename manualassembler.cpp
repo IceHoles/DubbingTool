@@ -46,18 +46,36 @@ void ManualAssembler::normalizeAudio()
     emit progressUpdated(-1, "Нормализация аудио");
 
     QString nugenPath = AppSettings::instance().nugenAmbPath();
-    QString audioPath = m_params["russianAudioPath"].toString();
+    QString originalAudioPath  = m_params["russianAudioPath"].toString();
 
-    if (nugenPath.isEmpty() || !audioPath.endsWith(".wav", Qt::CaseInsensitive)) {
+    if (nugenPath.isEmpty() || !originalAudioPath .endsWith(".wav", Qt::CaseInsensitive)) {
         emit logMessage("Нормализация пропущена (не указан путь к NUGEN или файл не .wav).", LogCategory::APP);
         if (m_params["convertAudio"].toBool()) convertAudio();
         else processSubtitlesAndAssemble();
         return;
     }
 
+    m_originalAudioPathBeforeNormalization = originalAudioPath;
+    QFileInfo originalInfo(m_originalAudioPathBeforeNormalization);
+    QString tempInputPath = originalInfo.dir().filePath("temp_audio_for_nugen.wav");
+
+    if (QFile::exists(tempInputPath)) {
+        QFile::remove(tempInputPath);
+    }
+
+    if (!QFile::copy(originalAudioPath, tempInputPath)) {
+        emit logMessage("ОШИБКА: Не удалось переименовать аудиофайл. Нормализация отменена.", LogCategory::APP);
+        if (m_params["convertAudio"].toBool()) convertAudio();
+        else processSubtitlesAndAssemble();
+        return;
+    }
+
+    emit logMessage("Аудиофайл переименован в temp_audio_for_nugen.wav  для безопасной обработки.", LogCategory::APP);
+
     QFileInfo nugenInfo(nugenPath);
     QString ambCmdPath = nugenInfo.dir().filePath("AMBCmd.exe");
     emit progressUpdated(-1, "Запуск NUGEN Audio AMB");
+    m_didLaunchNugen = true;
 
     if (!QFileInfo::exists(ambCmdPath)) {
         emit logMessage("Ошибка: AMBCmd.exe не найден. Нормализация пропущена.", LogCategory::APP);
@@ -67,8 +85,8 @@ void ManualAssembler::normalizeAudio()
     }
 
     QProcess::startDetached(nugenPath);
-    QTimer::singleShot(3000, this, [this, ambCmdPath, audioPath](){
-        m_processManager->startProcess(ambCmdPath, {"-a", audioPath});
+    QTimer::singleShot(3000, this, [this, ambCmdPath, tempInputPath](){
+        m_processManager->startProcess(ambCmdPath, {"-a", tempInputPath});
         emit progressUpdated(-1, "Нормализация аудиофайла");
     });
 }
@@ -250,15 +268,36 @@ void ManualAssembler::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
     if (m_currentStep == Step::NormalizingAudio) {
         emit logMessage("Нормализация аудио завершена.", LogCategory::APP);
 
-        QFileInfo audioInfo(m_params["russianAudioPath"].toString());
-        QString normalizedPath = audioInfo.dir().filePath(audioInfo.baseName() + "_corrected.wav");
-        if (QFileInfo::exists(normalizedPath)) {
-            emit logMessage("Найден нормализованный файл, он будет использован для сборки.", LogCategory::APP);
-            m_params["russianAudioPath"] = normalizedPath;
+        if (m_didLaunchNugen) {
+            emit logMessage("Закрытие NUGEN Audio AMB...", LogCategory::APP);
+            QProcess::execute("taskkill", {"/F", "/IM", "NUGEN Audio AMB.exe", "/T"});
+            m_didLaunchNugen = false;
+        }
+        QFileInfo originalInfo(m_originalAudioPathBeforeNormalization);
+        QString tempPath = originalInfo.dir().filePath("temp_audio_for_nugen.wav");
+        QString normalizedTempPath = originalInfo.dir().filePath("temp_audio_for_nugen_corrected.wav");
+
+        if (QFileInfo::exists(normalizedTempPath)) {
+            QString finalBaseName = originalInfo.baseName() + "_corrected.wav";
+            QString finalPath = originalInfo.dir().filePath(finalBaseName);
+
+            if (QFile::exists(finalPath)) {
+                QFile::remove(finalPath);
+            }
+            if (QFile::rename(normalizedTempPath, finalPath)) {
+                emit logMessage("Нормализованный файл сохранен как: " + finalPath, LogCategory::APP);
+                m_params["russianAudioPath"] = finalPath;
+            } else {
+                emit logMessage("ОШИБКА: Не удалось скопировать нормализованный файл. Будет использован исходный файл.", LogCategory::APP);
+                m_params["russianAudioPath"] = m_originalAudioPathBeforeNormalization;
+            }
         } else {
             emit logMessage("ПРЕДУПРЕЖДЕНИЕ: Нормализованный файл не найден. Будет использован исходный.", LogCategory::APP);
+            QFile::rename(tempPath, m_originalAudioPathBeforeNormalization);
+            m_params["russianAudioPath"] = m_originalAudioPathBeforeNormalization;
         }
-
+        QFile::remove(tempPath);
+        QFile::remove(normalizedTempPath);
         if (m_params["convertAudio"].toBool()) {
             convertAudio();
         } else {

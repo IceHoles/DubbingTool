@@ -8,6 +8,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QSettings>
 
 
 ManualRenderWidget::ManualRenderWidget(QWidget *parent) :
@@ -17,6 +18,11 @@ ManualRenderWidget::ManualRenderWidget(QWidget *parent) :
     ui->setupUi(this);
     updateRenderPresets();
 
+    QSettings settings("MyCompany", "DubbingTool");
+    QString lastPreset = settings.value("manualRender/lastUsedPreset", "").toString();
+    if (!lastPreset.isEmpty()) {
+        ui->renderPresetComboBox->setCurrentText(lastPreset);
+    }
     connect(ui->hardsubCheckBox, &QCheckBox::toggled, this, &ManualRenderWidget::updateHardsubOptions);
     connect(ui->internalSubsRadio, &QRadioButton::toggled, this, &ManualRenderWidget::updateHardsubOptions);
     connect(ui->externalSubsRadio, &QRadioButton::toggled, this, &ManualRenderWidget::updateHardsubOptions);
@@ -80,12 +86,20 @@ void ManualRenderWidget::on_renderButton_clicked()
         return;
     }
 
+    QSettings settings("MyCompany", "DubbingTool");
+    settings.setValue("manualRender/lastUsedPreset", ui->renderPresetComboBox->currentText());
+
     emit renderRequested();
 }
 
 void ManualRenderWidget::setRendering(bool rendering)
 {
     ui->renderButton->setDisabled(rendering);
+}
+
+QString ManualRenderWidget::getCurrentPresetName() const
+{
+    return ui->renderPresetComboBox->currentText();
 }
 
 void ManualRenderWidget::analyzeMkvForSubtitles(const QString& path)

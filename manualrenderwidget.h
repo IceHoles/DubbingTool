@@ -16,6 +16,7 @@ public:
     ~ManualRenderWidget();
 
     QVariantMap getParameters() const;
+    QString getCurrentPresetName() const;
 
 public slots:
     void updateRenderPresets();
