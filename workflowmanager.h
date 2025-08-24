@@ -222,9 +222,11 @@ private:
     QString m_parsedEndingTime;
     QString m_overrideSubsPath;
     QString m_overrideSignsPath;
+    QString m_originalAudioPathBeforeNormalization;
 
     bool m_wasUserInputRequested = false;
     bool m_wereStylesRequested = false;
+    bool m_wereFontsRequested = false;
     bool m_isNormalizationEnabled = false;
     bool m_didLaunchNugen = false;
     bool m_wasNormalizationPerformed = false;

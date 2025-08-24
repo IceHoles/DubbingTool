@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>800</width>
-    <height>675</height>
+    <height>686</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -297,6 +297,9 @@
            <property name="checkable">
             <bool>true</bool>
            </property>
+           <property name="checked">
+            <bool>false</bool>
+           </property>
            <layout class="QFormLayout" name="formLayout_2">
             <item row="0" column="0">
              <widget class="QLabel" name="label_8">
@@ -465,14 +468,18 @@
       <item row="1" column="0">
        <widget class="QLabel" name="label_7">
         <property name="text">
-         <string>Рабочая папка (опционально):</string>
+         <string>Путь сохранения:</string>
         </property>
        </widget>
       </item>
       <item row="1" column="1">
        <layout class="QHBoxLayout" name="horizontalLayout_5">
         <item>
-         <widget class="QLineEdit" name="workDirEdit"/>
+         <widget class="QLineEdit" name="workDirEdit">
+          <property name="placeholderText">
+           <string>Можно оставить пустым, будет использована папка с видеофайлом</string>
+          </property>
+         </widget>
         </item>
         <item>
          <widget class="QPushButton" name="browseWorkDirButton">
@@ -490,6 +497,18 @@
     <layout class="QHBoxLayout" name="horizontalLayout_6">
      <item>
       <widget class="QPushButton" name="assembleButton">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>0</width>
+         <height>50</height>
+        </size>
+       </property>
        <property name="text">
         <string>Собрать MKV</string>
        </property>

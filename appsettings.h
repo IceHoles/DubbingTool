@@ -76,6 +76,8 @@ public:
     QList<RenderPreset> renderPresets() const;
     void setRenderPresets(const QList<RenderPreset> &presets);
     RenderPreset findRenderPreset(const QString& name) const;
+    void setManualRenderPreset();
+    RenderPreset manualRenderPreset(const QString& name) const;
 
 private:
     void loadDefaults();

@@ -23,6 +23,7 @@ ManualRenderer::~ManualRenderer() {}
 void ManualRenderer::start()
 {
     emit logMessage("--- Начало ручного рендера ---", LogCategory::APP);
+    emit progressUpdated(-1, "Рендер MP4");
 
     QString inputMkv = m_params["inputMkv"].toString();
     QString presetName = m_params["renderPresetName"].toString();

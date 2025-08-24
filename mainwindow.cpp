@@ -176,25 +176,28 @@ void MainWindow::on_createTemplateButton_clicked()
 
     ReleaseTemplate defaultTemplate;
     defaultTemplate.templateName = "Новый шаблон";
-    defaultTemplate.seriesTitle = "Как в архиве mkv";
-    defaultTemplate.seriesTitleForPost = "Как в постах";
+    defaultTemplate.seriesTitle = "Как в архиве mkv, но без [DUB] и - 00.mkv";
+    defaultTemplate.seriesTitleForPost = "Как в постах, без кавычек";
     defaultTemplate.rssUrl = QUrl("https://example.com/rss.xml");
-    defaultTemplate.animationStudio = "STUDIO";
-    defaultTemplate.subAuthor = "Crunchyroll";
+    defaultTemplate.animationStudio = "STUDIO (с шикимори или MAL)";
+    defaultTemplate.subAuthor = "Crunchyroll (или Имя Фамилия, если перевод свой + галочка внизу \"Свой перевод\")";
     defaultTemplate.originalLanguage = "jpn";
     defaultTemplate.endingChapterName = "Ending Start";
     defaultTemplate.totalEpisodes = 12;
 
     defaultTemplate.director = "Режиссер Дубляжа";
     defaultTemplate.soundEngineer = "Звукорежиссер";
-    defaultTemplate.timingAuthor = "Таймингер";
+    defaultTemplate.timingAuthor = "Разметка";
     defaultTemplate.releaseBuilder = "Сборщик Релиза";
     defaultTemplate.cast << "Актер 1" << "Актер 2" << "Актер 3";
 
     defaultTemplate.postTemplates["tg_mp4"] =
         "▶️Серия: %EPISODE_NUMBER%/%TOTAL_EPISODES%\n\n"
         "📌«%SERIES_TITLE%» в дубляже от ТО Дубляжная\n\n"
-        "🎁А также вы можете поддержать наш коллектив копеечкой (https://boosty.to/dubl/single-payment/donation/696237/target?share=target_link)\n💙ВК(https://vk.com/dublyajnaya?from=groups&ref=group_widget&w=app6471849_-216649949)\n💰BOOSTY(https://boosty.to/dubl/single-payment/donation/696237/target?share=target_link)\n\n"
+        "🎁А также вы можете поддержать наш коллектив копеечкой\n"
+        "💙**ВК**(https://vk.com/dublyajnaya?from=groups&ref=group_widget&w=app6471849_-216649949)\n"
+        "💰**BOOSTY**(https://boosty.to/dubl/single-payment/donation/696237/target?share=target_link)\n\n"
+        "Помимо ТГ сериал можно посмотреть здесь:\n\n"
         "Anime365 (%LINK_ANIME365%)\n\n"
         "AnimeLib (%LINK_ANILIB%)\n\n"
         "Архив MKV (https://t.me/+CVpSSg33UwI4MzYy)\n\n"
@@ -211,7 +214,7 @@ void MainWindow::on_createTemplateButton_clicked()
         "Серия %EPISODE_NUMBER%/%TOTAL_EPISODES%\n"
         "#Хештег";
     defaultTemplate.postTemplates["vk"] =
-        "%SERIES_TITLE% в дубляже от ТО Дубляжная\n\n"
+        "«%SERIES_TITLE%» в дубляже от ТО Дубляжная\n\n"
         "Серия: %EPISODE_NUMBER%/%TOTAL_EPISODES%\n\n"
         "Роли дублировали:\n%CAST_LIST%\n\n"
         "Режиссёр дубляжа:\n%DIRECTOR%\n\n"
@@ -220,7 +223,7 @@ void MainWindow::on_createTemplateButton_clicked()
         "️Разметка:\n%TIMING_AUTHOR%\n\n"
         "Локализация постера:\nКирилл Хоримиев\n\n"
         "Сборка релиза:\n%RELEASE_BUILDER%\n\n"
-        "#Хештег";
+        "#Хештег@dublyajnaya";
     defaultTemplate.postTemplates["vk_comment"] =
         "А также вы можете поддержать наш коллектив на бусти: https://boosty.to/dubl/single-payment/donation/634652\n\n"
         "ТГ: https://t.me/dublyajnaya\n\n"
@@ -541,7 +544,7 @@ void MainWindow::startManualRender()
     connect(thread, &QThread::started, worker, &ManualRenderer::start);
     connect(worker, &ManualRenderer::finished, this, &MainWindow::finishWorkerProcess);
     connect(worker, &ManualRenderer::logMessage, this, &MainWindow::logMessage);
-    connect(worker, &ManualRenderer::progressUpdated, this, [this](int p){ updateProgress(p); });
+    connect(worker, &ManualRenderer::progressUpdated, this, &MainWindow::updateProgress);
     connect(thread, &QThread::finished, worker, &QObject::deleteLater);
     connect(worker, &QObject::destroyed, thread, &QObject::deleteLater);
     connect(worker, &ManualRenderer::bitrateCheckRequest, this, &MainWindow::onBitrateCheckRequest, Qt::QueuedConnection);
@@ -588,6 +591,8 @@ void MainWindow::onFilesReady(const QString &mkvPath, const QString &mp4Path)
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     AppSettings::instance().save();
+    QSettings settings("MyCompany", "DubbingTool");
+    settings.setValue("manualRender/lastUsedPreset", m_manualRenderWidget->getCurrentPresetName());
     if (m_currentWorker) {
         logMessage("Запрошена отмена операции перед закрытием...", LogCategory::APP);
         QMetaObject::invokeMethod(m_currentWorker, "cancelOperation", Qt::QueuedConnection);

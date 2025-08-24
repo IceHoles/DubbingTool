@@ -52,6 +52,8 @@ private:
     double m_sourceAudioDurationS = 0.0;
     QTimer* m_progressTimer;
     QString m_progressLogPath;
+    QString m_originalAudioPathBeforeNormalization;
+    bool m_didLaunchNugen = false;
 };
 
 #endif // MANUALASSEMBLER_H

@@ -625,6 +625,14 @@ void WorkflowManager::getMkvInfo()
         m_parsedEndingTime = parseChaptersWithMkvExtract();
         if (!m_parsedEndingTime.isEmpty()) {
             emit logMessage(QString("Найдена глава '%1', время начала: %2").arg(m_template.endingChapterName, m_parsedEndingTime), LogCategory::APP);
+            if (m_parsedEndingTime.contains('.')) {
+                QStringList parts = m_parsedEndingTime.split('.');
+                if (parts.size() == 2 && parts[1].length() > 3) {
+                    QString original = m_parsedEndingTime;
+                    m_parsedEndingTime = parts[0] + "." + parts[1].left(3);
+                    emit logMessage(QString("Время '%1' было нормализовано до '%2' для совместимости.").arg(original, m_parsedEndingTime), LogCategory::APP);
+                }
+            }
         } else {
             emit logMessage(QString("ПРЕДУПРЕЖДЕНИЕ: Глава с именем '%1' не найдена в файле. Проверьте правильность названия в шаблоне.").arg(m_template.endingChapterName), LogCategory::APP);
         }
@@ -921,23 +929,35 @@ void WorkflowManager::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
                 m_didLaunchNugen = false;
             }
 
-            QString originalPath = (m_lastStepBeforeRequest == Step::AssemblingSrtMaster) ? m_wavForSrtMasterPath : m_mainRuAudioPath;
-            QFileInfo originalInfo(originalPath);
-            QString normalizedPath = originalInfo.dir().filePath(originalInfo.baseName() + "_corrected.wav");
+            QFileInfo originalInfo(m_originalAudioPathBeforeNormalization);
+            QString tempPath = originalInfo.dir().filePath("temp_audio_for_nugen.wav");
+            QString normalizedTempPath = originalInfo.dir().filePath("temp_audio_for_nugen_corrected.wav");
+            if (QFileInfo::exists(normalizedTempPath)) {
 
-            if (QFileInfo::exists(normalizedPath)) {
-                emit logMessage("Найден нормализованный файл: " + normalizedPath, LogCategory::APP);
-                if(m_lastStepBeforeRequest == Step::AssemblingSrtMaster) {
-                    m_wavForSrtMasterPath = normalizedPath;
-                } else {
-                    m_mainRuAudioPath = normalizedPath;
-                    m_mainWindow->findChild<QLineEdit*>("audioPathLineEdit")->setText(m_mainRuAudioPath);
+                QString finalBaseName = originalInfo.baseName() + "_corrected.wav";
+                QString finalPath = originalInfo.dir().filePath(finalBaseName);
+                if (QFile::exists(finalPath)) {
+                    QFile::remove(finalPath);
                 }
-                m_wasNormalizationPerformed = true;
+                if (QFile::rename(normalizedTempPath, finalPath)) {
+                    emit logMessage("Нормализованный файл сохранен как: " + finalPath, LogCategory::APP);
+                    if (m_lastStepBeforeRequest == Step::AssemblingSrtMaster) {
+                        m_wavForSrtMasterPath = finalPath;
+                    } else {
+                        m_mainRuAudioPath = finalPath;
+                        m_mainWindow->findChild<QLineEdit*>("audioPathLineEdit")->setText(m_mainRuAudioPath);
+                    }
+                    m_wasNormalizationPerformed = true;
+                } else {
+                    emit logMessage("ОШИБКА: Не удалось переименовать нормализованный файл.", LogCategory::APP);
+                    emit workflowAborted();
+                }
             } else {
                 emit logMessage("ОШИБКА: Нормализованный файл не найден.", LogCategory::APP);
                 emit workflowAborted();
             }
+            QFile::remove(tempPath);
+            QFile::remove(normalizedTempPath);
             processSubtitles();
             break;
         }
@@ -1030,6 +1050,7 @@ void WorkflowManager::finishWorkflow()
 void WorkflowManager::audioPreparation()
 {
     m_currentStep = Step::AudioPreparation;
+    emit progressUpdated(-1, "Подготовка данных");
 
     UserInputRequest request;
     if (m_mainRuAudioPath.isEmpty()) {
@@ -1072,8 +1093,9 @@ void WorkflowManager::audioPreparation()
     }
 
     if (request.isValid()) {
-        emit logMessage("Недостаточно аудиоданных. Запрос у пользователя...", LogCategory::APP);
+        emit logMessage("Недостаточно данных. Запрос у пользователя...", LogCategory::APP);
         m_lastStepBeforeRequest = Step::AudioPreparation;
+        emit progressUpdated(-1, "Запрос данных у пользователя");
         emit userInputRequired(request);
         return;
     }
@@ -1119,9 +1141,25 @@ void WorkflowManager::audioPreparation()
     QProcess::startDetached(nugenPath);
     m_didLaunchNugen = true;
 
-    QTimer::singleShot(3000, this, [this, ambCmdPath, targetWavPath](){
-        emit logMessage("Запуск AMBCmd для обработки файла: " + targetWavPath, LogCategory::APP);
-        m_processManager->startProcess(ambCmdPath, {"-a", targetWavPath});
+    m_originalAudioPathBeforeNormalization = targetWavPath;
+    QFileInfo originalInfo(m_originalAudioPathBeforeNormalization);
+    QString tempInputPath = originalInfo.dir().filePath("temp_audio_for_nugen.wav");
+
+    if (QFile::exists(tempInputPath)) {
+        QFile::remove(tempInputPath);
+    }
+
+    if (!QFile::copy(targetWavPath, tempInputPath)) {
+        emit logMessage("ОШИБКА: Не удалось скопировать временный аудиофайл.", LogCategory::APP);
+        emit workflowAborted();
+        return;
+    }
+
+    emit logMessage("Аудиофайл переименован в temp_audio_for_nugen.wav для безопасной обработки.", LogCategory::APP);
+
+    QTimer::singleShot(3000, this, [this, ambCmdPath, tempInputPath](){
+        emit logMessage("Запуск AMBCmd для обработки файла: " + tempInputPath, LogCategory::APP);
+        m_processManager->startProcess(ambCmdPath, {"-a", tempInputPath});
         emit progressUpdated(-1, "Нормализация аудиофайла");
     });
 }
@@ -1235,7 +1273,6 @@ void WorkflowManager::assembleMkv(const QString &russianAudioPath)
     QString fullSubsPath = m_paths->processedFullSubs();
     QString signsPath = m_paths->processedSignsSubs();
 
-
     UserInputRequest request;
     if (!m_fontResult.notFoundFontNames.isEmpty()) {
         request.missingFonts = m_fontResult.notFoundFontNames;
@@ -1244,10 +1281,12 @@ void WorkflowManager::assembleMkv(const QString &russianAudioPath)
         request.audioFileRequired = true;
     }
 
-    if (request.isValid()) {
+    if (request.isValid() && !m_wereFontsRequested) {
         emit logMessage("Недостаточно файлов для сборки MKV. Запрос у пользователя...", LogCategory::APP);
         m_lastStepBeforeRequest = Step::AssemblingMkv;
+        emit progressUpdated(-1, "Запрос файлов у пользователя");
         emit userInputRequired(request);
+        m_wereFontsRequested = true;
         return;
     }
 
@@ -1269,6 +1308,8 @@ void WorkflowManager::assembleMkv(const QString &russianAudioPath)
         emit logMessage("ПРЕДУПРЕЖДЕНИЕ: Не все шрифты были предоставлены. Субтитры могут отображаться некорректно.", LogCategory::APP);
         emit logMessage("Пропущены: " + m_fontResult.notFoundFontNames.join(", "), LogCategory::APP);
     }
+
+    m_wereFontsRequested = false;
 
     QString outputFileName = QString("[DUB] %1 - %2.mkv").arg(m_template.seriesTitle).arg(m_episodeNumberForSearch);
     m_finalMkvPath  = QDir(m_paths->resultPath).absoluteFilePath(outputFileName);
@@ -1625,7 +1666,7 @@ void WorkflowManager::resumeWithUserInput(const UserInputResponse &response)
     } else if (m_lastStepBeforeRequest == Step::ProcessingSubs) {
         processSubtitles();
     } else if (m_lastStepBeforeRequest == Step::AssemblingMkv) {
-        assembleMkv(m_mainRuAudioPath);
+        assembleMkv(m_finalAudioPath);
     }
 }
 
@@ -1871,5 +1912,5 @@ void WorkflowManager::onBitrateCheckFinished(RerenderDecision decision, const Re
 void WorkflowManager::resumeAfterSubEdit()
 {
     emit logMessage("Редактирование завершено, процесс возобновлен.", LogCategory::APP);
-    processSubtitles();
+    audioPreparation();
 }
