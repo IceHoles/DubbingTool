@@ -30,6 +30,7 @@ SOURCES += \
     rerenderdialog.cpp \
     settingsdialog.cpp \
     styleselectordialog.cpp \
+    telegramformatter.cpp \
     templateeditor.cpp \
     torrentselectordialog.cpp \
     trackselectordialog.cpp \
@@ -45,6 +46,7 @@ HEADERS += \
     manualrenderer.h \
     manualrenderwidget.h \
     missingfilesdialog.h \
+    placeholderwidget.h \
     postgenerator.h \
     processmanager.h \
     publicationwidget.h \
@@ -53,6 +55,7 @@ HEADERS += \
     rerenderdialog.h \
     settingsdialog.h \
     styleselectordialog.h \
+    telegramformatter.h \
     templateeditor.h \
     torrentselectordialog.h \
     trackselectordialog.h \

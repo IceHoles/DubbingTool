@@ -1,5 +1,6 @@
 #include "publicationwidget.h"
 #include "ui_publicationwidget.h"
+#include "telegramformatter.h"
 #include <QApplication>
 #include <QClipboard>
 #include <QPixmap>
@@ -35,13 +36,15 @@ PublicationWidget::PublicationWidget(QWidget *parent) :
 
     // Подключаем кнопки копирования напрямую к данным в m_currentPosts
     connect(ui->copyTgMp4Button, &QPushButton::clicked, this, [this](){
-        QApplication::clipboard()->setText(m_currentPosts.value("tg_mp4").markdown);
-        emit logMessage(QString("Пост '%1' скопирован.").arg("Telegram (MP4)"), LogCategory::APP);
+        TelegramFormatter::formatAndCopyToClipboard(m_currentPosts.value("tg_mp4").markdown);
+        emit logMessage(QString("Пост '%1' скопирован в формате Telegram.").arg("Telegram (MP4)"), LogCategory::APP);
+        QMessageBox::information(this, "Готово", "Форматированный текст для Telegram скопирован!");
     });
 
     connect(ui->copyTgMkvButton, &QPushButton::clicked, this, [this](){
-        QApplication::clipboard()->setText(m_currentPosts.value("tg_mkv").markdown);
-        emit logMessage(QString("Пост '%1' скопирован.").arg("Telegram (MKV)"), LogCategory::APP);
+        TelegramFormatter::formatAndCopyToClipboard(m_currentPosts.value("tg_mkv").markdown);
+        emit logMessage(QString("Пост '%1' скопирован в формате Telegram.").arg("Telegram (MKV)"), LogCategory::APP);
+        QMessageBox::information(this, "Готово", "Форматированный текст для Telegram скопирован!");
     });
 
     connect(ui->copyVkButton, &QPushButton::clicked, this, [this](){
@@ -70,10 +73,10 @@ void PublicationWidget::updateData(const ReleaseTemplate &t, const EpisodeData &
     m_currentPosts = posts;
 
     // Отображаем HTML-версию
-    ui->tgMkvPostEdit->setHtml(posts.value("tg_mkv").html);
-    ui->tgMp4PostEdit->setHtml(posts.value("tg_mp4").html);
-    ui->vkPostEdit->setHtml(posts.value("vk").html);
-    ui->vkCommentEdit->setHtml(posts.value("vk_comment").html);
+    ui->tgMkvPostEdit->setPlainText(posts.value("tg_mkv").markdown);
+    ui->tgMp4PostEdit->setPlainText(posts.value("tg_mp4").markdown);
+    ui->vkPostEdit->setPlainText(posts.value("vk").markdown);
+    ui->vkCommentEdit->setPlainText(posts.value("vk_comment").markdown);
 
     setFilePaths(mkvPath, mp4Path);
 }

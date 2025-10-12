@@ -159,18 +159,21 @@ void ManualAssembler::processSubtitlesAndAssemble()
         QString tbStartTime = m_params["tbStartTime"].toString();
         t.defaultTbStyleName = m_params["tbStyleName"].toString();
 
-        QString subsPath = m_params.value("subtitlesPath").toString();
-        if (!subsPath.isEmpty()) {
-            QString newSubsPathBase = QFileInfo(subsPath).dir().filePath(QFileInfo(subsPath).baseName() + "_with_tb");
-            m_assProcessor->processExistingFile(subsPath, newSubsPathBase, t, tbStartTime);
-            m_params["subtitlesPath"] = newSubsPathBase + "_full.ass";
+        if (m_params.contains("subtitlesPath")) {
+            QString subsPath = m_params.value("subtitlesPath").toString();
+            QString newSubsPath = QFileInfo(subsPath).dir().filePath(QFileInfo(subsPath).baseName() + "_with_tb.ass");
+            if (m_assProcessor->addTbToFile(subsPath, newSubsPath, t, tbStartTime)) {
+                m_params["subtitlesPath"] = newSubsPath;
+            }
         }
 
-        QString signsPath = m_params.value("signsPath").toString();
-        if (!signsPath.isEmpty()) {
-            QString newSignsPathBase = QFileInfo(signsPath).dir().filePath(QFileInfo(signsPath).baseName() + "_with_tb");
-            m_assProcessor->processExistingFile(signsPath, newSignsPathBase, t, tbStartTime);
-            m_params["signsPath"] = newSignsPathBase + "_signs.ass";
+        // Обрабатываем файл надписей, если он есть
+        if (m_params.contains("signsPath")) {
+            QString signsPath = m_params.value("signsPath").toString();
+            QString newSignsPath = QFileInfo(signsPath).dir().filePath(QFileInfo(signsPath).baseName() + "_with_tb.ass");
+            if (m_assProcessor->addTbToFile(signsPath, newSignsPath, t, tbStartTime)) {
+                m_params["signsPath"] = newSignsPath;
+            }
         }
     }
 
@@ -241,11 +244,12 @@ void ManualAssembler::assemble()
         ReleaseTemplate t;
         QFile file("templates/" + m_params["templateName"].toString() + ".json");
         if (file.open(QIODevice::ReadOnly)) t.read(QJsonDocument::fromJson(file.readAll()).object());
+        QString subTrackAuthorName = t.isCustomTranslation ? "Дубляжная" : t.subAuthor;
         if (m_params.contains("videoPath")) args << "--language" << "0:" + t.originalLanguage << "--track-name" << QString("0:Видеоряд [%1]").arg(t.animationStudio) << m_params["videoPath"].toString();
         if (m_params.contains("russianAudioPath")) args << "--default-track-flag" << "0:yes" << "--language" << "0:rus" << "--track-name" << "0:Русский [Дубляжная]" << m_params["russianAudioPath"].toString();
         if (m_params.contains("originalAudioPath")) args << "--language" << "0:" + t.originalLanguage << "--track-name" << QString("0:Оригинал [%1]").arg(t.animationStudio) << m_params["originalAudioPath"].toString();
-        if (m_params.contains("signsPath")) args << "--forced-display-flag" << "0:yes" << "--default-track-flag" << "0:yes" << "--language" << "0:rus" << "--track-name" << QString("0:Надписи [%1]").arg(t.subAuthor) << m_params["signsPath"].toString();
-        if (m_params.contains("subtitlesPath")) args << "--language" << "0:rus" << "--track-name" << QString("0:Субтитры [%1]").arg(t.subAuthor) << m_params["subtitlesPath"].toString();
+        if (m_params.contains("signsPath")) args << "--forced-display-flag" << "0:yes" << "--default-track-flag" << "0:yes" << "--language" << "0:rus" << "--track-name" << QString("0:Надписи [%1]").arg(subTrackAuthorName) << m_params["signsPath"].toString();
+        if (m_params.contains("subtitlesPath")) args << "--language" << "0:rus" << "--track-name" << QString("0:Субтитры [%1]").arg(subTrackAuthorName) << m_params["subtitlesPath"].toString();
     }
 
     m_processManager->startProcess(mkvmergePath, args);

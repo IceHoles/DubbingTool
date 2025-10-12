@@ -19,7 +19,6 @@
 #include "rerenderdialog.h"
 #include "appsettings.h"
 
-
 class ProcessManager;
 
 namespace Ui {
@@ -38,6 +37,7 @@ public:
     QString getManualMkvPath() const;
     QString getOverrideSubsPath() const;
     QString getOverrideSignsPath() const;
+    bool isSrtSubsDecoupled() const;
     bool isNormalizationEnabled() const;
 
 public slots:
@@ -81,6 +81,7 @@ private slots:
     void startManualAssembly();
     void startManualRender();
     void finishWorkerProcess();
+    void updateDecoupleCheckBoxState();
 
 private:
     Ui::MainWindow *ui;

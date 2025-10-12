@@ -44,6 +44,9 @@ void ReleaseTemplate::read(const QJsonObject &json)
     isCustomTranslation = json["isCustomTranslation"].toBool(false);
     director = json["director"].toString();
     soundEngineer = json["soundEngineer"].toString();
+    songsSoundEngineer = json["songsSoundEngineer"].toString();
+    episodeSoundEngineer = json["episodeSoundEngineer"].toString();
+    recordingSoundEngineer = json["recordingSoundEngineer"].toString();
     timingAuthor = json["timingAuthor"].toString();
     signsAuthor = json["signsAuthor"].toString();
     translationEditor = json["translationEditor"].toString();
@@ -108,6 +111,9 @@ void ReleaseTemplate::write(QJsonObject &json) const
     json["isCustomTranslation"] = isCustomTranslation;
     json["director"] = director;
     json["soundEngineer"] = soundEngineer;
+    json["songsSoundEngineer"] = songsSoundEngineer;
+    json["episodeSoundEngineer"] = episodeSoundEngineer;
+    json["recordingSoundEngineer"] = recordingSoundEngineer;
     json["timingAuthor"] = timingAuthor;
     json["signsAuthor"] = signsAuthor;
     json["translationEditor"] = translationEditor;

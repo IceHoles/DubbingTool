@@ -55,6 +55,9 @@ public:
     bool createSrtMaster = false;           // Нужен ли .mkv с .srt и аудио без сжатия
     QString director;                       // Режиссер
     QString soundEngineer;                  // Звукорежиссер
+    QString songsSoundEngineer;             // Звукорежиссер песен
+    QString episodeSoundEngineer;           // Звукорежиссер эпизода
+    QString recordingSoundEngineer;         // Звукорежиссер записи
     QString timingAuthor;                   // Разметка (тайминг)
     QString signsAuthor;                    // Локализация надписей
     QString translationEditor;              // Редактор перевода

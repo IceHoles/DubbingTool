@@ -505,7 +505,28 @@ QStringList AssProcessor::generateTb(const ReleaseTemplate &t, const QString &st
                                 ? "Куратор закадра: "
                                 : "Режиссёр дубляжа: ";
     if (!t.director.isEmpty()) tbLines.append(generateDialogueLine(directorLabel + t.director));
-    if (!t.soundEngineer.isEmpty()) tbLines.append(generateDialogueLine("Звукорежиссёр: " + t.soundEngineer));
+
+    QStringList soundEngineersBlock;
+    if (!t.soundEngineer.isEmpty()) {
+        soundEngineersBlock << QString("Звукорежиссёр: %1").arg(t.soundEngineer);
+    }
+    if (!t.songsSoundEngineer.isEmpty()) {
+        soundEngineersBlock << QString("Звукорежиссёр песен: %1").arg(t.songsSoundEngineer);
+    }
+    if (!soundEngineersBlock.isEmpty()) {
+        tbLines.append(generateDialogueLine(soundEngineersBlock.join("\\N")));
+    }
+
+    QStringList studioSoundEngineersBlock;
+    if (!t.episodeSoundEngineer.isEmpty()) {
+        studioSoundEngineersBlock << QString("Звукорежиссёр эпизода: %1").arg(t.episodeSoundEngineer);
+    }
+    if (!t.recordingSoundEngineer.isEmpty()) {
+        studioSoundEngineersBlock << QString("Звукорежиссёр записи: %1").arg(t.recordingSoundEngineer);
+    }
+    if (!studioSoundEngineersBlock.isEmpty()) {
+        tbLines.append(generateDialogueLine(studioSoundEngineersBlock.join("\\N")));
+    }
 
     QStringList authorsBlock;
     if (!t.timingAuthor.isEmpty()) {
@@ -529,6 +550,49 @@ QStringList AssProcessor::generateTb(const ReleaseTemplate &t, const QString &st
 
     emit logMessage(QString("Сгенерировано %1 строк ТБ.").arg(tbLines.size()), LogCategory::APP);
     return tbLines;
+}
+
+bool AssProcessor::addTbToFile(const QString &inputPath, const QString &outputPath, const ReleaseTemplate &t, const QString &startTime)
+{
+    emit logMessage("Обработка файла, содержащего только надписи: " + inputPath, LogCategory::APP);
+
+    QFile inputFile(inputPath);
+    if (!inputFile.open(QIODevice::ReadOnly)) {
+        emit logMessage("Ошибка: не удалось открыть для чтения файл " + inputPath, LogCategory::APP);
+        return false;
+    }
+    QTextStream in(&inputFile);
+    in.setEncoding(QStringConverter::Utf8);
+    QStringList originalLines = in.readAll().split('\n');
+    inputFile.close();
+    int eventsIndex = -1;
+    for(int i = 0; i < originalLines.size(); ++i) {
+        if (originalLines[i].trimmed() == "[Events]") {
+            eventsIndex = i;
+            break;
+        }
+    }
+    if (eventsIndex == -1) { return false; }
+
+    QStringList headers = originalLines.mid(0, eventsIndex + 2);
+    QStringList events = originalLines.mid(eventsIndex + 2);
+    QStringList tbLines = generateTb(t, startTime, 0);
+    int styleFormatIndex = -1;
+    for(int i = 0; i < headers.size(); ++i) {
+        if (headers[i].trimmed().startsWith("Format:", Qt::CaseInsensitive) && headers[i-1].trimmed() == "[V4+ Styles]") {
+            styleFormatIndex = i;
+            break;
+        }
+    }
+    if (styleFormatIndex != -1) {
+        headers.insert(styleFormatIndex + 1, "Style: ТБ,Tahoma,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1");
+    }
+    if (!writeAssFile(outputPath, headers + events + tbLines)) {
+        emit logMessage("Ошибка записи в файл: " + outputPath, LogCategory::APP);
+        return false;
+    }
+    emit logMessage("Создан файл только с надписями: " + outputPath, LogCategory::APP);
+    return true;
 }
 
 bool AssProcessor::processFromTwoSources(const QString &subsInputPath, const QString &signsInputPath, const QString &outputPathBase, const ReleaseTemplate &t, const QString& startTime)

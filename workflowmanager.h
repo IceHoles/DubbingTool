@@ -230,6 +230,7 @@ private:
     bool m_isNormalizationEnabled = false;
     bool m_didLaunchNugen = false;
     bool m_wasNormalizationPerformed = false;
+    bool m_isSrtMasterDecoupled = false;
 
     struct TrackInfo {
         int id = -1;

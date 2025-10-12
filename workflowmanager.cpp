@@ -5,7 +5,6 @@
 #include "processmanager.h"
 #include "manualrenderer.h"
 #include "trackselectordialog.h"
-#include "rerenderdialog.h"
 #include <QDir>
 #include <QFileInfo>
 #include <QFontInfo>
@@ -29,10 +28,10 @@
 
 WorkflowManager::WorkflowManager(ReleaseTemplate t, const QString &episodeNumberForPost, const QString &episodeNumberForSearch, const QSettings &settings, MainWindow *mainWindow)
     : QObject(nullptr),
+    m_mainWindow(mainWindow),
     m_template(t),
     m_episodeNumberForPost(episodeNumberForPost),
     m_episodeNumberForSearch(episodeNumberForSearch),
-    m_mainWindow(mainWindow),
     m_wasUserInputRequested(false)
 {
     m_webUiHost = settings.value("webUi/host", "http://127.0.0.1").toString();
@@ -47,6 +46,7 @@ WorkflowManager::WorkflowManager(ReleaseTemplate t, const QString &episodeNumber
     m_overrideSubsPath = m_mainWindow->getOverrideSubsPath();
     m_overrideSignsPath = m_mainWindow->getOverrideSignsPath();
     m_isNormalizationEnabled = m_mainWindow->isNormalizationEnabled();
+    m_isSrtMasterDecoupled = m_mainWindow->isSrtSubsDecoupled();
 
     m_netManager = new QNetworkAccessManager(this);
     m_hashFindTimer = new QTimer(this);
@@ -1564,19 +1564,6 @@ void WorkflowManager::convertToSrtAndAssembleMaster()
     emit logMessage("--- Начало сборки мастер-копии с SRT ---", LogCategory::APP);
     m_currentStep = Step::AssemblingSrtMaster;
 
-    // 1. Определяем исходный ASS для конвертации (полные субтитры)
-    QString sourceAss = m_paths->processedFullSubs();
-    if (!QFileInfo::exists(sourceAss)) {
-        emit logMessage("Ошибка: не найдены обработанные .ass файлы для создания SRT. Сборка мастер-копии отменена.", LogCategory::APP);
-        convertAudioIfNeeded();
-        return;
-    }
-
-    // 2. Конвертируем в SRT
-    QString outputSrtPath = m_paths->masterSrt();
-    m_assProcessor->convertToSrt(sourceAss, outputSrtPath, m_template.signStyles);
-
-    // 3. Собираем MKV
     QStringList args;
     QString outputMkvPath = m_paths->masterMkv(QString("[DUB x TVOЁ] %1 - %2.mkv").arg(m_template.seriesTitle, m_episodeNumberForSearch));
     args << "-o" << outputMkvPath;
@@ -1586,7 +1573,7 @@ void WorkflowManager::convertToSrtAndAssembleMaster()
 
     QString wavPath = m_wavForSrtMasterPath.isEmpty() ? m_mainRuAudioPath : m_wavForSrtMasterPath;
     args << "--language" << "0:rus" << wavPath;
-    args << "--language" << "0:rus" << outputSrtPath;
+    args << "--language" << "0:rus" << m_paths->masterSrt();
 
     emit progressUpdated(0, "Сборка SRT-копии");
     m_processManager->startProcess(m_mkvmergePath, args);
@@ -1672,11 +1659,11 @@ void WorkflowManager::resumeWithUserInput(const UserInputResponse &response)
 
 void WorkflowManager::resumeWithSignStyles(const QStringList &styles)
 {
-    if (styles.isEmpty()) {
-        emit logMessage("Не выбрано ни одного стиля для надписей. Процесс остановлен.", LogCategory::APP);
-        emit workflowAborted();
-        return;
-    }
+    // if (styles.isEmpty()) {
+    //     emit logMessage("Не выбрано ни одного стиля для надписей. Процесс остановлен.", LogCategory::APP);
+    //     emit workflowAborted();
+    //     return;
+    // }
     m_template.signStyles = styles;
     emit logMessage("Стили для надписей получены. Продолжаем...", LogCategory::APP);
     m_wasUserInputRequested = false;
@@ -1758,6 +1745,44 @@ void WorkflowManager::runAssProcessing()
     bool hasOverrideSigns = !overrideSigns.isEmpty() && QFileInfo::exists(overrideSigns);
 
     QString outputFileBase = m_paths->processedFullSubs().left(m_paths->processedFullSubs().lastIndexOf('_'));
+    if (m_isSrtMasterDecoupled && hasOverrideSubs && m_template.createSrtMaster)
+    {
+        emit logMessage("АКТИВИРОВАН РАЗДЕЛЕННЫЙ РЕЖИМ ОБРАБОТКИ СУБТИТРОВ.", LogCategory::APP);
+        bool srtSuccess = false;
+        bool releaseSuccess = false;
+
+        // 1. Поток для SRT-мастера: override_subs -> master.srt
+        emit logMessage("Создание SRT из файла 'Свои субтитры'...", LogCategory::APP);
+        srtSuccess = m_assProcessor->convertToSrt(overrideSubs, m_paths->masterSrt(), m_template.signStyles);
+        if (hasOverrideSigns) {
+            // 2. Поток для релиза: override_signs -> _signs.ass
+            emit logMessage("Обработка файла 'Свои надписи' для релиза...", LogCategory::APP);
+            releaseSuccess = m_assProcessor->addTbToFile(overrideSigns, m_paths->processedSignsSubs(), m_template, m_parsedEndingTime);
+        } else if (m_template.generateTb)
+        {
+            emit logMessage("Сценарий: диалоги не используются, надписи не указаны. Генерируем только ТБ.", LogCategory::APP);
+            QString outputPath = m_paths->processedSignsSubs();
+            m_assProcessor->generateTbOnlyFile(outputPath, m_template, m_parsedEndingTime);
+        } else
+        {
+            emit logMessage("Сценарий: диалоги не используются, надписи не указаны. Генерация ТБ отключена. Выходной файл будет без субтитров и надписей", LogCategory::APP);
+        }
+        if (!srtSuccess || !releaseSuccess) {
+            emit logMessage("Ошибка во время раздельной обработки субтитров.", LogCategory::APP);
+            emit workflowAborted();
+            return;
+        }
+
+        emit logMessage("Генерация текстов постов...", LogCategory::APP);
+        EpisodeData data;
+        data.episodeNumber = m_episodeNumberForPost;
+        data.cast = m_template.cast;
+        emit postsReady(m_template, data);
+        m_wereStylesRequested = false;
+
+        findFontsInProcessedSubs();
+        return;
+    }
     bool success = false;
     if (hasOverrideSubs && hasOverrideSigns) {
         emit logMessage("Сценарий: используются свои субтитры для диалогов и свои надписи для надписей.", LogCategory::APP);
@@ -1771,16 +1796,19 @@ void WorkflowManager::runAssProcessing()
             success = m_assProcessor->processFromTwoSources(extractedSubs, overrideSigns, outputFileBase, m_template, m_parsedEndingTime);
         } else {
             emit logMessage("Сценарий: извлеченных субтитров нет, используются только свои надписи.", LogCategory::APP);
-            success = m_assProcessor->processExistingFile(overrideSigns, outputFileBase, m_template, m_parsedEndingTime);
+            QString outputPath = m_paths->processedSignsSubs();
+            success = m_assProcessor->addTbToFile(overrideSigns, outputPath, m_template, m_parsedEndingTime);
         }
     } else {
         if (hasExtracted) {
             emit logMessage("Сценарий: используются извлеченные субтитры. Файл будет разделен.", LogCategory::APP);
             success = m_assProcessor->processExistingFile(extractedSubs, outputFileBase, m_template, m_parsedEndingTime);
-        } else {
+        } else if (m_template.generateTb) {
             emit logMessage("Сценарий: субтитры не найдены и не указаны. Генерируем только ТБ.", LogCategory::APP);
             QString outputPath = m_paths->processedSignsSubs();
             success = m_assProcessor->generateTbOnlyFile(outputPath, m_template, m_parsedEndingTime);
+        } else {
+            emit logMessage("Сценарий: субтитры не найдены и не указаны. Генерация ТБ отключена. Выходной файл будет без субтитров и надписей", LogCategory::APP);
         }
     }
 
@@ -1791,6 +1819,11 @@ void WorkflowManager::runAssProcessing()
     }
 
     emit logMessage("Обработка субтитров успешно завершена.", LogCategory::APP);
+
+    if(m_template.createSrtMaster) {
+        m_assProcessor->convertToSrt(m_paths->processedFullSubs(), m_paths->masterSrt(), m_template.signStyles);
+    }
+
     emit logMessage("Генерация текстов постов...", LogCategory::APP);
     EpisodeData data;
     data.episodeNumber = m_episodeNumberForPost;

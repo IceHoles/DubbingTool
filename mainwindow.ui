@@ -24,204 +24,249 @@
        <attribute name="title">
         <string>Автоматический режим</string>
        </attribute>
-       <layout class="QGridLayout" name="gridLayout">
-        <item row="0" column="0" colspan="2">
-         <layout class="QHBoxLayout" name="horizontalLayout">
-          <item>
-           <widget class="QLabel" name="label_template">
-            <property name="text">
-             <string>Шаблон:</string>
-            </property>
-           </widget>
+       <layout class="QVBoxLayout" name="verticalLayout" stretch="0,0,1,0,0,0">
+        <item>
+         <layout class="QGridLayout" name="gridLayout">
+          <item row="0" column="0" colspan="2">
+           <layout class="QHBoxLayout" name="horizontalLayout_2">
+            <item>
+             <widget class="QLabel" name="label_template">
+              <property name="text">
+               <string>Шаблон:</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QComboBox" name="templateComboBox">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                <horstretch>1</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="createTemplateButton">
+              <property name="text">
+               <string>Создать</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="editTemplateButton">
+              <property name="text">
+               <string>Редактировать</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="deleteTemplateButton">
+              <property name="text">
+               <string>Удалить</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
           </item>
-          <item>
-           <widget class="QComboBox" name="templateComboBox">
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-              <horstretch>1</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-           </widget>
+          <item row="1" column="0" colspan="2">
+           <layout class="QHBoxLayout" name="horizontalLayout_4">
+            <item>
+             <widget class="QLabel" name="label_3">
+              <property name="text">
+               <string>Исходный MKV:</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="mkvPathLineEdit">
+              <property name="placeholderText">
+               <string>Выберите .mkv файл</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="selectMkvButton">
+              <property name="text">
+               <string>Обзор...</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
           </item>
-          <item>
-           <widget class="QPushButton" name="createTemplateButton">
-            <property name="text">
-             <string>Создать</string>
-            </property>
-           </widget>
+          <item row="2" column="0" colspan="2">
+           <layout class="QHBoxLayout" name="horizontalLayout_3">
+            <item>
+             <widget class="QLabel" name="label_2">
+              <property name="text">
+               <string>Русское аудио:</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="audioPathLineEdit">
+              <property name="placeholderText">
+               <string>Выберите .wav, .flac, .aac или .eac3  файл</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="selectAudioButton">
+              <property name="text">
+               <string>Обзор...</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
           </item>
-          <item>
-           <widget class="QPushButton" name="editTemplateButton">
-            <property name="text">
-             <string>Редактировать</string>
-            </property>
-           </widget>
+          <item row="3" column="0" colspan="2">
+           <layout class="QHBoxLayout" name="horizontalLayout">
+            <item>
+             <widget class="QLabel" name="label">
+              <property name="text">
+               <string>Номер серии:</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="episodeNumberLineEdit">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                <horstretch>1</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>16777215</width>
+                <height>16777215</height>
+               </size>
+              </property>
+              <property name="placeholderText">
+               <string>Можно оставить пустым при работе с указанным .mkv файлом</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QCheckBox" name="normalizeAudioCheckBox">
+              <property name="toolTip">
+               <string>Если указан путь к NUGEN AMB и предоставлен WAV файл, выполнить нормализацию аудио.</string>
+              </property>
+              <property name="text">
+               <string>Нормализовать аудио</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
           </item>
-          <item>
-           <widget class="QPushButton" name="deleteTemplateButton">
-            <property name="text">
-             <string>Удалить</string>
-            </property>
-           </widget>
+          <item row="4" column="0">
+           <layout class="QHBoxLayout" name="horizontalLayout_5">
+            <item>
+             <widget class="QLabel" name="label_41">
+              <property name="text">
+               <string>Свои субтитры:</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="overrideSubsPathEdit">
+              <property name="placeholderText">
+               <string>Субтитры из MKV будут проигнорированы</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="browseOverrideSubsButton">
+              <property name="text">
+               <string>Обзор...</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item row="4" column="1">
+           <layout class="QHBoxLayout" name="horizontalLayout_51">
+            <item>
+             <widget class="QLabel" name="label_44">
+              <property name="text">
+               <string>Свои надписи:</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="overrideSignsPathEdit">
+              <property name="placeholderText">
+               <string>Надписи из MKV будут проигнорированы</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="browseOverrideSignsButton">
+              <property name="text">
+               <string>Обзор...</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
           </item>
          </layout>
         </item>
-        <item row="1" column="0" colspan="2">
-         <layout class="QHBoxLayout" name="horizontalLayout_4">
-          <item>
-           <widget class="QLabel" name="label_3">
-            <property name="text">
-             <string>Исходный MKV:</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QLineEdit" name="mkvPathLineEdit">
-            <property name="placeholderText">
-             <string>Выберите .mkv файл</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="selectMkvButton">
-            <property name="text">
-             <string>Обзор...</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
+        <item>
+         <widget class="QWidget" name="decoupleContainerWidget" native="true">
+          <layout class="QHBoxLayout" name="horizontalLayout_decouple">
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <item>
+            <widget class="QCheckBox" name="decoupleSrtSubsCheckBox">
+             <property name="toolTip">
+              <string>Если опция включена, файл &quot;Свои полные&quot; будет использован ТОЛЬКО для создания диалогов в SRT-мастере, а файл &quot;Свои надписи&quot; - для создания дорожек в финальном MKV/MP4.</string>
+             </property>
+             <property name="text">
+              <string>Использовать &quot;Свои субтитры&quot; только для SRT-мастера</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_decouple">
+             <property name="orientation">
+              <enum>Qt::Orientation::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </widget>
         </item>
-        <item row="2" column="0" colspan="2">
-         <layout class="QHBoxLayout" name="horizontalLayout_3">
-          <item>
-           <widget class="QLabel" name="label_2">
-            <property name="text">
-             <string>Русское аудио:</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QLineEdit" name="audioPathLineEdit">
-            <property name="placeholderText">
-             <string>Выберите .wav или .aac файл</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="selectAudioButton">
-            <property name="text">
-             <string>Обзор...</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </item>
-        <item row="3" column="0" colspan="2">
-         <layout class="QHBoxLayout" name="horizontalLayout">
-          <item>
-           <widget class="QLabel" name="label">
-            <property name="text">
-             <string>Номер серии:</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QLineEdit" name="episodeNumberLineEdit">
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-              <horstretch>1</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-            <property name="maximumSize">
-             <size>
-              <width>16777215</width>
-              <height>16777215</height>
-             </size>
-            </property>
-            <property name="placeholderText">
-             <string>Оставьте пустым при работе с указанным .mkv файлом</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QCheckBox" name="normalizeAudioCheckBox">
-            <property name="toolTip">
-             <string>Если указан путь к NUGEN AMB и предоставлен WAV файл, выполнить нормализацию аудио.</string>
-            </property>
-            <property name="text">
-             <string>Нормализовать аудио</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </item>
-        <item row="4" column="0">
-         <layout class="QHBoxLayout" name="horizontalLayout_5">
-          <item>
-           <widget class="QLabel" name="label_41">
-            <property name="text">
-             <string>Свои субтитры:</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QLineEdit" name="overrideSubsPathEdit">
-            <property name="placeholderText">
-             <string>Субтитры из MKV будут проигнорированы</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="browseOverrideSubsButton">
-            <property name="text">
-             <string>Обзор...</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </item>
-        <item row="4" column="1">
-         <layout class="QHBoxLayout" name="horizontalLayout_51">
-          <item>
-           <widget class="QLabel" name="label_44">
-            <property name="text">
-             <string>Свои надписи:</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QLineEdit" name="overrideSignsPathEdit">
-            <property name="placeholderText">
-             <string>Надписи из MKV будут проигнорированы</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="browseOverrideSignsButton">
-            <property name="text">
-             <string>Обзор...</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </item>
-        <item row="5" column="0" colspan="2">
+        <item>
          <widget class="QPlainTextEdit" name="logOutput">
           <property name="readOnly">
            <bool>true</bool>
           </property>
          </widget>
         </item>
-        <item row="6" column="0" colspan="2">
+        <item>
          <widget class="QLabel" name="progressLabel">
           <property name="text">
            <string>Текущий этап:</string>
           </property>
          </widget>
         </item>
-        <item row="7" column="0" colspan="2">
+        <item>
          <widget class="QProgressBar" name="downloadProgressBar">
           <property name="enabled">
            <bool>true</bool>
@@ -237,7 +282,7 @@
           </property>
          </widget>
         </item>
-        <item row="8" column="0" colspan="2">
+        <item>
          <widget class="QPushButton" name="startButton">
           <property name="minimumSize">
            <size>

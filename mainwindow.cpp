@@ -6,7 +6,6 @@
 #include "templateeditor.h"
 #include "settingsdialog.h"
 #include "postgenerator.h"
-#include "processmanager.h"
 #include "styleselectordialog.h"
 #include "torrentselectordialog.h"
 #include "trackselectordialog.h"
@@ -14,6 +13,7 @@
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
+#include <QFrame>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMessageBox>
@@ -63,6 +63,9 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_publicationWidget, &PublicationWidget::logMessage, this, &MainWindow::logMessage);
     connect(m_publicationWidget, &PublicationWidget::postsUpdateRequest, this, &MainWindow::onPostsUpdateRequest);
 
+    connect(ui->overrideSubsPathEdit, &QLineEdit::textChanged, this, &MainWindow::updateDecoupleCheckBoxState);
+    connect(ui->templateComboBox, &QComboBox::currentIndexChanged, this, &MainWindow::updateDecoupleCheckBoxState);
+
     ui->downloadProgressBar->setVisible(false);
     ui->progressLabel->setVisible(false);
 
@@ -73,6 +76,8 @@ MainWindow::MainWindow(QWidget *parent)
     } else {
         logMessage(QString("Загружено %1 шаблонов.").arg(m_templates.count()));
     }
+
+    updateDecoupleCheckBoxState();
 }
 
 MainWindow::~MainWindow()
@@ -194,13 +199,10 @@ void MainWindow::on_createTemplateButton_clicked()
     defaultTemplate.postTemplates["tg_mp4"] =
         "▶️Серия: %EPISODE_NUMBER%/%TOTAL_EPISODES%\n\n"
         "📌«%SERIES_TITLE%» в дубляже от ТО Дубляжная\n\n"
-        "🎁А также вы можете поддержать наш коллектив копеечкой\n"
-        "💙**ВК**(https://vk.com/dublyajnaya?from=groups&ref=group_widget&w=app6471849_-216649949)\n"
-        "💰**BOOSTY**(https://boosty.to/dubl/single-payment/donation/696237/target?share=target_link)\n\n"
+        "🎁Сериал озвучен при поддержке [онлайн-кинотеатра TVOЁ](https://tvoe.live/), если вы хотите поддержать Дубляжную, то смотрите нашу озвучку именно там, ведь TVOЁ дарит скидку нашим подписчикам по промокоду - `Dublyazhnaya`, где 1 месяц 99 рублей вместо 299 руб\n\n"
         "Помимо ТГ сериал можно посмотреть здесь:\n\n"
-        "Anime365 (%LINK_ANIME365%)\n\n"
-        "AnimeLib (%LINK_ANILIB%)\n\n"
-        "Архив MKV (https://t.me/+CVpSSg33UwI4MzYy)\n\n"
+        "[TVOЁ](https://tvoe.live/p/) (~~299~~ 99 руб. по промокоду: `Dublyazhnaya`)\n\n"
+        "[Архив MKV](https://t.me/+CVpSSg33UwI4MzYy)\n\n"
         "🎙Роли дублировали:\n%CAST_LIST%\n\n"
         "📝Режиссёр дубляжа:\n%DIRECTOR%\n\n"
         "🪄Звукорежиссёр:\n%SOUND_ENGINEER%\n\n"
@@ -216,6 +218,7 @@ void MainWindow::on_createTemplateButton_clicked()
     defaultTemplate.postTemplates["vk"] =
         "«%SERIES_TITLE%» в дубляже от ТО Дубляжная\n\n"
         "Серия: %EPISODE_NUMBER%/%TOTAL_EPISODES%\n\n"
+        "🎁Сериал озвучен при поддержке онлайн-кинотеатра TVOЁ, если вы хотите поддержать Дубляжную, то смотрите нашу озвучку именно там, ведь TVOЁ дарит скидку нашим подписчикам по промокоду - Dublyazhnaya, где 1 месяц 99 рублей вместо 299 руб tvoe.cc/inby"
         "Роли дублировали:\n%CAST_LIST%\n\n"
         "Режиссёр дубляжа:\n%DIRECTOR%\n\n"
         "Звукорежиссёр:\n%SOUND_ENGINEER%\n\n"
@@ -227,8 +230,7 @@ void MainWindow::on_createTemplateButton_clicked()
     defaultTemplate.postTemplates["vk_comment"] =
         "А также вы можете поддержать наш коллектив на бусти: https://boosty.to/dubl/single-payment/donation/634652\n\n"
         "ТГ: https://t.me/dublyajnaya\n\n"
-        "Anime365: %LINK_ANIME365%\n"
-        "AnimeLib: %LINK_ANILIB%\n";
+        "TVOЁ (99 руб. по промокоду: Dublyazhnaya): https://tvoe.live/p/";
     defaultTemplate.uploadUrls << "https://vk.com/dublyajnaya" << "https://converter.kodik.biz/media-files" << "https://anime-365.ru/" << "https://anilib.me/ru";
     editor.setTemplate(defaultTemplate);
 
@@ -803,4 +805,30 @@ void MainWindow::onPauseForSubEditRequest(const QString &subFilePath)
     msgBox.exec();
 
     emit subEditFinished();
+}
+
+bool MainWindow::isSrtSubsDecoupled() const
+{
+    // Чекбокс может быть скрыт, но его состояние isChecked() все равно будет верным
+    return ui->decoupleSrtSubsCheckBox->isChecked();
+}
+
+void MainWindow::updateDecoupleCheckBoxState()
+{
+    QString currentTemplateName = ui->templateComboBox->currentText();
+    if (currentTemplateName.isEmpty() || !m_templates.contains(currentTemplateName)) {
+        ui->decoupleContainerWidget->setVisible(false);
+        return;
+    }
+
+    const ReleaseTemplate& currentTemplate = m_templates.value(currentTemplateName);
+
+    bool canBeVisible = !ui->overrideSubsPathEdit->text().isEmpty() &&
+                        QFileInfo::exists(ui->overrideSubsPathEdit->text()) &&
+                        currentTemplate.createSrtMaster;
+
+    ui->decoupleContainerWidget->setVisible(canBeVisible);
+    if (!canBeVisible) {
+        ui->decoupleSrtSubsCheckBox->setChecked(false);
+    }
 }

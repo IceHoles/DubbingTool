@@ -60,11 +60,13 @@ void StyleSelectorDialog::analyzeFile(const QString &filePath)
         item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
         item->setCheckState(Qt::Unchecked);
     }
+    ui->stylesListWidget->sortItems();
     for(const QString &actor : foundActors) {
         QListWidgetItem *item = new QListWidgetItem(actor, ui->actorsListWidget);
         item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
         item->setCheckState(Qt::Unchecked);
     }
+    ui->actorsListWidget->sortItems();
 }
 
 QStringList StyleSelectorDialog::getSelectedStyles() const

@@ -14,6 +14,9 @@ QMap<QString, PostVersions> PostGenerator::generate(const ReleaseTemplate &t, co
     const QString castStr = data.cast.join(", ");
     const QString directorStr = t.director;
     const QString soundStr = t.soundEngineer;
+    const QString songStr = t.songsSoundEngineer;
+    const QString episodeEngineerStr = t.episodeSoundEngineer;
+    const QString recordingEngineerStr = t.recordingSoundEngineer;
     const QString subAuthorStr = t.subAuthor;
     const QString timingStr = t.timingAuthor;
     const QString signsAuthorStr = t.signsAuthor;
@@ -33,6 +36,9 @@ QMap<QString, PostVersions> PostGenerator::generate(const ReleaseTemplate &t, co
         markdownPost.replace("%CAST_LIST%", castStr);
         markdownPost.replace("%DIRECTOR%", directorStr);
         markdownPost.replace("%SOUND_ENGINEER%", soundStr);
+        markdownPost.replace("%SONG_ENGINEER%", songStr);
+        markdownPost.replace("%EPISODE_ENGINEER%", episodeEngineerStr);
+        markdownPost.replace("%RECORDING_ENGINEER%", recordingEngineerStr);
         markdownPost.replace("%SUB_AUTHOR%", subAuthorStr);
         markdownPost.replace("%TIMING_AUTHOR%", timingStr);
         markdownPost.replace("%SIGNS_AUTHOR%", signsAuthorStr);

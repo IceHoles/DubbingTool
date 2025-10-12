@@ -15,6 +15,7 @@ public:
 
     bool processExistingFile(const QString &inputPath, const QString &outputPathBase, const ReleaseTemplate &t, const QString& startTime);
     bool generateTbOnlyFile(const QString &outputPath, const ReleaseTemplate &t, const QString& startTime, int resolutionX = 1920);
+    bool addTbToFile(const QString &inputPath, const QString &outputPath, const ReleaseTemplate &t, const QString& startTime);
     bool processFromTwoSources(const QString &dialoguesInputPath, const QString &signsInputPath, const QString &outputPathBase, const ReleaseTemplate &t, const QString& startTime);
     bool convertToSrt(const QString &inputAssPath, const QString &outputSrtPath, const QStringList &signStyles);
     bool applySubstitutions(const QString &filePath, const QMap<QString, QString> &substitutions);

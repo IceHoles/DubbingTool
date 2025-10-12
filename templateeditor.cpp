@@ -114,6 +114,9 @@ void TemplateEditor::setTemplate(const ReleaseTemplate &t)
     ui->castEdit->setPlainText(t.cast.join(", "));
     ui->directorEdit->setText(t.director);
     ui->soundEngineerEdit->setText(t.soundEngineer);
+    ui->songsSoundEngineerEdit->setText(t.songsSoundEngineer);
+    ui->episodeSoundEngineerEdit->setText(t.episodeSoundEngineer);
+    ui->recordingSoundEngineerEdit->setText(t.recordingSoundEngineer);
     ui->timingAuthorEdit->setText(t.timingAuthor);
     ui->signsAuthorEdit->setText(t.signsAuthor);
     ui->translationEditorEdit->setText(t.translationEditor);
@@ -180,6 +183,9 @@ ReleaseTemplate TemplateEditor::getTemplate() const
     t.cast = ui->castEdit->toPlainText().split(rx, Qt::SkipEmptyParts);
     t.director = ui->directorEdit->text().trimmed();
     t.soundEngineer = ui->soundEngineerEdit->text().trimmed();
+    t.songsSoundEngineer = ui->songsSoundEngineerEdit->text().trimmed();
+    t.episodeSoundEngineer = ui->episodeSoundEngineerEdit->text().trimmed();
+    t.recordingSoundEngineer = ui->recordingSoundEngineerEdit->text().trimmed();
     t.timingAuthor = ui->timingAuthorEdit->text().trimmed();
     t.signsAuthor = ui->signsAuthorEdit->text().trimmed();
     t.translationEditor = ui->translationEditorEdit->text().trimmed();
@@ -264,30 +270,51 @@ void TemplateEditor::on_helpButton_clicked()
     addRow(placeholdersLayout, 3, "%CAST_LIST%", "Список актеров через запятую");
     addRow(placeholdersLayout, 4, "%DIRECTOR%", "Режиссер дубляжа");
     addRow(placeholdersLayout, 5, "%SOUND_ENGINEER%", "Звукорежиссер");
-    addRow(placeholdersLayout, 6, "%SUB_AUTHOR%", "Автор перевода");
-    addRow(placeholdersLayout, 7, "%TIMING_AUTHOR%", "Разметка (тайминг)");
-    addRow(placeholdersLayout, 8, "%SIGNS_AUTHOR%", "Локализация надписей");
-    addRow(placeholdersLayout, 9, "%TRANSLATION_EDITOR%", "Редактор перевода");
-    addRow(placeholdersLayout, 10, "%RELEASE_BUILDER%", "Сборка релиза");
-    addRow(placeholdersLayout, 11, "%LINK_ANILIB%", "Ссылка на Anilib (из панели 'Публикация')");
-    addRow(placeholdersLayout, 12, "%LINK_ANIME365%", "Ссылка на Anime365 (из панели 'Публикация')");
+    addRow(placeholdersLayout, 6, "%SONG_ENGINEER%", "Звукорежиссер песен");
+    addRow(placeholdersLayout, 7, "%EPISODE_ENGINEER%", "Звукорежиссер эпизода");
+    addRow(placeholdersLayout, 8, "%RECORDING_ENGINEER%", "Звукорежиссер записи");
+    addRow(placeholdersLayout, 9, "%SUB_AUTHOR%", "Автор перевода");
+    addRow(placeholdersLayout, 10, "%TIMING_AUTHOR%", "Разметка (тайминг)");
+    addRow(placeholdersLayout, 11, "%SIGNS_AUTHOR%", "Локализация надписей");
+    addRow(placeholdersLayout, 12, "%TRANSLATION_EDITOR%", "Редактор перевода");
+    addRow(placeholdersLayout, 13, "%RELEASE_BUILDER%", "Сборка релиза");
+    addRow(placeholdersLayout, 14, "%LINK_ANILIB%", "Ссылка на Anilib (из панели 'Публикация')");
+    addRow(placeholdersLayout, 15, "%LINK_ANIME365%", "Ссылка на Anime365 (из панели 'Публикация')");
     placeholdersLayout->setColumnStretch(1, 1);
     mainLayout->addWidget(placeholdersWidget);
 
     mainLayout->addWidget(new QFrame);
 
     // --- Блок 2: Форматирование Telegram ---
-    mainLayout->addWidget(new QLabel("<h3>Форматирование Telegram:</h3>"));
-    QWidget *tgWidget = new QWidget();
-    QGridLayout *tgLayout = new QGridLayout(tgWidget);
-    addRow(tgLayout, 0, "**Жирный**", "<b>Жирный текст</b>");
-    addRow(tgLayout, 1, "__Курсив__", "<i>Курсив</i>");
-    addRow(tgLayout, 2, "~~Зачеркнутый~~", "<s>Зачеркнутый текст</s>");
-    addRow(tgLayout, 3, "||Спойлер||", "<span style='background-color: #555; color: #555;'>Спойлер</span>");
-    addRow(tgLayout, 4, "`Моноширинный`", "<code>Моноширинный текст</code>");
-    addRow(tgLayout, 5, "```python\nprint('Hello')\n```", "Блок кода (с указанием языка)");
-    tgLayout->setColumnStretch(1, 1);
-    mainLayout->addWidget(tgWidget);
+    mainLayout->addWidget(new QLabel("<h3>Форматирование Telegram (псевдо-Markdown):</h3>"));
+    QTextBrowser* tgHelpBrowser = new QTextBrowser();
+    tgHelpBrowser->setOpenExternalLinks(true);
+    tgHelpBrowser->setHtml(R"(
+        <p>Для форматирования текста используйте специальные символы. При копировании текста для Telegram, он будет автоматически преобразован в нужный формат.</p>
+        <h4>Базовые стили</h4>
+        <table border="1" cellspacing="0" cellpadding="5">
+            <tr><th>Стиль</th><th>Синтаксис</th></tr>
+            <tr><td><b>Жирный</b></td><td><code>**Жирный текст**</code></td></tr>
+            <tr><td><i>Курсив</i></td><td><code>__Курсивный текст__</code></td></tr>
+            <tr><td><u>Подчеркнутый</u></td><td><code>^^Подчеркнутый текст^^</code></td></tr>
+            <tr><td><s>Зачеркнутый</s></td><td><code>~~Зачеркнутый текст~~</code></td></tr>
+            <tr><td><span style='background-color: #555; color: #555;'>Спойлер</span></td><td><code>||Скрытый текст||</code></td></tr>
+            <tr><td><code>Моноширинный</code></td><td><code>`моноширинный текст`</code></td></tr>
+        </table>
+        <h4>Ссылки и кастомные эмодзи</h4>
+        <ul>
+            <li><b>Обычная ссылка:</b> <code>[видимый текст](URL-адрес)</code><br><i>Пример:</i> <code>[Сайт Qt](https://qt.io/)</code></li>
+            <li><b>Кастомный эмодзи:</b> <code>[эмодзи](emoji:ID)</code><br><i>Пример:</i> <code>[💙](emoji:5278229754099540071)</code></li>
+        </ul>
+        <h4>Блочные элементы</h4>
+        <ul>
+            <li><b>Цитата:</b> Текст заключается в <code>&gt;</code> и <code>&lt;</code>.<br><i>Пример:</i> <code>&gt;Это цитата.&lt;</code></li>
+            <li><b>Сворачиваемая цитата:</b> Текст заключается в <code>&gt;^</code> и <code>&lt;^</code>.</li>
+            <li><b>Блок кода:</b> Текст заключается в тройные обратные кавычки <code>```</code>. Можно указать язык.<br><i>Пример:</i> <code>```cpp<br>#include &lt;iostream&gt;<br>```</code></li>
+        </ul>
+        <p><b>Правила вложенности:</b> Стили можно комбинировать (<code>**__жирный курсив__**</code>). Блок кода имеет наивысший приоритет и отменяет любое форматирование внутри. Внутри цитаты нельзя использовать моноширинный стиль.</p>
+    )");
+    mainLayout->addWidget(tgHelpBrowser);
 
     mainLayout->addWidget(new QFrame);
 
