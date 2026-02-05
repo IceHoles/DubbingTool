@@ -1,0 +1,57 @@
+# Build directories
+build/
+release/
+debug/
+out/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+*.cmake
+
+# qmake (legacy)
+Makefile
+Makefile.*
+.qmake.stash
+*.pro.user
+*.pro.user.*
+
+# Qt generated
+moc_*.cpp
+ui_*.h
+qrc_*.cpp
+*.moc
+
+# Compiled
+*.o
+*.obj
+*.exe
+*.dll
+*.lib
+*.pdb
+*.ilk
+*.exp
+
+# IDE
+.cursor/
+.vs/
+
+# VSCode - ignore all except shared configs
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.user
+*.suo
+*.sln
+*.vcxproj*
+
+# Logs
+*.log
+debug.log
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini

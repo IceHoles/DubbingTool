@@ -1,0 +1,40 @@
+# clangd configuration
+# https://clangd.llvm.org/config
+
+CompileFlags:
+  # Treat .h files as C++ headers
+  Add:
+    - "-xc++"
+    - "-std=c++17"
+  # Remove flags that clangd doesn't understand
+  Remove:
+    - "-fno-keep-inline-dllexport"
+    - "/utf-8"
+
+Diagnostics:
+  # Enable clang-tidy checks
+  ClangTidy:
+    Add:
+      - bugprone-*
+      - modernize-*
+      - performance-*
+      - readability-*
+    Remove:
+      - modernize-use-trailing-return-type
+      - readability-magic-numbers
+      - readability-identifier-length
+
+  # Suppress some noisy warnings
+  Suppress:
+    - pp_including_mainfile_in_preamble
+
+InlayHints:
+  Enabled: true
+  ParameterNames: true
+  DeducedTypes: true
+
+Hover:
+  ShowAKA: true
+
+Index:
+  Background: Build

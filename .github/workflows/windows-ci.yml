@@ -1,7 +1,10 @@
-name: Windows CI Build (Direct Path Injection)
+name: Windows CI Build
 
 on:
   push:
+    branches:
+      - 'main'
+  pull_request:
     branches:
       - 'main'
 
@@ -18,28 +21,69 @@ jobs:
         with:
           version: '6.7.2'
           arch: 'win64_msvc2019_64'
-          cached: 'true'
+          cache: true
 
-      - name: Print Qt installation path
-        shell: cmd
-        run: echo %Qt6_DIR%
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
 
-      - name: Build Project
-        shell: cmd
+      - name: Configure CMake
         run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          echo --- Starting build ---
-          "%Qt6_DIR%\bin\qmake.exe" DubbingTool.pro -spec win32-msvc "CONFIG+=release"
-          nmake  
+          cmake -B build -G Ninja `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_PREFIX_PATH="$env:Qt6_DIR"
+
+      - name: Build
+        run: cmake --build build --config Release
 
       - name: Deploy Qt dependencies
-        shell: cmd
         run: |
-          "%Qt6_DIR%\bin\windeployqt.exe" --release release\DubbingTool.exe
+          & "$env:Qt6_DIR\bin\windeployqt.exe" --release build\DubbingTool.exe
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: DubbingTool-Windows-x64-Build 
-          path: release/
+          name: DubbingTool-Windows-x64
+          path: build/
           retention-days: 90
+
+  clang-tidy:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: '6.7.2'
+          arch: 'win64_msvc2019_64'
+          cache: true
+
+      - name: Install LLVM
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "17"
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Configure CMake with compile_commands.json
+        run: |
+          cmake -B build -G Ninja `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_PREFIX_PATH="$env:Qt6_DIR" `
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Run clang-tidy
+        run: |
+          $files = Get-ChildItem -Path . -Include *.cpp -Recurse | Where-Object { $_.FullName -notmatch 'build' }
+          foreach ($file in $files) {
+            Write-Host "Checking $($file.Name)..."
+            clang-tidy $file.FullName -p build --warnings-as-errors="" 2>&1 | Out-Default
+          }
+        continue-on-error: true

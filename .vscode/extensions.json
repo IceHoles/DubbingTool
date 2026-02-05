@@ -1,0 +1,36 @@
+{
+    "recommendations": [
+        // C++ / CMake
+        "llvm-vs-code-extensions.vscode-clangd",
+        "ms-vscode.cmake-tools",
+        "twxs.cmake",
+        "cheshirekow.cmake-format",
+        "xaver.clang-format",
+        
+        // Qt
+        "theqtcompany.qt-cpp-pack",
+        
+        // Debugging
+        "vadimcn.vscode-lldb",
+        
+        // Git
+        "eamodio.gitlens",
+        "mhutchie.git-graph",
+        
+        // Files & Languages
+        "redhat.vscode-yaml",
+        "yzhang.markdown-all-in-one",
+        "tamasfe.even-better-toml",
+        "editorconfig.editorconfig",
+        
+        // Productivity
+        "usernamehw.errorlens",
+        "gruntfuggly.todo-tree",
+        "alefragnani.bookmarks",
+        "aaron-bond.better-comments"
+    ],
+    "unwantedRecommendations": [
+        // Disable Microsoft C++ IntelliSense (conflicts with clangd)
+        "ms-vscode.cpptools"
+    ]
+}

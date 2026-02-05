@@ -1,0 +1,46 @@
+{
+    // Disable Microsoft C++ IntelliSense (use clangd instead)
+    "C_Cpp.intelliSenseEngine": "disabled",
+    
+    // clangd settings
+    "clangd.path": "C:\\Program Files\\LLVM\\bin\\clangd.exe",
+    "clangd.arguments": [
+        "--compile-commands-dir=${workspaceFolder}/build",
+        "--background-index",
+        "--clang-tidy",
+        "--header-insertion=iwyu",
+        "--completion-style=detailed"
+    ],
+    
+    // CMake settings
+    "cmake.buildDirectory": "${workspaceFolder}/build",
+    "cmake.generator": "Ninja",
+    "cmake.configureOnOpen": true,
+    
+    // File associations
+    "files.associations": {
+        "*.qrc": "xml",
+        "*.ui": "xml"
+    },
+    
+    // Editor settings for C++
+    "[cpp]": {
+        "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd",
+        "editor.formatOnSave": false
+    },
+    
+    // Todo Tree keywords
+    "todo-tree.general.tags": [
+        "BUG",
+        "HACK",
+        "FIXME",
+        "TODO",
+        "XXX"
+    ],
+    
+    // Error Lens
+    "errorLens.enabledDiagnosticLevels": [
+        "error",
+        "warning"
+    ]
+}

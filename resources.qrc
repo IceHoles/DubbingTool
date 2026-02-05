@@ -1,6 +1,0 @@
-<RCC>
-    <qresource prefix="/">
-        <file>icon.png</file>
-        <file>font_finder_wrapper.exe</file>
-    </qresource>
-</RCC>
