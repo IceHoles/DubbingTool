@@ -16,6 +16,11 @@
     "cmake.buildDirectory": "${workspaceFolder}/build",
     "cmake.generator": "Ninja",
     "cmake.configureOnOpen": true,
+    "cmake.configureSettings": {
+        "CMAKE_PREFIX_PATH": "C:/Qt/6.10.2/msvc2022_64",
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_TESTING": "ON"
+    },
     
     // File associations
     "files.associations": {

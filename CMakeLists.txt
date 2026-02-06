@@ -192,3 +192,84 @@ install(TARGETS ${PROJECT_NAME}
     BUNDLE DESTINATION .
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+
+# ============================================================================
+# Testing
+# ============================================================================
+option(BUILD_TESTING "Build unit tests" OFF)
+
+if(BUILD_TESTING)
+    enable_testing()
+    find_package(Qt6 REQUIRED COMPONENTS Test)
+
+    # Minimal library for testing FontFinder (no UI dependencies)
+    set(TESTABLE_SOURCES
+        src/core/appsettings.cpp
+        src/processing/fontfinder.cpp
+        src/processing/assprocessor.cpp
+        src/models/releasetemplate.cpp
+    )
+
+    set(TESTABLE_HEADERS
+        src/core/appsettings.h
+        src/processing/fontfinder.h
+        src/processing/assprocessor.h
+        src/models/releasetemplate.h
+    )
+
+    add_library(FontFinderLib STATIC
+        ${TESTABLE_SOURCES}
+        ${TESTABLE_HEADERS}
+    )
+
+    set_target_properties(FontFinderLib PROPERTIES AUTOMOC ON)
+
+    target_include_directories(FontFinderLib PUBLIC
+        ${CMAKE_SOURCE_DIR}/src/core
+        ${CMAKE_SOURCE_DIR}/src/processing
+        ${CMAKE_SOURCE_DIR}/src/models
+    )
+
+    target_link_libraries(FontFinderLib PUBLIC
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Widgets
+    )
+
+    if(WIN32)
+        target_link_libraries(FontFinderLib PUBLIC
+            dwrite
+            gdi32
+            user32
+            ole32
+        )
+    endif()
+
+    if(MSVC)
+        target_compile_options(FontFinderLib PRIVATE /W3 /utf-8)
+    else()
+        target_compile_options(FontFinderLib PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+
+    # FontFinder tests
+    add_executable(fontfinder_test tests/fontfinder_test.cpp)
+    set_target_properties(fontfinder_test PROPERTIES AUTOMOC ON)
+    target_link_libraries(fontfinder_test PRIVATE
+        FontFinderLib
+        Qt6::Test
+    )
+
+    # Copy test data files to build directory
+    set(TEST_DATA_DIR ${CMAKE_SOURCE_DIR}/tests/test_data)
+    file(GLOB TEST_DATA_FILES "${TEST_DATA_DIR}/*.ass")
+    
+    add_custom_command(TARGET fontfinder_test POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:fontfinder_test>/test_data"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${TEST_DATA_FILES}
+            "$<TARGET_FILE_DIR:fontfinder_test>/test_data/"
+        COMMENT "Copying test data files..."
+    )
+
+    add_test(NAME FontFinderTest COMMAND fontfinder_test)
+endif()

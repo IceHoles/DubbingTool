@@ -32,10 +32,16 @@ jobs:
         run: |
           cmake -B build -G Ninja `
             -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_PREFIX_PATH="$env:Qt6_DIR"
+            -DCMAKE_PREFIX_PATH="$env:Qt6_DIR" `
+            -DBUILD_TESTING=ON
 
       - name: Build
         run: cmake --build build --config Release
+
+      - name: Run Tests
+        run: |
+          $env:PATH = "$env:Qt6_DIR\bin;$env:PATH"
+          ctest --test-dir build --output-on-failure
 
       - name: Deploy Qt dependencies
         run: |
