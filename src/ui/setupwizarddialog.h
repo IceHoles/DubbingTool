@@ -8,6 +8,7 @@
 #include <QComboBox>
 #include <QSpinBox>
 #include <QStackedWidget>
+#include <QGridLayout>
 
 /**
  * @brief Setup wizard dialog shown on first launch or when required tools are missing.
@@ -49,11 +50,13 @@ private:
     struct ToolRow {
         QString exeName;
         QString displayName;
+        bool required = true;
         QLabel *statusIcon = nullptr;
         QLineEdit *pathEdit = nullptr;
         QPushButton *browseButton = nullptr;
     };
     QList<ToolRow> m_tools;
+    QGridLayout *m_toolsGrid = nullptr;
 
     // Page 2: qBittorrent
     QLineEdit *m_qbtHostEdit = nullptr;

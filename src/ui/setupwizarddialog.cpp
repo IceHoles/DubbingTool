@@ -3,11 +3,13 @@
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
-#include <QGridLayout>
 #include <QGroupBox>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFont>
+#include <QFrame>
+#include <QDesktopServices>
+#include <QUrl>
 
 
 SetupWizardDialog::SetupWizardDialog(QWidget *parent)
@@ -69,25 +71,39 @@ void SetupWizardDialog::buildToolsPage()
     auto *desc = new QLabel(
         "Для работы необходимы FFmpeg и MKVToolNix. "
         "Программа автоматически ищет их в папке tools/, рядом с exe и в системном PATH. "
-        "Если инструмент не найден — укажите путь вручную.",
+        "Если инструмент не найден — укажите путь вручную или скачайте по ссылкам ниже.",
         page);
     desc->setWordWrap(true);
     layout->addWidget(desc);
 
-    layout->addSpacing(8);
+    // Download links
+    auto *linksLayout = new QHBoxLayout();
+    auto *ffmpegLink = new QLabel(
+        "<a href=\"https://www.gyan.dev/ffmpeg/builds/\">Скачать FFmpeg</a>", page);
+    ffmpegLink->setOpenExternalLinks(true);
+    auto *mkvtoolnixLink = new QLabel(
+        "<a href=\"https://mkvtoolnix.download/downloads.html\">Скачать MKVToolNix</a>", page);
+    mkvtoolnixLink->setOpenExternalLinks(true);
+    linksLayout->addWidget(ffmpegLink);
+    linksLayout->addWidget(mkvtoolnixLink);
+    linksLayout->addStretch();
+    layout->addLayout(linksLayout);
 
-    auto *grid = new QGridLayout();
-    grid->setColumnStretch(1, 1);
+    layout->addSpacing(4);
+
+    m_toolsGrid = new QGridLayout();
+    m_toolsGrid->setColumnStretch(2, 1);
 
     struct ToolDef {
         QString exeName;
         QString displayName;
+        bool required;
     };
     const QList<ToolDef> kToolDefs = {
-        {"ffmpeg.exe",     "FFmpeg"},
-        {"ffprobe.exe",    "FFprobe"},
-        {"mkvmerge.exe",   "MKVmerge"},
-        {"mkvextract.exe", "MKVextract"},
+        {"ffmpeg.exe",         "FFmpeg",      true},
+        {"ffprobe.exe",        "FFprobe",     true},
+        {"mkvmerge.exe",       "MKVmerge",    true},
+        {"mkvextract.exe",     "MKVextract",  true},
     };
 
     for (int32_t i = 0; i < kToolDefs.size(); ++i)
@@ -95,13 +111,14 @@ void SetupWizardDialog::buildToolsPage()
         ToolRow row;
         row.exeName = kToolDefs[i].exeName;
         row.displayName = kToolDefs[i].displayName;
+        row.required = kToolDefs[i].required;
 
         row.statusIcon = new QLabel("⏳", page);
         row.statusIcon->setFixedWidth(24);
         row.statusIcon->setAlignment(Qt::AlignCenter);
 
         auto *nameLabel = new QLabel(row.displayName + ":", page);
-        nameLabel->setFixedWidth(90);
+        nameLabel->setFixedWidth(100);
 
         row.pathEdit = new QLineEdit(page);
         row.pathEdit->setReadOnly(true);
@@ -110,10 +127,10 @@ void SetupWizardDialog::buildToolsPage()
         row.browseButton = new QPushButton("Обзор...", page);
         row.browseButton->setFixedWidth(80);
 
-        grid->addWidget(row.statusIcon, i, 0);
-        grid->addWidget(nameLabel, i, 1);
-        grid->addWidget(row.pathEdit, i, 2);
-        grid->addWidget(row.browseButton, i, 3);
+        m_toolsGrid->addWidget(row.statusIcon, i, 0);
+        m_toolsGrid->addWidget(nameLabel, i, 1);
+        m_toolsGrid->addWidget(row.pathEdit, i, 2);
+        m_toolsGrid->addWidget(row.browseButton, i, 3);
 
         const int32_t kToolIdx = i;
         connect(row.browseButton, &QPushButton::clicked, this, [this, kToolIdx]() {
@@ -123,7 +140,52 @@ void SetupWizardDialog::buildToolsPage()
         m_tools.append(row);
     }
 
-    layout->addLayout(grid);
+    // Separator before optional tools
+    int32_t separatorRow = kToolDefs.size();
+    auto *separator = new QFrame(page);
+    separator->setFrameShape(QFrame::HLine);
+    separator->setFrameShadow(QFrame::Sunken);
+    m_toolsGrid->addWidget(separator, separatorRow, 0, 1, 4);
+
+    auto *optionalLabel = new QLabel("<i>Необязательные:</i>", page);
+    m_toolsGrid->addWidget(optionalLabel, separatorRow + 1, 0, 1, 4);
+
+    // NUGEN Audio AMB — optional
+    {
+        int32_t nugenRow = separatorRow + 2;
+        ToolRow row;
+        row.exeName = "NUGEN Audio AMB.exe";
+        row.displayName = "NUGEN Audio AMB";
+        row.required = false;
+
+        row.statusIcon = new QLabel("➖", page);
+        row.statusIcon->setFixedWidth(24);
+        row.statusIcon->setAlignment(Qt::AlignCenter);
+
+        auto *nameLabel = new QLabel(row.displayName + ":", page);
+        nameLabel->setFixedWidth(100);
+
+        row.pathEdit = new QLineEdit(page);
+        row.pathEdit->setReadOnly(true);
+        row.pathEdit->setPlaceholderText("Не указан (необязательно)");
+
+        row.browseButton = new QPushButton("Обзор...", page);
+        row.browseButton->setFixedWidth(80);
+
+        m_toolsGrid->addWidget(row.statusIcon, nugenRow, 0);
+        m_toolsGrid->addWidget(nameLabel, nugenRow, 1);
+        m_toolsGrid->addWidget(row.pathEdit, nugenRow, 2);
+        m_toolsGrid->addWidget(row.browseButton, nugenRow, 3);
+
+        const int32_t kToolIdx = m_tools.size();
+        connect(row.browseButton, &QPushButton::clicked, this, [this, kToolIdx]() {
+            slotBrowseTool(kToolIdx);
+        });
+
+        m_tools.append(row);
+    }
+
+    layout->addLayout(m_toolsGrid);
     layout->addStretch();
 
     m_stack->addWidget(page);
@@ -239,6 +301,8 @@ void SetupWizardDialog::detectTools()
     updateToolStatus(2, settings.mkvmergePath());
     // mkvextract
     updateToolStatus(3, settings.mkvextractPath());
+    // NUGEN Audio AMB (optional)
+    updateToolStatus(4, settings.nugenAmbPath());
 }
 
 void SetupWizardDialog::updateToolStatus(int32_t toolIndex, const QString &path)
@@ -249,11 +313,26 @@ void SetupWizardDialog::updateToolStatus(int32_t toolIndex, const QString &path)
     }
 
     auto &row = m_tools[toolIndex];
-    bool found = QFileInfo::exists(path);
+    bool found = !path.isEmpty() && QFileInfo::exists(path);
 
-    row.statusIcon->setText(found ? "✅" : "❌");
-    row.pathEdit->setText(found ? path : "");
-    row.pathEdit->setToolTip(found ? path : "Не найден");
+    if (found)
+    {
+        row.statusIcon->setText("✅");
+        row.pathEdit->setText(path);
+        row.pathEdit->setToolTip(path);
+    }
+    else if (row.required)
+    {
+        row.statusIcon->setText("❌");
+        row.pathEdit->setText("");
+        row.pathEdit->setToolTip("Не найден");
+    }
+    else
+    {
+        row.statusIcon->setText("➖");
+        row.pathEdit->setText("");
+        row.pathEdit->setToolTip("Не указан (необязательно)");
+    }
 }
 
 void SetupWizardDialog::updateNextButtonState()
@@ -264,11 +343,11 @@ void SetupWizardDialog::updateNextButtonState()
         return;
     }
 
-    // Page 1: all tools must be found
+    // Page 1: all required tools must be found
     bool allFound = true;
     for (const auto &row : m_tools)
     {
-        if (!QFileInfo::exists(row.pathEdit->text()))
+        if (row.required && !QFileInfo::exists(row.pathEdit->text()))
         {
             allFound = false;
             break;
@@ -307,12 +386,13 @@ void SetupWizardDialog::slotNextPage()
     if (current == 0)
     {
         auto &settings = AppSettings::instance();
-        if (m_tools.size() >= 4)
+        if (m_tools.size() >= 5)
         {
             settings.setFfmpegPath(m_tools[0].pathEdit->text());
-            // ffprobe is auto-detected, but we store ffmpeg path which it derives from
+            // ffprobe (index 1) is auto-detected from ffmpeg path
             settings.setMkvmergePath(m_tools[2].pathEdit->text());
             settings.setMkvextractPath(m_tools[3].pathEdit->text());
+            settings.setNugenAmbPath(m_tools[4].pathEdit->text());
         }
     }
 
@@ -368,11 +448,13 @@ void SetupWizardDialog::slotFinish()
     auto &settings = AppSettings::instance();
 
     // Save tool paths (page 1)
-    if (m_tools.size() >= 4)
+    if (m_tools.size() >= 5)
     {
         settings.setFfmpegPath(m_tools[0].pathEdit->text());
+        // ffprobe (index 1) is auto-detected from ffmpeg path
         settings.setMkvmergePath(m_tools[2].pathEdit->text());
         settings.setMkvextractPath(m_tools[3].pathEdit->text());
+        settings.setNugenAmbPath(m_tools[4].pathEdit->text());
     }
 
     // Save qBittorrent settings (page 2) — only if user didn't skip
