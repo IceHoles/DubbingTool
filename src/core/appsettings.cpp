@@ -1,12 +1,32 @@
 #include "appsettings.h"
+#include <QCoreApplication>
 #include <QStandardPaths>
 #include <QDir>
 #include <QFileInfo>
 
 
 static QString findExecutablePath(const QString &exeName) {
+    // 1. Ищем в tools/ рядом с exe
+    const QString kAppDir = QCoreApplication::applicationDirPath();
+    QString candidate = QDir(kAppDir).filePath("tools/" + exeName);
+    if (QFileInfo::exists(candidate)) {
+        return QDir::toNativeSeparators(candidate);
+    }
+
+    // 2. Ищем рядом с exe
+    candidate = QDir(kAppDir).filePath(exeName);
+    if (QFileInfo::exists(candidate)) {
+        return QDir::toNativeSeparators(candidate);
+    }
+
+    // 3. Ищем в PATH
     QString path = QStandardPaths::findExecutable(exeName);
-    return path.isEmpty() ? exeName : QDir::toNativeSeparators(path);
+    if (!path.isEmpty()) {
+        return QDir::toNativeSeparators(path);
+    }
+
+    // 4. Фоллбэк — просто имя, вызывающий код проверит существование
+    return exeName;
 }
 
 AppSettings& AppSettings::instance() {
@@ -178,20 +198,33 @@ void AppSettings::setFfmpegPath(const QString &path) { m_ffmpegPath = path; }
 
 QString AppSettings::ffprobePath() const
 {
-    // 1. Ищем рядом с ffmpeg
-    QFileInfo ffmpegInfo(m_ffmpegPath);
-    QString candidate = QDir(ffmpegInfo.absolutePath()).filePath("ffprobe.exe");
+    // 1. Ищем в tools/ рядом с exe
+    const QString kAppDir = QCoreApplication::applicationDirPath();
+    QString candidate = QDir(kAppDir).filePath("tools/ffprobe.exe");
     if (QFileInfo::exists(candidate)) {
         return candidate;
     }
 
-    // 2. Ищем в PATH
+    // 2. Ищем рядом с exe
+    candidate = QDir(kAppDir).filePath("ffprobe.exe");
+    if (QFileInfo::exists(candidate)) {
+        return candidate;
+    }
+
+    // 3. Ищем рядом с ffmpeg
+    QFileInfo ffmpegInfo(m_ffmpegPath);
+    candidate = QDir(ffmpegInfo.absolutePath()).filePath("ffprobe.exe");
+    if (QFileInfo::exists(candidate)) {
+        return candidate;
+    }
+
+    // 4. Ищем в PATH
     QString inPath = QStandardPaths::findExecutable("ffprobe.exe");
     if (!inPath.isEmpty()) {
         return inPath;
     }
 
-    // 3. Фоллбэк — вернём предполагаемый путь (вызывающий код проверит существование)
+    // 5. Фоллбэк — вернём предполагаемый путь (вызывающий код проверит существование)
     return candidate;
 }
 QString AppSettings::qbittorrentPath() const { return m_qbittorrentPath; }

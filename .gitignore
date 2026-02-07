@@ -51,6 +51,9 @@ qrc_*.cpp
 *.log
 debug.log
 
+# Bundled tools (ffmpeg, mkvtoolnix, etc.)
+tools/
+
 # OS
 .DS_Store
 Thumbs.db
