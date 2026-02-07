@@ -1147,6 +1147,8 @@ void WorkflowManager::audioPreparation()
     }
 
     if (request.isValid()) {
+        request.videoFilePath = m_mkvFilePath;
+        request.videoDurationS = m_sourceDurationS;
         emit logMessage("Недостаточно данных. Запрос у пользователя...", LogCategory::APP);
         m_lastStepBeforeRequest = Step::AudioPreparation;
         emit progressUpdated(-1, "Запрос данных у пользователя");
@@ -1365,7 +1367,8 @@ void WorkflowManager::assembleMkv(const QString &russianAudioPath)
 
     m_wereFontsRequested = false;
 
-    QString outputFileName = QString("[DUB] %1 - %2.mkv").arg(m_template.seriesTitle).arg(m_episodeNumberForSearch);
+    QString outputFileName = PathManager::sanitizeForPath(
+        QString("[DUB] %1 - %2.mkv").arg(m_template.seriesTitle).arg(m_episodeNumberForSearch));
     m_finalMkvPath  = QDir(m_paths->resultPath).absoluteFilePath(outputFileName);
 
     QStringList args;
@@ -1549,22 +1552,19 @@ void WorkflowManager::renderMp4Concat()
         emit logMessage("Concat рендер: после ТБ есть контент, используем 3 сегмента.", LogCategory::APP);
     }
 
-    // Start by finding the keyframe after TB end (needed only for 3-segment mode)
-    if (m_concatSegmentCount == 3)
+    // Always search for keyframes: we need the keyframe before TB start
+    // for a clean segment 1→2 boundary, and (in 3-segment mode) the keyframe
+    // after TB end for the segment 2→3 boundary.
+    if (m_concatSegmentCount == 2)
     {
-        concatFindKeyframe();
-    }
-    else
-    {
-        // For 2 segments, no keyframe needed — go straight to cutting
         m_concatKeyframeTime = static_cast<double>(m_sourceDurationS);
-        concatCutSegment1();
     }
+    concatFindKeyframe();
 }
 
 void WorkflowManager::concatFindKeyframe()
 {
-    emit logMessage("Concat рендер: поиск keyframe после конца ТБ...", LogCategory::APP);
+    emit logMessage("Concat рендер: поиск keyframe-ов для границ сегментов...", LogCategory::APP);
     m_currentStep = Step::ConcatFindKeyframe;
 
     QString ffprobePath = AppSettings::instance().ffprobePath();
@@ -1575,63 +1575,134 @@ void WorkflowManager::concatFindKeyframe()
         return;
     }
 
-    // Search for keyframes in a 10-second window after TB end
-    QString readInterval = QString("%1%%2")
-                               .arg(m_concatTbEndSeconds, 0, 'f', 3)
-                               .arg(m_concatTbEndSeconds + 10.0, 0, 'f', 3);
-
-    QStringList args;
-    args << "-v" << "quiet"
-         << "-select_streams" << "v:0"
-         << "-show_entries" << "frame=pts_time,key_frame"
-         << "-read_intervals" << readInterval
-         << "-of" << "json"
-         << m_finalMkvPath;
-
-    QByteArray output;
-    bool success = m_processManager->executeAndWait(ffprobePath, args, output);
-
-    if (!success || output.isEmpty())
+    // --- 1. Find the last keyframe AT or BEFORE TB start (for seg1→seg2 boundary) ---
     {
-        emit logMessage("Concat рендер: не удалось получить данные о keyframe. Переключение на полный рендер.", LogCategory::APP);
-        renderMp4();
-        return;
-    }
+        double searchStart = m_concatTbStartSeconds > 15.0 ? m_concatTbStartSeconds - 15.0 : 0.0;
+        QString readInterval = QString("%1%%2")
+                                   .arg(searchStart, 0, 'f', 3)
+                                   .arg(m_concatTbStartSeconds + 0.001, 0, 'f', 3);
 
-    // Parse JSON output from ffprobe
-    bool foundKeyframe = false;
-    QJsonDocument doc = QJsonDocument::fromJson(output);
-    QJsonArray frames = doc.object()["frames"].toArray();
-    for (const auto &frameVal : frames)
-    {
-        QJsonObject frame = frameVal.toObject();
-        if (frame["key_frame"].toInt() == 1)
+        QStringList args;
+        args << "-v" << "quiet"
+             << "-select_streams" << "v:0"
+             << "-show_entries" << "frame=pts_time,key_frame"
+             << "-read_intervals" << readInterval
+             << "-of" << "json"
+             << m_finalMkvPath;
+
+        QByteArray output;
+        bool success = m_processManager->executeAndWait(ffprobePath, args, output);
+
+        if (!success || output.isEmpty())
         {
-            bool ok = false;
-            double kfTime = frame["pts_time"].toString().toDouble(&ok);
-            if (ok && kfTime >= m_concatTbEndSeconds)
+            emit logMessage("Concat рендер: не удалось найти keyframe перед ТБ. Переключение на полный рендер.",
+                            LogCategory::APP);
+            renderMp4();
+            return;
+        }
+
+        // Pick the LAST keyframe with pts_time <= tbStart
+        m_concatKfBeforeTbStart = 0.0;
+        bool foundBefore = false;
+        QJsonDocument doc = QJsonDocument::fromJson(output);
+        QJsonArray frames = doc.object()["frames"].toArray();
+        for (const auto& frameVal : frames)
+        {
+            QJsonObject frame = frameVal.toObject();
+            if (frame["key_frame"].toInt() == 1)
             {
-                m_concatKeyframeTime = kfTime;
-                foundKeyframe = true;
-                break;
+                bool ok = false;
+                double kfTime = frame["pts_time"].toString().toDouble(&ok);
+                if (ok && kfTime <= m_concatTbStartSeconds)
+                {
+                    m_concatKfBeforeTbStart = kfTime;
+                    foundBefore = true;
+                    // Don't break — keep iterating to find the LAST one
+                }
             }
+        }
+
+        if (!foundBefore)
+        {
+            // Fallback: use 0 (very beginning) — practically unreachable
+            m_concatKfBeforeTbStart = 0.0;
+            emit logMessage("Concat рендер: keyframe перед ТБ не найден, используем начало видео.",
+                            LogCategory::APP);
+        }
+        else
+        {
+            emit logMessage(
+                QString("Concat рендер: keyframe перед ТБ на %1с (начало ТБ: %2с, разница: %3с)")
+                    .arg(m_concatKfBeforeTbStart, 0, 'f', 3)
+                    .arg(m_concatTbStartSeconds, 0, 'f', 3)
+                    .arg(m_concatTbStartSeconds - m_concatKfBeforeTbStart, 0, 'f', 3),
+                LogCategory::APP);
         }
     }
 
-    if (!foundKeyframe)
+    // --- 2. Find the first keyframe AT or AFTER TB end (for seg2→seg3 boundary) ---
+    if (m_concatSegmentCount == 3)
     {
-        // No keyframe found after TB end — treat as 2-segment mode (TB extends to end)
-        emit logMessage("Concat рендер: keyframe после ТБ не найден. Переключение в 2-сегментный режим.", LogCategory::APP);
-        m_concatSegmentCount = 2;
-        m_concatKeyframeTime = static_cast<double>(m_sourceDurationS);
-    }
-    else
-    {
-        emit logMessage(QString("Concat рендер: найден keyframe на %1с (конец ТБ: %2с, разница: %3с)")
-                            .arg(m_concatKeyframeTime, 0, 'f', 3)
-                            .arg(m_concatTbEndSeconds, 0, 'f', 3)
-                            .arg(m_concatKeyframeTime - m_concatTbEndSeconds, 0, 'f', 3),
-                        LogCategory::APP);
+        QString readInterval = QString("%1%%2")
+                                   .arg(m_concatTbEndSeconds, 0, 'f', 3)
+                                   .arg(m_concatTbEndSeconds + 10.0, 0, 'f', 3);
+
+        QStringList args;
+        args << "-v" << "quiet"
+             << "-select_streams" << "v:0"
+             << "-show_entries" << "frame=pts_time,key_frame"
+             << "-read_intervals" << readInterval
+             << "-of" << "json"
+             << m_finalMkvPath;
+
+        QByteArray output;
+        bool success = m_processManager->executeAndWait(ffprobePath, args, output);
+
+        if (!success || output.isEmpty())
+        {
+            emit logMessage(
+                "Concat рендер: не удалось получить данные о keyframe после ТБ. Переключение на полный рендер.",
+                LogCategory::APP);
+            renderMp4();
+            return;
+        }
+
+        bool foundAfter = false;
+        QJsonDocument doc = QJsonDocument::fromJson(output);
+        QJsonArray frames = doc.object()["frames"].toArray();
+        for (const auto& frameVal : frames)
+        {
+            QJsonObject frame = frameVal.toObject();
+            if (frame["key_frame"].toInt() == 1)
+            {
+                bool ok = false;
+                double kfTime = frame["pts_time"].toString().toDouble(&ok);
+                if (ok && kfTime >= m_concatTbEndSeconds)
+                {
+                    m_concatKeyframeTime = kfTime;
+                    foundAfter = true;
+                    break;
+                }
+            }
+        }
+
+        if (!foundAfter)
+        {
+            emit logMessage(
+                "Concat рендер: keyframe после ТБ не найден. Переключение в 2-сегментный режим.",
+                LogCategory::APP);
+            m_concatSegmentCount = 2;
+            m_concatKeyframeTime = static_cast<double>(m_sourceDurationS);
+        }
+        else
+        {
+            emit logMessage(
+                QString("Concat рендер: keyframe после ТБ на %1с (конец ТБ: %2с, разница: %3с)")
+                    .arg(m_concatKeyframeTime, 0, 'f', 3)
+                    .arg(m_concatTbEndSeconds, 0, 'f', 3)
+                    .arg(m_concatKeyframeTime - m_concatTbEndSeconds, 0, 'f', 3),
+                LogCategory::APP);
+        }
     }
 
     concatCutSegment1();
@@ -1643,36 +1714,39 @@ void WorkflowManager::concatCutSegment1()
     m_currentStep = Step::ConcatCutSegment1;
     emit progressUpdated(-1, "Concat: сегмент 1/3");
 
-    // MPEG-TS intermediate segments with timestamps starting at 0.
-    // mkvmerge will concatenate them sequentially and force exact frame durations.
+    // Cut segment 1 at the keyframe BEFORE TB start so that -c copy produces
+    // a clean cut without B-frame overlap at the seg1→seg2 boundary.
     QString seg1Path = QDir(m_paths->resultPath).filePath("concat_seg1.ts");
 
-    QString tbStartStr = QString::number(m_concatTbStartSeconds, 'f', 3);
+    QString seg1EndStr = QString::number(m_concatKfBeforeTbStart, 'f', 3);
 
     QStringList args;
     args << "-y";
 
+    // Video-only segment: audio will be taken from the continuous MKV track
+    // in the final join step, eliminating AAC splicing artefacts entirely.
     bool sourceIsMp4 = (m_sourceFormat == SourceFormat::MP4);
     if (sourceIsMp4)
     {
         args << "-i" << m_mkvFilePath   // original MP4 — video with correct DTS
-             << "-i" << m_finalMkvPath  // assembled MKV — dubbed audio
-             << "-to" << tbStartStr
-             << "-map" << "0:v:0"       // video from original MP4
-             << "-map" << "1:a:0"       // dubbed audio from assembled MKV
-             << "-c" << "copy"
+             << "-to" << seg1EndStr
+             << "-map" << "0:v:0"
+             << "-c:v" << "copy"
+             << "-an"
              << "-avoid_negative_ts" << "make_non_negative";
     }
     else
     {
         args << "-i" << m_finalMkvPath
-             << "-to" << tbStartStr
+             << "-to" << seg1EndStr
              << "-map" << "0:v:0"
-             << "-map" << "0:a:0"
-             << "-c" << "copy"
+             << "-c:v" << "copy"
+             << "-an"
              << "-avoid_negative_ts" << "make_non_negative";
     }
 
+    // Prevent TS muxer from adding initial buffering delays
+    args << "-muxdelay" << "0" << "-muxpreload" << "0";
     args << seg1Path;
 
     m_processManager->startProcess(m_ffmpegPath, args);
@@ -1684,36 +1758,93 @@ void WorkflowManager::concatRenderSegment2()
     m_currentStep = Step::ConcatRenderSegment2;
     emit progressUpdated(-1, "Concat: рендер ТБ");
 
-    bool sourceIsMp4 = (m_sourceFormat == SourceFormat::MP4);
     QString seg2Path = QDir(m_paths->resultPath).filePath("concat_seg2.ts");
     QString encoder = concatEncoderForCodec(m_videoTrack.extension);
 
-    QString tbStartStr = QString::number(m_concatTbStartSeconds, 'f', 3);
+    // --- Probe segment 1 to find its actual end time (B-frame tail) ---
+    // With -c copy, B-frame packets whose DTS <= keyframe but PTS > keyframe
+    // end up in segment 1, creating a content overlap with segment 2.
+    // We probe the actual duration and skip those frames via trim filter.
+    double bframeOverlap = 0.0;
+    {
+        QString seg1Path = QDir(m_paths->resultPath).filePath("concat_seg1.ts");
+        QString ffprobePath = AppSettings::instance().ffprobePath();
+        QStringList probeArgs;
+        probeArgs << "-v" << "quiet"
+                  << "-show_entries" << "format=duration"
+                  << "-of" << "csv=p=0"
+                  << seg1Path;
+
+        QByteArray probeOutput;
+        if (m_processManager->executeAndWait(ffprobePath, probeArgs, probeOutput))
+        {
+            bool ok = false;
+            double seg1Duration = QString::fromUtf8(probeOutput).trimmed().toDouble(&ok);
+            if (ok && seg1Duration > m_concatKfBeforeTbStart)
+            {
+                bframeOverlap = seg1Duration - m_concatKfBeforeTbStart;
+                emit logMessage(
+                    QString("Concat рендер: сег.1 фактическая длительность %1с, B-frame хвост %2с — корректируем старт сег.2")
+                        .arg(seg1Duration, 0, 'f', 3)
+                        .arg(bframeOverlap, 0, 'f', 3),
+                    LogCategory::APP);
+            }
+        }
+    }
+
+    // Fast seek to the keyframe before TB start.
+    // -t before -i limits input duration (avoids reading entire file).
+    QString seg2StartStr = QString::number(m_concatKfBeforeTbStart, 'f', 3);
 
     QStringList args;
     args << "-y"
-         << "-ss" << tbStartStr
-         << "-i" << m_finalMkvPath;
+         << "-ss" << seg2StartStr;
 
-    // Duration: limit to keyframe for 3-segment mode
+    // Input duration: exact distance from keyframe-before-TB to keyframe-after-TB.
+    // No margin — the encoder produces the exact number of frames needed, and
+    // -shortest (below) ensures audio matches video duration precisely.
     if (m_concatSegmentCount == 3)
     {
-        double segDuration = m_concatKeyframeTime - m_concatTbStartSeconds;
-        args << "-t" << QString::number(segDuration, 'f', 3);
+        double segInputDuration = m_concatKeyframeTime - m_concatKfBeforeTbStart;
+        args << "-t" << QString::number(segInputDuration, 'f', 3);
+        emit logMessage(
+            QString("Concat рендер: input duration сег.2 = %1с (keyframe %2 - start %3)")
+                .arg(segInputDuration, 0, 'f', 3)
+                .arg(m_concatKeyframeTime, 0, 'f', 3)
+                .arg(m_concatKfBeforeTbStart, 0, 'f', 3),
+            LogCategory::APP);
     }
 
-    // With -ss before -i (fast seek), output PTS starts from 0, but the
-    // external ASS file has events at original timestamps (~1271s).
-    // Use setpts to temporarily shift PTS forward so the subtitles filter
-    // matches, then shift back to 0.
+    args << "-i" << m_finalMkvPath;
+
+    // Build the video filter chain:
+    // 1. setpts to shift PTS to original timeline (for subtitle matching)
+    // 2. subtitles filter to burn hardsub
+    // 3. setpts to reset PTS back to 0
+    // 4. trim to skip B-frame overlap from segment 1
+    // 5. setpts to reset PTS after trim
     bool useHardsub = QFileInfo::exists(m_paths->processedSignsSubs());
+    QStringList vfParts;
     if (useHardsub)
     {
         QString signsPath = "'" + escapePathForFfmpegFilter(m_paths->processedSignsSubs()) + "'";
-        QString vf = QString("setpts=PTS+%1/TB,subtitles=%2,setpts=PTS-STARTPTS")
-                         .arg(tbStartStr, signsPath);
-        args << "-vf" << vf;
+        vfParts << QString("setpts=PTS+%1/TB").arg(seg2StartStr);
+        vfParts << QString("subtitles=%1").arg(signsPath);
+        vfParts << "setpts=PTS-STARTPTS";
     }
+    if (bframeOverlap > 0.001)
+    {
+        vfParts << QString("trim=start=%1").arg(bframeOverlap, 0, 'f', 3);
+        vfParts << "setpts=PTS-STARTPTS";
+    }
+    if (!vfParts.isEmpty())
+    {
+        args << "-vf" << vfParts.join(",");
+    }
+
+    // Video-only segment: audio will be taken from the continuous MKV track
+    // in the final join step, eliminating AAC splicing artefacts entirely.
+    args << "-an";
 
     args << "-c:v" << encoder;
 
@@ -1746,10 +1877,10 @@ void WorkflowManager::concatRenderSegment2()
         }
     }
 
-    args << "-c:a" << "copy"
-         << "-map" << "0:v:0"
-         << "-map" << "0:a:0";
+    args << "-map" << "0:v:0";
 
+    // Prevent TS muxer from adding initial buffering delays
+    args << "-muxdelay" << "0" << "-muxpreload" << "0";
     args << seg2Path;
 
     m_processManager->startProcess(m_ffmpegPath, args);
@@ -1768,27 +1899,29 @@ void WorkflowManager::concatCutSegment3()
     QStringList args;
     args << "-y";
 
+    // Video-only segment: audio will be taken from the continuous MKV track
+    // in the final join step, eliminating AAC splicing artefacts entirely.
     if (sourceIsMp4)
     {
         args << "-ss" << kfTimeStr
-             << "-i" << m_mkvFilePath   // original MP4 — video with correct DTS
-             << "-ss" << kfTimeStr
-             << "-i" << m_finalMkvPath  // assembled MKV — dubbed audio
-             << "-map" << "0:v:0"       // video from original MP4
-             << "-map" << "1:a:0"       // dubbed audio from assembled MKV
-             << "-c" << "copy"
+             << "-i" << m_mkvFilePath   // original MP4 — video only
+             << "-map" << "0:v:0"
+             << "-c:v" << "copy"
+             << "-an"
              << "-avoid_negative_ts" << "make_non_negative";
     }
     else
     {
         args << "-ss" << kfTimeStr
              << "-i" << m_finalMkvPath
-             << "-c" << "copy"
              << "-map" << "0:v:0"
-             << "-map" << "0:a:0"
+             << "-c:v" << "copy"
+             << "-an"
              << "-avoid_negative_ts" << "make_non_negative";
     }
 
+    // Prevent TS muxer from adding initial buffering delays
+    args << "-muxdelay" << "0" << "-muxpreload" << "0";
     args << seg3Path;
 
     m_processManager->startProcess(m_ffmpegPath, args);
@@ -1800,7 +1933,7 @@ void WorkflowManager::concatJoinSegments()
     m_currentStep = Step::ConcatJoin;
     emit progressUpdated(-1, "Concat: склейка");
 
-    // Write concat list file for the concat demuxer
+    // Write concat list file for the video-only TS segments.
     QString listPath = QDir(m_paths->resultPath).filePath("concat_list.txt");
     QFile listFile(listPath);
     if (!listFile.open(QIODevice::WriteOnly | QIODevice::Text))
@@ -1819,19 +1952,23 @@ void WorkflowManager::concatJoinSegments()
     }
     listFile.close();
 
-    // Concat demuxer → final MP4 directly.
-    // With matching B-frame structure across all segments (seg2 also has B-frames),
-    // the DTS at segment boundaries should be consistent and monotonic.
+    // Concat demuxer provides concatenated video from segments (input 0).
+    // Audio is taken from the continuous MKV track (input 1), which runs
+    // from 0 to end with no splices — this eliminates AAC priming artefacts,
+    // encoder delay mismatches, and audio-video duration drift that caused
+    // jumps and audio repeats at segment boundaries.
     QStringList args;
     args << "-y"
          << "-f" << "concat"
          << "-safe" << "0"
          << "-i" << QFileInfo(listPath).absoluteFilePath()
+         << "-i" << m_finalMkvPath
          << "-map" << "0:v:0"
-         << "-map" << "0:a:0"
-         << "-c" << "copy"
-         << "-bsf:a" << "aac_adtstoasc"
+         << "-map" << "1:a:0"
+         << "-c:v" << "copy"
+         << "-c:a" << "copy"
          << "-movflags" << "+faststart"
+         << "-shortest"
          << m_outputMp4Path;
 
     m_processManager->startProcess(m_ffmpegPath, args);

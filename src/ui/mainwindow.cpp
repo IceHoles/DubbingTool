@@ -697,6 +697,7 @@ void MainWindow::onUserInputRequired(const UserInputRequest &request)
     dialog.setTimeInputVisible(request.tbTimeRequired);
     if (request.tbTimeRequired) {
         dialog.setTimePrompt(request.tbTimeReason);
+        dialog.setVideoFile(request.videoFilePath, request.videoDurationS);
     }
 
     if (dialog.exec() == QDialog::Accepted) {

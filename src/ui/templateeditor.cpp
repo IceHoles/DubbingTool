@@ -17,6 +17,7 @@
 #include <QTextDocumentFragment>
 #include <QApplication>
 #include <QClipboard>
+#include <QMessageBox>
 #include <QPropertyAnimation>
 
 
@@ -68,7 +69,7 @@ TemplateEditor::TemplateEditor(QWidget *parent) :
         }
     });
 
-    connect(ui->buttonBox, &QDialogButtonBox::accepted, this, &TemplateEditor::accept);
+    connect(ui->buttonBox, &QDialogButtonBox::accepted, this, &TemplateEditor::slotValidateAndAccept);
     connect(ui->buttonBox, &QDialogButtonBox::rejected, this, &TemplateEditor::reject);
 }
 
@@ -338,4 +339,55 @@ void TemplateEditor::on_helpButton_clicked()
     dialogLayout->addWidget(scrollArea);
     helpDialog->setLayout(dialogLayout);
     helpDialog->show();
+}
+
+void TemplateEditor::slotValidateAndAccept()
+{
+    // Validate fields that will be used in file/directory names
+    QString seriesTitle = ui->seriesTitleEdit->text().trimmed();
+
+    if (containsForbiddenChars(seriesTitle))
+    {
+        QString found = forbiddenCharsFound(seriesTitle);
+        QMessageBox::warning(this, "Недопустимые символы",
+            QString("Название серии содержит символы, запрещённые в именах файлов Windows:\n\n"
+                    "  %1\n\n"
+                    "Запрещённые символы:  : \" < > | ? * '\n\n"
+                    "Пожалуйста, уберите их из названия.").arg(found));
+        ui->seriesTitleEdit->setFocus();
+        return;
+    }
+
+    accept();
+}
+
+bool TemplateEditor::containsForbiddenChars(const QString &text)
+{
+    static const QString kForbidden = ":\"<>|?*'";
+    for (const QChar &ch : text)
+    {
+        if (kForbidden.contains(ch))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+QString TemplateEditor::forbiddenCharsFound(const QString &text)
+{
+    static const QString kForbidden = ":\"<>|?*'";
+    QStringList found;
+    for (const QChar &ch : text)
+    {
+        if (kForbidden.contains(ch))
+        {
+            QString repr = (ch == '"') ? "\"" : QString(ch);
+            if (!found.contains(repr))
+            {
+                found.append(repr);
+            }
+        }
+    }
+    return found.join("  ");
 }

@@ -34,6 +34,8 @@ struct UserInputRequest {
     QStringList missingFonts;
     bool tbTimeRequired = false;
     QString tbTimeReason;
+    QString videoFilePath;       // Path to source video for TB viewfinder preview
+    double videoDurationS = 0.0; // Source video duration in seconds
 
     bool isValid() const {
         return audioFileRequired || !missingFonts.isEmpty() || tbTimeRequired;
@@ -275,6 +277,7 @@ private:
     double m_concatTbStartSeconds = 0.0;
     double m_concatTbEndSeconds = 0.0;
     double m_concatKeyframeTime = 0.0;
+    double m_concatKfBeforeTbStart = 0.0;
     int m_concatSegmentCount = 0;
     bool m_wasUserInputRequested = false;
     bool m_wereStylesRequested = false;

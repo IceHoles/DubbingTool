@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>500</width>
-    <height>460</height>
+    <width>750</width>
+    <height>640</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -83,25 +83,150 @@
      <property name="title">
       <string>Время эндинга (Начала ТБ)</string>
      </property>
-     <layout class="QFormLayout" name="formLayout2">
-      <item row="0" column="0" colspan="2">
+     <layout class="QVBoxLayout" name="timeGroupLayout">
+      <item>
        <widget class="QLabel" name="timeLabel">
         <property name="text">
-         <string>Не удалось определить время эндинга. Введите его вручную в формате Ч:ММ:СС.ммм:</string>
+         <string>Не удалось определить время эндинга. Используйте превью или введите время вручную:</string>
         </property>
         <property name="wordWrap">
          <bool>true</bool>
         </property>
        </widget>
       </item>
-      <item row="1" column="0" colspan="2">
-       <layout class="QHBoxLayout" name="horizontalLayout_2">
+      <item>
+       <widget class="QLabel" name="previewImageLabel">
+        <property name="minimumSize">
+         <size>
+          <width>640</width>
+          <height>270</height>
+         </size>
+        </property>
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="text">
+         <string>Загрузка превью...</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignmentFlag::AlignCenter</set>
+        </property>
+        <property name="styleSheet">
+         <string>background-color: #1a1a1a; color: #888;</string>
+        </property>
+        <property name="scaledContents">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QSlider" name="timeSlider">
+        <property name="orientation">
+         <enum>Qt::Orientation::Horizontal</enum>
+        </property>
+        <property name="minimum">
+         <number>0</number>
+        </property>
+        <property name="maximum">
+         <number>1000</number>
+        </property>
+        <property name="singleStep">
+         <number>10</number>
+        </property>
+        <property name="pageStep">
+         <number>100</number>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="timeControlsLayout">
+        <item>
+         <widget class="QPushButton" name="prevFrameButton">
+          <property name="text">
+           <string>◀|</string>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>36</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="toolTip">
+           <string>Предыдущий кадр</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="playPauseButton">
+          <property name="text">
+           <string>▶</string>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>36</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="toolTip">
+           <string>Воспроизведение / Пауза</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="nextFrameButton">
+          <property name="text">
+           <string>|▶</string>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>36</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="toolTip">
+           <string>Следующий кадр</string>
+          </property>
+         </widget>
+        </item>
         <item>
          <widget class="QTimeEdit" name="timeEdit">
           <property name="displayFormat">
            <string>H:mm:ss.zzz</string>
           </property>
          </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="previewFrameButton">
+          <property name="text">
+           <string>Показать кадр</string>
+          </property>
+          <property name="toolTip">
+           <string>Принудительно обновить превью</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="openInPlayerButton">
+          <property name="text">
+           <string>Открыть в плеере</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="timeControlsSpacer">
+          <property name="orientation">
+           <enum>Qt::Orientation::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
         </item>
        </layout>
       </item>

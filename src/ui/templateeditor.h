@@ -23,8 +23,12 @@ public:
 private slots:
     void on_selectStylesButton_clicked();
     void on_helpButton_clicked();
+    void slotValidateAndAccept();
 
 private:
+    static bool containsForbiddenChars(const QString &text);
+    static QString forbiddenCharsFound(const QString &text);
+
     Ui::TemplateEditor *ui;
 };
 
