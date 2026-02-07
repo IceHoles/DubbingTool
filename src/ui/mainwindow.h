@@ -6,6 +6,7 @@
 #include <QVariantMap>
 #include <QPointer>
 #include <QList>
+#include <QFile>
 #include "releasetemplate.h"
 #include "postgenerator.h"
 #include "workflowmanager.h"
@@ -85,6 +86,7 @@ private slots:
 
 private:
     Ui::MainWindow *ui;
+    QFile m_logFile;
     QMap<QString, ReleaseTemplate> m_templates;
     QString m_editingTemplateFileName;
 

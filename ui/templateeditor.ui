@@ -177,6 +177,16 @@
          </property>
         </widget>
        </item>
+       <item row="12" column="0" colspan="2">
+        <widget class="QCheckBox" name="useConcatRenderCheckBox">
+         <property name="toolTip">
+          <string>Перекодировать только сегмент с ТБ (титульным блоком), остальное видео копировать без перекодирования. Сохраняет оригинальное качество и значительно ускоряет рендер.</string>
+         </property>
+         <property name="text">
+          <string>Умный рендер (concat) — перекодировать только ТБ</string>
+         </property>
+        </widget>
+       </item>
       </layout>
      </widget>
      <widget class="QWidget" name="tabSubtitles">
@@ -414,83 +424,103 @@
           <widget class="QLineEdit" name="directorEdit"/>
          </item>
          <item row="4" column="0">
+          <widget class="QLabel" name="label_assistant_director">
+           <property name="text">
+            <string>Помощник режиссера:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="4" column="1">
+          <widget class="QLineEdit" name="assistantDirectorEdit"/>
+         </item>
+         <item row="5" column="0">
           <widget class="QLabel" name="label_13">
            <property name="text">
             <string>Звукорежиссер:</string>
            </property>
           </widget>
          </item>
-         <item row="4" column="1">
+         <item row="5" column="1">
           <widget class="QLineEdit" name="soundEngineerEdit"/>
          </item>
-         <item row="5" column="0">
+         <item row="6" column="0">
           <widget class="QLabel" name="label_16">
            <property name="text">
             <string>Звукорежиссер песен:</string>
            </property>
           </widget>
          </item>
-         <item row="5" column="1">
+         <item row="6" column="1">
           <widget class="QLineEdit" name="songsSoundEngineerEdit"/>
          </item>
-         <item row="6" column="0">
+         <item row="7" column="0">
           <widget class="QLabel" name="label_26">
            <property name="text">
             <string>Звукорежиссер эпизода:</string>
            </property>
           </widget>
          </item>
-         <item row="6" column="1">
+         <item row="7" column="1">
           <widget class="QLineEdit" name="episodeSoundEngineerEdit"/>
          </item>
-         <item row="7" column="0">
+         <item row="8" column="0">
           <widget class="QLabel" name="label_27">
            <property name="text">
             <string>Звукорежиссер записи:</string>
            </property>
           </widget>
          </item>
-         <item row="7" column="1">
+         <item row="8" column="1">
           <widget class="QLineEdit" name="recordingSoundEngineerEdit"/>
          </item>
-         <item row="8" column="0">
+         <item row="9" column="0">
+          <widget class="QLabel" name="label_video_localization">
+           <property name="text">
+            <string>Локализация видеоряда:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="9" column="1">
+          <widget class="QLineEdit" name="videoLocalizationAuthorEdit"/>
+         </item>
+         <item row="10" column="0">
           <widget class="QLabel" name="label_14">
            <property name="text">
             <string>Разметка:</string>
            </property>
           </widget>
          </item>
-         <item row="8" column="1">
+         <item row="10" column="1">
           <widget class="QLineEdit" name="timingAuthorEdit"/>
          </item>
-         <item row="9" column="0">
+         <item row="11" column="0">
           <widget class="QLabel" name="label_signs_author">
            <property name="text">
             <string>Локализация надписей:</string>
            </property>
           </widget>
          </item>
-         <item row="9" column="1">
+         <item row="11" column="1">
           <widget class="QLineEdit" name="signsAuthorEdit"/>
          </item>
-         <item row="10" column="0">
+         <item row="12" column="0">
           <widget class="QLabel" name="label_translation_editor">
            <property name="text">
             <string>Редактор перевода:</string>
            </property>
           </widget>
          </item>
-         <item row="10" column="1">
+         <item row="12" column="1">
           <widget class="QLineEdit" name="translationEditorEdit"/>
          </item>
-         <item row="11" column="0">
+         <item row="13" column="0">
           <widget class="QLabel" name="label_15">
            <property name="text">
             <string>Сборка релиза:</string>
            </property>
           </widget>
          </item>
-         <item row="11" column="1">
+         <item row="13" column="1">
           <widget class="QLineEdit" name="releaseBuilderEdit"/>
          </item>
         </layout>

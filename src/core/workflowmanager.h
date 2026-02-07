@@ -179,6 +179,13 @@ private:
                       AssemblingMkv,
                       RenderingMp4Pass1,
                       RenderingMp4Pass2,
+                      ConcatFindKeyframe,
+                      ConcatCutSegment1,
+                      ConcatRenderSegment2,
+                      ConcatCutSegment3,
+                      ConcatJoin,
+                      ConcatExtract,
+                      ConcatRemux,
                       _NormalizingAudio
     };
 
@@ -217,6 +224,16 @@ private:
     void assembleMkv(const QString &m_finalAudioPath);
     void renderMp4();
     void runRenderPass(Step pass);
+    void renderMp4Concat();
+    void concatFindKeyframe();
+    void concatCutSegment1();
+    void concatRenderSegment2();
+    void concatCutSegment3();
+    void concatJoinSegments();
+    void concatExtractH264();
+    void concatRemux();
+    void concatCleanup();
+    static QString concatEncoderForCodec(const QString& codecExtension);
     void prepareUserFiles();
     void finishWorkflow();
     void processSubtitles();
@@ -253,6 +270,12 @@ private:
     QString m_originalAudioPathBeforeNormalization;
 
     SourceFormat m_sourceFormat = SourceFormat::Unknown;
+
+    // Concat render state
+    double m_concatTbStartSeconds = 0.0;
+    double m_concatTbEndSeconds = 0.0;
+    double m_concatKeyframeTime = 0.0;
+    int m_concatSegmentCount = 0;
     bool m_wasUserInputRequested = false;
     bool m_wereStylesRequested = false;
     bool m_wereFontsRequested = false;
@@ -265,6 +288,8 @@ private:
         int id = -1;
         QString codecId;
         QString extension;
+        int bitrateKbps = 0;
+        QString frameRate; // e.g. "25/1", "24000/1001"
     };
 
     FontFinder *m_fontFinder;

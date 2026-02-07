@@ -898,7 +898,13 @@ void WorkflowManager::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
         return;
     }
 
-    if (exitCode != 0 || exitStatus != QProcess::NormalExit) {
+    // mkvmerge returns exit code 1 for warnings, which is still a success.
+    bool isMkvmergeStep = (m_currentStep == Step::AssemblingMkv ||
+                           m_currentStep == Step::AssemblingSrtMaster);
+    bool isMkvmergeWarning = (exitCode == 1 && isMkvmergeStep &&
+                              exitStatus == QProcess::NormalExit);
+
+    if ((exitCode != 0 && !isMkvmergeWarning) || exitStatus != QProcess::NormalExit) {
         emit logMessage("Ошибка выполнения дочернего процесса. Рабочий процесс остановлен.", LogCategory::APP);
         emit workflowAborted();
         return;
@@ -1002,7 +1008,11 @@ void WorkflowManager::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
             }
 
             emit mkvFileReady(m_finalMkvPath);
-            renderMp4();
+            if (m_template.useConcatRender && m_template.generateTb) {
+                renderMp4Concat();
+            } else {
+                renderMp4();
+            }
             break;
         }
         case Step::RenderingMp4Pass1:
@@ -1042,6 +1052,38 @@ void WorkflowManager::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
             connect(helper, &RenderHelper::finished, this, &WorkflowManager::onBitrateCheckFinished);
             connect(helper, &RenderHelper::showDialogRequest, this, &WorkflowManager::bitrateCheckRequest);
             helper->startCheck();
+            break;
+        }
+        // ---- Concat render steps ----
+        case Step::ConcatCutSegment1:
+        {
+            emit logMessage("Concat рендер: сегмент 1 готов.", LogCategory::APP);
+            concatRenderSegment2();
+            break;
+        }
+        case Step::ConcatRenderSegment2:
+        {
+            emit logMessage("Concat рендер: сегмент 2 (ТБ) готов.", LogCategory::APP);
+            if (m_concatSegmentCount == 3)
+            {
+                concatCutSegment3();
+            }
+            else
+            {
+                concatJoinSegments();
+            }
+            break;
+        }
+        case Step::ConcatCutSegment3:
+        {
+            emit logMessage("Concat рендер: сегмент 3 готов.", LogCategory::APP);
+            concatJoinSegments();
+            break;
+        }
+        case Step::ConcatJoin:
+        {
+            concatCleanup();
+            finishWorkflow();
             break;
         }
         default:
@@ -1430,6 +1472,425 @@ QStringList WorkflowManager::prepareCommandArguments(const QString& commandTempl
     return QProcess::splitCommand(processedTemplate);
 }
 
+// ==================== Smart Concat Render ====================
+
+QString WorkflowManager::concatEncoderForCodec(const QString& codecExtension)
+{
+    if (codecExtension == "h264")
+    {
+        return "libx264";
+    }
+    if (codecExtension == "h265")
+    {
+        return "libx265";
+    }
+    return "";
+}
+
+void WorkflowManager::renderMp4Concat()
+{
+    emit logMessage("Шаг 10: Умный рендер MP4 (concat) — перекодирование только ТБ...", LogCategory::APP);
+    emit progressUpdated(-1, "Concat рендер");
+
+    // Determine output path
+    m_outputMp4Path = m_finalMkvPath;
+    m_outputMp4Path.replace(".mkv", ".mp4");
+
+    // Validate that we have a supported video codec for re-encoding
+    QString encoder = concatEncoderForCodec(m_videoTrack.extension);
+    if (encoder.isEmpty())
+    {
+        emit logMessage("Concat рендер: неподдерживаемый кодек '" + m_videoTrack.extension
+                        + "'. Переключение на полный рендер.", LogCategory::APP);
+        renderMp4();
+        return;
+    }
+
+    // Calculate TB start/end in seconds
+    QString timeForTb = m_parsedEndingTime;
+    if (m_template.useManualTime && !m_template.endingStartTime.isEmpty())
+    {
+        timeForTb = m_template.endingStartTime;
+    }
+
+    QTime tbStartTime = QTime::fromString(timeForTb, "H:mm:ss.zzz");
+    if (!tbStartTime.isValid())
+    {
+        emit logMessage("Concat рендер: некорректное время начала ТБ '" + timeForTb
+                        + "'. Переключение на полный рендер.", LogCategory::APP);
+        renderMp4();
+        return;
+    }
+
+    m_concatTbStartSeconds = (tbStartTime.hour() * 3600.0) + (tbStartTime.minute() * 60.0)
+                             + tbStartTime.second() + (tbStartTime.msec() / 1000.0);
+
+    int tbLines = AssProcessor::calculateTbLineCount(m_template);
+    double tbDurationSeconds = tbLines * 3.0;
+    m_concatTbEndSeconds = m_concatTbStartSeconds + tbDurationSeconds;
+
+    emit logMessage(QString("Concat рендер: ТБ начало=%1с, длительность=%2с (%3 строк), конец=%4с, видео=%5с")
+                        .arg(m_concatTbStartSeconds, 0, 'f', 3)
+                        .arg(tbDurationSeconds, 0, 'f', 1)
+                        .arg(tbLines)
+                        .arg(m_concatTbEndSeconds, 0, 'f', 3)
+                        .arg(m_sourceDurationS),
+                    LogCategory::APP);
+
+    // Check if there is content after TB
+    if (m_concatTbEndSeconds >= static_cast<double>(m_sourceDurationS))
+    {
+        m_concatSegmentCount = 2;
+        emit logMessage("Concat рендер: ТБ в конце видео, используем 2 сегмента.", LogCategory::APP);
+    }
+    else
+    {
+        m_concatSegmentCount = 3;
+        emit logMessage("Concat рендер: после ТБ есть контент, используем 3 сегмента.", LogCategory::APP);
+    }
+
+    // Start by finding the keyframe after TB end (needed only for 3-segment mode)
+    if (m_concatSegmentCount == 3)
+    {
+        concatFindKeyframe();
+    }
+    else
+    {
+        // For 2 segments, no keyframe needed — go straight to cutting
+        m_concatKeyframeTime = static_cast<double>(m_sourceDurationS);
+        concatCutSegment1();
+    }
+}
+
+void WorkflowManager::concatFindKeyframe()
+{
+    emit logMessage("Concat рендер: поиск keyframe после конца ТБ...", LogCategory::APP);
+    m_currentStep = Step::ConcatFindKeyframe;
+
+    QString ffprobePath = AppSettings::instance().ffprobePath();
+    if (ffprobePath.isEmpty() || !QFileInfo::exists(ffprobePath))
+    {
+        emit logMessage("Concat рендер: ffprobe не найден. Переключение на полный рендер.", LogCategory::APP);
+        renderMp4();
+        return;
+    }
+
+    // Search for keyframes in a 10-second window after TB end
+    QString readInterval = QString("%1%%2")
+                               .arg(m_concatTbEndSeconds, 0, 'f', 3)
+                               .arg(m_concatTbEndSeconds + 10.0, 0, 'f', 3);
+
+    QStringList args;
+    args << "-v" << "quiet"
+         << "-select_streams" << "v:0"
+         << "-show_entries" << "frame=pts_time,key_frame"
+         << "-read_intervals" << readInterval
+         << "-of" << "json"
+         << m_finalMkvPath;
+
+    QByteArray output;
+    bool success = m_processManager->executeAndWait(ffprobePath, args, output);
+
+    if (!success || output.isEmpty())
+    {
+        emit logMessage("Concat рендер: не удалось получить данные о keyframe. Переключение на полный рендер.", LogCategory::APP);
+        renderMp4();
+        return;
+    }
+
+    // Parse JSON output from ffprobe
+    bool foundKeyframe = false;
+    QJsonDocument doc = QJsonDocument::fromJson(output);
+    QJsonArray frames = doc.object()["frames"].toArray();
+    for (const auto &frameVal : frames)
+    {
+        QJsonObject frame = frameVal.toObject();
+        if (frame["key_frame"].toInt() == 1)
+        {
+            bool ok = false;
+            double kfTime = frame["pts_time"].toString().toDouble(&ok);
+            if (ok && kfTime >= m_concatTbEndSeconds)
+            {
+                m_concatKeyframeTime = kfTime;
+                foundKeyframe = true;
+                break;
+            }
+        }
+    }
+
+    if (!foundKeyframe)
+    {
+        // No keyframe found after TB end — treat as 2-segment mode (TB extends to end)
+        emit logMessage("Concat рендер: keyframe после ТБ не найден. Переключение в 2-сегментный режим.", LogCategory::APP);
+        m_concatSegmentCount = 2;
+        m_concatKeyframeTime = static_cast<double>(m_sourceDurationS);
+    }
+    else
+    {
+        emit logMessage(QString("Concat рендер: найден keyframe на %1с (конец ТБ: %2с, разница: %3с)")
+                            .arg(m_concatKeyframeTime, 0, 'f', 3)
+                            .arg(m_concatTbEndSeconds, 0, 'f', 3)
+                            .arg(m_concatKeyframeTime - m_concatTbEndSeconds, 0, 'f', 3),
+                        LogCategory::APP);
+    }
+
+    concatCutSegment1();
+}
+
+void WorkflowManager::concatCutSegment1()
+{
+    emit logMessage("Concat рендер: вырезка сегмента 1 (до ТБ, копирование)...", LogCategory::APP);
+    m_currentStep = Step::ConcatCutSegment1;
+    emit progressUpdated(-1, "Concat: сегмент 1/3");
+
+    // MPEG-TS intermediate segments with timestamps starting at 0.
+    // mkvmerge will concatenate them sequentially and force exact frame durations.
+    QString seg1Path = QDir(m_paths->resultPath).filePath("concat_seg1.ts");
+
+    QString tbStartStr = QString::number(m_concatTbStartSeconds, 'f', 3);
+
+    QStringList args;
+    args << "-y";
+
+    bool sourceIsMp4 = (m_sourceFormat == SourceFormat::MP4);
+    if (sourceIsMp4)
+    {
+        args << "-i" << m_mkvFilePath   // original MP4 — video with correct DTS
+             << "-i" << m_finalMkvPath  // assembled MKV — dubbed audio
+             << "-to" << tbStartStr
+             << "-map" << "0:v:0"       // video from original MP4
+             << "-map" << "1:a:0"       // dubbed audio from assembled MKV
+             << "-c" << "copy"
+             << "-avoid_negative_ts" << "make_non_negative";
+    }
+    else
+    {
+        args << "-i" << m_finalMkvPath
+             << "-to" << tbStartStr
+             << "-map" << "0:v:0"
+             << "-map" << "0:a:0"
+             << "-c" << "copy"
+             << "-avoid_negative_ts" << "make_non_negative";
+    }
+
+    args << seg1Path;
+
+    m_processManager->startProcess(m_ffmpegPath, args);
+}
+
+void WorkflowManager::concatRenderSegment2()
+{
+    emit logMessage("Concat рендер: перекодирование сегмента 2 (ТБ с хардсабом)...", LogCategory::APP);
+    m_currentStep = Step::ConcatRenderSegment2;
+    emit progressUpdated(-1, "Concat: рендер ТБ");
+
+    bool sourceIsMp4 = (m_sourceFormat == SourceFormat::MP4);
+    QString seg2Path = QDir(m_paths->resultPath).filePath("concat_seg2.ts");
+    QString encoder = concatEncoderForCodec(m_videoTrack.extension);
+
+    QString tbStartStr = QString::number(m_concatTbStartSeconds, 'f', 3);
+
+    QStringList args;
+    args << "-y"
+         << "-ss" << tbStartStr
+         << "-i" << m_finalMkvPath;
+
+    // Duration: limit to keyframe for 3-segment mode
+    if (m_concatSegmentCount == 3)
+    {
+        double segDuration = m_concatKeyframeTime - m_concatTbStartSeconds;
+        args << "-t" << QString::number(segDuration, 'f', 3);
+    }
+
+    // With -ss before -i (fast seek), output PTS starts from 0, but the
+    // external ASS file has events at original timestamps (~1271s).
+    // Use setpts to temporarily shift PTS forward so the subtitles filter
+    // matches, then shift back to 0.
+    bool useHardsub = QFileInfo::exists(m_paths->processedSignsSubs());
+    if (useHardsub)
+    {
+        QString signsPath = "'" + escapePathForFfmpegFilter(m_paths->processedSignsSubs()) + "'";
+        QString vf = QString("setpts=PTS+%1/TB,subtitles=%2,setpts=PTS-STARTPTS")
+                         .arg(tbStartStr, signsPath);
+        args << "-vf" << vf;
+    }
+
+    args << "-c:v" << encoder;
+
+    // Quality settings: prefer source bitrate matching, fall back to CRF
+    if (m_videoTrack.bitrateKbps > 0)
+    {
+        QString bitrateStr = QString::number(m_videoTrack.bitrateKbps) + "k";
+        args << "-b:v" << bitrateStr << "-preset" << "medium";
+        emit logMessage(QString("Concat рендер: кодируем ТБ с битрейтом оригинала: %1").arg(bitrateStr), LogCategory::APP);
+
+        if (encoder == "libx264")
+        {
+            args << "-profile:v" << "high";
+        }
+        else if (encoder == "libx265")
+        {
+            args << "-tag:v" << "hvc1";
+        }
+    }
+    else
+    {
+        emit logMessage("Concat рендер: битрейт оригинала неизвестен, используем CRF.", LogCategory::APP);
+        if (encoder == "libx264")
+        {
+            args << "-crf" << "18" << "-preset" << "medium" << "-profile:v" << "high";
+        }
+        else if (encoder == "libx265")
+        {
+            args << "-crf" << "22" << "-preset" << "medium" << "-tag:v" << "hvc1";
+        }
+    }
+
+    args << "-c:a" << "copy"
+         << "-map" << "0:v:0"
+         << "-map" << "0:a:0";
+
+    args << seg2Path;
+
+    m_processManager->startProcess(m_ffmpegPath, args);
+}
+
+void WorkflowManager::concatCutSegment3()
+{
+    emit logMessage("Concat рендер: вырезка сегмента 3 (после ТБ, копирование)...", LogCategory::APP);
+    m_currentStep = Step::ConcatCutSegment3;
+    emit progressUpdated(-1, "Concat: сегмент 3/3");
+
+    bool sourceIsMp4 = (m_sourceFormat == SourceFormat::MP4);
+    QString seg3Path = QDir(m_paths->resultPath).filePath("concat_seg3.ts");
+    QString kfTimeStr = QString::number(m_concatKeyframeTime, 'f', 3);
+
+    QStringList args;
+    args << "-y";
+
+    if (sourceIsMp4)
+    {
+        args << "-ss" << kfTimeStr
+             << "-i" << m_mkvFilePath   // original MP4 — video with correct DTS
+             << "-ss" << kfTimeStr
+             << "-i" << m_finalMkvPath  // assembled MKV — dubbed audio
+             << "-map" << "0:v:0"       // video from original MP4
+             << "-map" << "1:a:0"       // dubbed audio from assembled MKV
+             << "-c" << "copy"
+             << "-avoid_negative_ts" << "make_non_negative";
+    }
+    else
+    {
+        args << "-ss" << kfTimeStr
+             << "-i" << m_finalMkvPath
+             << "-c" << "copy"
+             << "-map" << "0:v:0"
+             << "-map" << "0:a:0"
+             << "-avoid_negative_ts" << "make_non_negative";
+    }
+
+    args << seg3Path;
+
+    m_processManager->startProcess(m_ffmpegPath, args);
+}
+
+void WorkflowManager::concatJoinSegments()
+{
+    emit logMessage("Concat рендер: склейка сегментов...", LogCategory::APP);
+    m_currentStep = Step::ConcatJoin;
+    emit progressUpdated(-1, "Concat: склейка");
+
+    // Write concat list file for the concat demuxer
+    QString listPath = QDir(m_paths->resultPath).filePath("concat_list.txt");
+    QFile listFile(listPath);
+    if (!listFile.open(QIODevice::WriteOnly | QIODevice::Text))
+    {
+        emit logMessage("Concat рендер: не удалось создать файл списка. Переключение на полный рендер.", LogCategory::APP);
+        renderMp4();
+        return;
+    }
+
+    QTextStream stream(&listFile);
+    stream << "file 'concat_seg1.ts'\n";
+    stream << "file 'concat_seg2.ts'\n";
+    if (m_concatSegmentCount == 3)
+    {
+        stream << "file 'concat_seg3.ts'\n";
+    }
+    listFile.close();
+
+    // Concat demuxer → final MP4 directly.
+    // With matching B-frame structure across all segments (seg2 also has B-frames),
+    // the DTS at segment boundaries should be consistent and monotonic.
+    QStringList args;
+    args << "-y"
+         << "-f" << "concat"
+         << "-safe" << "0"
+         << "-i" << QFileInfo(listPath).absoluteFilePath()
+         << "-map" << "0:v:0"
+         << "-map" << "0:a:0"
+         << "-c" << "copy"
+         << "-bsf:a" << "aac_adtstoasc"
+         << "-movflags" << "+faststart"
+         << m_outputMp4Path;
+
+    m_processManager->startProcess(m_ffmpegPath, args);
+}
+
+void WorkflowManager::concatExtractH264()
+{
+    // Use mkvmerge to force CFR instead of raw H.264 extraction.
+    // mkvmerge preserves B-frame PTS ordering and fixes Non-monotonic DTS
+    // errors at segment boundaries by forcing each frame to exactly 1/fps duration.
+    emit logMessage("Concat рендер: принудительное CFR через mkvmerge...", LogCategory::APP);
+    m_currentStep = Step::ConcatExtract;
+    emit progressUpdated(-1, "Concat: CFR ремукс");
+
+    QString tempMp4Path = QDir(m_paths->resultPath).filePath("concat_temp.mp4");
+    QString tempMkvPath = QDir(m_paths->resultPath).filePath("concat_cfr.mkv");
+
+    QString fps = m_videoTrack.frameRate.isEmpty() ? "25" : m_videoTrack.frameRate;
+
+    QStringList args;
+    args << "-o" << tempMkvPath
+         << "--default-duration" << QString("0:%1p").arg(fps)
+         << tempMp4Path;
+
+    m_processManager->startProcess(m_mkvmergePath, args);
+}
+
+void WorkflowManager::concatRemux()
+{
+    emit logMessage("Concat рендер: конвертация MKV → MP4...", LogCategory::APP);
+    m_currentStep = Step::ConcatRemux;
+    emit progressUpdated(-1, "Concat: финальный MP4");
+
+    // Convert the CFR MKV (from mkvmerge) to MP4 with faststart for streaming.
+    QString tempMkvPath = QDir(m_paths->resultPath).filePath("concat_cfr.mkv");
+
+    QStringList args;
+    args << "-y"
+         << "-i" << tempMkvPath
+         << "-c" << "copy"
+         << "-movflags" << "+faststart"
+         << m_outputMp4Path;
+
+    m_processManager->startProcess(m_ffmpegPath, args);
+}
+
+void WorkflowManager::concatCleanup()
+{
+    emit logMessage("Concat рендер: очистка временных файлов...", LogCategory::APP);
+
+    QFile::remove(QDir(m_paths->resultPath).filePath("concat_seg1.ts"));
+    QFile::remove(QDir(m_paths->resultPath).filePath("concat_seg2.ts"));
+    QFile::remove(QDir(m_paths->resultPath).filePath("concat_seg3.ts"));
+    QFile::remove(QDir(m_paths->resultPath).filePath("concat_list.txt"));
+    emit logMessage("Concat рендер MP4 успешно завершен.", LogCategory::APP);
+}
+
+// ==================== End Smart Concat Render ====================
+
 void WorkflowManager::extractAttachments(const QJsonArray &attachments)
 {
     emit logMessage("Шаг 3: Извлечение вложенных шрифтов...", LogCategory::APP);
@@ -1491,9 +1952,18 @@ void WorkflowManager::onProcessStdOut(const QString &output)
             category = (m_sourceFormat == SourceFormat::MP4) ? LogCategory::FFMPEG : LogCategory::MKVTOOLNIX;
             break;
 
+        case Step::ConcatExtract:
+            category = LogCategory::MKVTOOLNIX;
+            break;
+
         case Step::ConvertingAudio:
         case Step::RenderingMp4Pass1:
         case Step::RenderingMp4Pass2:
+        case Step::ConcatCutSegment1:
+        case Step::ConcatRenderSegment2:
+        case Step::ConcatCutSegment3:
+        case Step::ConcatJoin:
+        case Step::ConcatRemux:
             category = LogCategory::FFMPEG;
             break;
 
@@ -1503,7 +1973,7 @@ void WorkflowManager::onProcessStdOut(const QString &output)
         emit logMessage(output, category);
     }
 
-    if (m_currentStep == Step::ExtractingTracks || m_currentStep == Step::ExtractingAttachments || m_currentStep == Step::AssemblingMkv || m_currentStep == Step::AssemblingSrtMaster)
+    if (m_currentStep == Step::ConcatExtract || m_currentStep == Step::ExtractingTracks || m_currentStep == Step::ExtractingAttachments || m_currentStep == Step::AssemblingMkv || m_currentStep == Step::AssemblingSrtMaster)
     {
         QRegularExpression re("Progress: (\\d+)%");
         auto it = re.globalMatch(output);
@@ -1531,9 +2001,18 @@ void WorkflowManager::onProcessStdErr(const QString &output)
             category = (m_sourceFormat == SourceFormat::MP4) ? LogCategory::FFMPEG : LogCategory::MKVTOOLNIX;
             break;
 
+        case Step::ConcatExtract:
+            category = LogCategory::MKVTOOLNIX;
+            break;
+
         case Step::ConvertingAudio:
         case Step::RenderingMp4Pass1:
         case Step::RenderingMp4Pass2:
+        case Step::ConcatCutSegment1:
+        case Step::ConcatRenderSegment2:
+        case Step::ConcatCutSegment3:
+        case Step::ConcatJoin:
+        case Step::ConcatRemux:
             category = LogCategory::FFMPEG;
             break;
 
@@ -1544,7 +2023,8 @@ void WorkflowManager::onProcessStdErr(const QString &output)
     }
 
     // И парсим прогресс
-    if (m_currentStep == Step::RenderingMp4Pass1 || m_currentStep == Step::RenderingMp4Pass2)
+    if (m_currentStep == Step::RenderingMp4Pass1 || m_currentStep == Step::RenderingMp4Pass2
+        || m_currentStep == Step::ConcatRenderSegment2)
     {
         QRegularExpression re("time=(\\d{2}):(\\d{2}):(\\d{2})\\.(\\d{2})");
         QRegularExpressionMatch match = re.match(output); // Используем match, т.к. ffmpeg пишет в stderr порциями
@@ -1705,7 +2185,20 @@ void WorkflowManager::getMp4Info()
             m_videoTrack.id = streamIndex;
             m_videoTrack.codecId = codecName;
             m_videoTrack.extension = getExtensionForFfprobeCodec(codecName);
-            emit logMessage(QString("Видеодорожка найдена: индекс %1, кодек %2").arg(streamIndex).arg(codecName), LogCategory::APP);
+
+            // Parse video bitrate (ffprobe reports in bps as string)
+            QString bitRateStr = stream["bit_rate"].toString();
+            if (!bitRateStr.isEmpty()) {
+                m_videoTrack.bitrateKbps = static_cast<int>(bitRateStr.toLongLong() / 1000);
+            }
+
+            // Parse frame rate (e.g. "25/1", "24000/1001")
+            m_videoTrack.frameRate = stream["r_frame_rate"].toString();
+
+            emit logMessage(QString("Видеодорожка найдена: индекс %1, кодек %2, битрейт %3 kbps, fps %4")
+                                .arg(streamIndex).arg(codecName).arg(m_videoTrack.bitrateKbps)
+                                .arg(m_videoTrack.frameRate),
+                            LogCategory::APP);
         }
         else if (codecType == "audio") {
             // Для MP4 от режиссёра берём все аудиодорожки

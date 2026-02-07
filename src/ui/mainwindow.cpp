@@ -69,6 +69,13 @@ MainWindow::MainWindow(QWidget *parent)
     ui->downloadProgressBar->setVisible(false);
     ui->progressLabel->setVisible(false);
 
+    // Open log file for writing (append mode, overwritten each launch)
+    m_logFile.setFileName("dubbing_tool.log");
+    if (!m_logFile.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text))
+    {
+        qWarning("Failed to open dubbing_tool.log for writing");
+    }
+
     loadTemplates();
 
     if(ui->templateComboBox->count() == 0) {
@@ -87,16 +94,27 @@ MainWindow::~MainWindow()
 
 void MainWindow::logMessage(const QString &message, LogCategory category)
 {
-    const auto& enabledCategories = AppSettings::instance().enabledLogCategories();
-    if (!enabledCategories.contains(category)) {
-        return;
-    }
-
     QString categoryName = logCategoryToString(category);
     QString timedMessage = QString("[%1] %2 - %3")
                                .arg(categoryName)
                                .arg(QDateTime::currentDateTime().toString("hh:mm:ss"))
                                .arg(message.trimmed());
+
+    // Always write to log file (all categories)
+    if (m_logFile.isOpen())
+    {
+        m_logFile.write(timedMessage.toUtf8());
+        m_logFile.write("\n");
+        m_logFile.flush();
+    }
+
+    // Filter for UI display
+    const auto& enabledCategories = AppSettings::instance().enabledLogCategories();
+    if (!enabledCategories.contains(category))
+    {
+        return;
+    }
+
     ui->logOutput->appendPlainText(timedMessage);
 }
 

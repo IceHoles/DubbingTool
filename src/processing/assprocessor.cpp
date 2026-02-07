@@ -504,7 +504,16 @@ QStringList AssProcessor::generateTb(const ReleaseTemplate &t, const QString &st
     QString directorLabel = (t.voiceoverType == ReleaseTemplate::VoiceoverType::Voiceover)
                                 ? "Куратор закадра: "
                                 : "Режиссёр дубляжа: ";
-    if (!t.director.isEmpty()) tbLines.append(generateDialogueLine(directorLabel + t.director));
+    if (!t.director.isEmpty())
+    {
+        QStringList directorBlock;
+        directorBlock << directorLabel + t.director;
+        if (!t.assistantDirector.isEmpty())
+        {
+            directorBlock << QString("Помощник режиссёра: %1").arg(t.assistantDirector);
+        }
+        tbLines.append(generateDialogueLine(directorBlock.join("\\N")));
+    }
 
     QStringList soundEngineersBlock;
     if (!t.soundEngineer.isEmpty()) {
@@ -526,6 +535,11 @@ QStringList AssProcessor::generateTb(const ReleaseTemplate &t, const QString &st
     }
     if (!studioSoundEngineersBlock.isEmpty()) {
         tbLines.append(generateDialogueLine(studioSoundEngineersBlock.join("\\N")));
+    }
+
+    if (!t.videoLocalizationAuthor.isEmpty())
+    {
+        tbLines.append(generateDialogueLine("Локализация видеоряда: " + t.videoLocalizationAuthor));
     }
 
     QStringList authorsBlock;

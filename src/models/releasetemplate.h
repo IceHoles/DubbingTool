@@ -54,10 +54,12 @@ public:
     bool isCustomTranslation = false;       // Свой перевод или нет
     bool createSrtMaster = false;           // Нужен ли .mkv с .srt и аудио без сжатия
     QString director;                       // Режиссер
+    QString assistantDirector;              // Помощник режиссера
     QString soundEngineer;                  // Звукорежиссер
     QString songsSoundEngineer;             // Звукорежиссер песен
     QString episodeSoundEngineer;           // Звукорежиссер эпизода
     QString recordingSoundEngineer;         // Звукорежиссер записи
+    QString videoLocalizationAuthor;        // Локализация видеоряда
     QString timingAuthor;                   // Разметка (тайминг)
     QString signsAuthor;                    // Локализация надписей
     QString translationEditor;              // Редактор перевода
@@ -69,6 +71,7 @@ public:
     QString targetAudioFormat = "aac";      // Формат аудио для .mkv
     bool forceSignStyleRequest = false;     // Всегда запрашивать стили для надписей
     bool pauseForSubEdit = false;           // Пауза для ручной правки субтитров
+    bool useConcatRender = false;           // Умный рендер: перекодировать только ТБ, остальное копировать
     QMap<QString, QString> substitutions;   // Карта замен "Найти" -> "Заменить на"
 
     // Шаблоны для постов

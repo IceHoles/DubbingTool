@@ -90,6 +90,7 @@ void TemplateEditor::setTemplate(const ReleaseTemplate &t)
     ui->targetAudioFormatComboBox->setCurrentText(t.targetAudioFormat);
     ui->createSrtMasterCheckBox->setChecked(t.createSrtMaster);
     ui->isCustomTranslationCheckBox->setChecked(t.isCustomTranslation);
+    ui->useConcatRenderCheckBox->setChecked(t.useConcatRender);
     ui->renderPresetComboBox->clear();
     for(const auto& preset : AppSettings::instance().renderPresets()) {
         ui->renderPresetComboBox->addItem(preset.name);
@@ -113,10 +114,12 @@ void TemplateEditor::setTemplate(const ReleaseTemplate &t)
     }
     ui->castEdit->setPlainText(t.cast.join(", "));
     ui->directorEdit->setText(t.director);
+    ui->assistantDirectorEdit->setText(t.assistantDirector);
     ui->soundEngineerEdit->setText(t.soundEngineer);
     ui->songsSoundEngineerEdit->setText(t.songsSoundEngineer);
     ui->episodeSoundEngineerEdit->setText(t.episodeSoundEngineer);
     ui->recordingSoundEngineerEdit->setText(t.recordingSoundEngineer);
+    ui->videoLocalizationAuthorEdit->setText(t.videoLocalizationAuthor);
     ui->timingAuthorEdit->setText(t.timingAuthor);
     ui->signsAuthorEdit->setText(t.signsAuthor);
     ui->translationEditorEdit->setText(t.translationEditor);
@@ -166,6 +169,7 @@ ReleaseTemplate TemplateEditor::getTemplate() const
     t.targetAudioFormat = ui->targetAudioFormatComboBox->currentText();
     t.createSrtMaster = ui->createSrtMasterCheckBox->isChecked();
     t.isCustomTranslation = ui->isCustomTranslationCheckBox->isChecked();
+    t.useConcatRender = ui->useConcatRenderCheckBox->isChecked();
     t.renderPresetName = ui->renderPresetComboBox->currentText();
 
     // Вкладка "Создание ТБ"
@@ -182,10 +186,12 @@ ReleaseTemplate TemplateEditor::getTemplate() const
     QRegularExpression rx("((\\, )|\\,|\\n)");
     t.cast = ui->castEdit->toPlainText().split(rx, Qt::SkipEmptyParts);
     t.director = ui->directorEdit->text().trimmed();
+    t.assistantDirector = ui->assistantDirectorEdit->text().trimmed();
     t.soundEngineer = ui->soundEngineerEdit->text().trimmed();
     t.songsSoundEngineer = ui->songsSoundEngineerEdit->text().trimmed();
     t.episodeSoundEngineer = ui->episodeSoundEngineerEdit->text().trimmed();
     t.recordingSoundEngineer = ui->recordingSoundEngineerEdit->text().trimmed();
+    t.videoLocalizationAuthor = ui->videoLocalizationAuthorEdit->text().trimmed();
     t.timingAuthor = ui->timingAuthorEdit->text().trimmed();
     t.signsAuthor = ui->signsAuthorEdit->text().trimmed();
     t.translationEditor = ui->translationEditorEdit->text().trimmed();

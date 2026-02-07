@@ -43,10 +43,12 @@ void ReleaseTemplate::read(const QJsonObject &json)
     createSrtMaster = json["createSrtMaster"].toBool(false);
     isCustomTranslation = json["isCustomTranslation"].toBool(false);
     director = json["director"].toString();
+    assistantDirector = json["assistantDirector"].toString();
     soundEngineer = json["soundEngineer"].toString();
     songsSoundEngineer = json["songsSoundEngineer"].toString();
     episodeSoundEngineer = json["episodeSoundEngineer"].toString();
     recordingSoundEngineer = json["recordingSoundEngineer"].toString();
+    videoLocalizationAuthor = json["videoLocalizationAuthor"].toString();
     timingAuthor = json["timingAuthor"].toString();
     signsAuthor = json["signsAuthor"].toString();
     translationEditor = json["translationEditor"].toString();
@@ -54,6 +56,7 @@ void ReleaseTemplate::read(const QJsonObject &json)
     targetAudioFormat = json["targetAudioFormat"].toString("aac");
     forceSignStyleRequest = json["forceSignStyleRequest"].toBool(false);
     pauseForSubEdit = json["pauseForSubEdit"].toBool(false);
+    useConcatRender = json["useConcatRender"].toBool(false);
 
     QString typeStr = json["voiceoverType"].toString("Dubbing");
     voiceoverType = (typeStr == "Voiceover") ? VoiceoverType::Voiceover : VoiceoverType::Dubbing;
@@ -110,10 +113,12 @@ void ReleaseTemplate::write(QJsonObject &json) const
     json["createSrtMaster"] = createSrtMaster;
     json["isCustomTranslation"] = isCustomTranslation;
     json["director"] = director;
+    json["assistantDirector"] = assistantDirector;
     json["soundEngineer"] = soundEngineer;
     json["songsSoundEngineer"] = songsSoundEngineer;
     json["episodeSoundEngineer"] = episodeSoundEngineer;
     json["recordingSoundEngineer"] = recordingSoundEngineer;
+    json["videoLocalizationAuthor"] = videoLocalizationAuthor;
     json["timingAuthor"] = timingAuthor;
     json["signsAuthor"] = signsAuthor;
     json["translationEditor"] = translationEditor;
@@ -123,6 +128,7 @@ void ReleaseTemplate::write(QJsonObject &json) const
     json["targetAudioFormat"] = targetAudioFormat;
     json["forceSignStyleRequest"] = forceSignStyleRequest;
     json["pauseForSubEdit"] = pauseForSubEdit;
+    json["useConcatRender"] = useConcatRender;
 
     json["voiceoverType"] = (voiceoverType == VoiceoverType::Voiceover) ? "Voiceover" : "Dubbing";
 
