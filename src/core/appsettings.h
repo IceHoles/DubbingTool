@@ -79,9 +79,12 @@ public:
     RenderPreset findRenderPreset(const QString& name) const;
     void setManualRenderPreset();
     RenderPreset manualRenderPreset(const QString& name) const;
+    bool isSetupCompleted() const;
+    void setSetupCompleted(bool completed);
 
 private:
     void loadDefaults();
+    bool m_setupCompleted = false;
     QSet<LogCategory> m_enabledLogCategories;
     QString m_qbittorrentHost;
     int m_qbittorrentPort;

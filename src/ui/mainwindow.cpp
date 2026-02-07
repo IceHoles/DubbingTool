@@ -5,6 +5,7 @@
 #include "manualrenderer.h"
 #include "templateeditor.h"
 #include "settingsdialog.h"
+#include "setupwizarddialog.h"
 #include "postgenerator.h"
 #include "styleselectordialog.h"
 #include "torrentselectordialog.h"
@@ -55,6 +56,13 @@ MainWindow::MainWindow(QWidget *parent)
     QAction *settingsAction = new QAction("Настройки", this);
     ui->menubar->addAction(settingsAction);
     connect(settingsAction, &QAction::triggered, this, &MainWindow::on_actionSettings_triggered);
+
+    QAction *setupWizardAction = new QAction("Мастер настройки", this);
+    ui->menubar->addAction(setupWizardAction);
+    connect(setupWizardAction, &QAction::triggered, this, [this]() {
+        SetupWizardDialog wizard(this);
+        wizard.exec();
+    });
     connect(m_manualAssemblyWidget, &ManualAssemblyWidget::templateDataRequested, this, &MainWindow::onRequestTemplateData);
 
     connect(m_manualAssemblyWidget, &ManualAssemblyWidget::assemblyRequested, this, &MainWindow::startManualAssembly);

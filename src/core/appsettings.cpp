@@ -39,6 +39,7 @@ AppSettings::AppSettings(QObject *parent) : QObject(parent) {}
 void AppSettings::load() {
     QSettings settings("MyCompany", "DubbingTool");
 
+    m_setupCompleted = settings.value("general/setupCompleted", false).toBool();
     m_qbittorrentHost = settings.value("webUi/host", "http://127.0.0.1").toString();
     m_qbittorrentPort = settings.value("webUi/port", 8080).toInt();
     m_qbittorrentUser = settings.value("webUi/user", "admin").toString();
@@ -101,6 +102,7 @@ void AppSettings::save() {
     settings.setValue("paths/ffmpeg", m_ffmpegPath);
     settings.setValue("paths/qbittorrent", m_qbittorrentPath);
     settings.setValue("paths/nugenAmb", m_nugenAmbPath);
+    settings.setValue("general/setupCompleted", m_setupCompleted);
     settings.setValue("general/deleteTempFiles", m_deleteTempFiles);
     settings.setValue("general/userFileAction", static_cast<int>(m_userFileAction));
 
@@ -239,3 +241,5 @@ QList<TbStyleInfo> AppSettings::tbStyles() const { return m_tbStyles; }
 void AppSettings::setTbStyles(const QList<TbStyleInfo> &styles) { m_tbStyles = styles; }
 QList<RenderPreset> AppSettings::renderPresets() const { return m_renderPresets; }
 void AppSettings::setRenderPresets(const QList<RenderPreset> &presets) { m_renderPresets = presets; }
+bool AppSettings::isSetupCompleted() const { return m_setupCompleted; }
+void AppSettings::setSetupCompleted(bool completed) { m_setupCompleted = completed; }

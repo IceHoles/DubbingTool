@@ -46,6 +46,7 @@ set(SOURCES_UI
     src/ui/publicationwidget.cpp
     src/ui/rerenderdialog.cpp
     src/ui/settingsdialog.cpp
+    src/ui/setupwizarddialog.cpp
     src/ui/styleselectordialog.cpp
     src/ui/templateeditor.cpp
     src/ui/torrentselectordialog.cpp
@@ -81,6 +82,7 @@ set(HEADERS_UI
     src/ui/publicationwidget.h
     src/ui/rerenderdialog.h
     src/ui/settingsdialog.h
+    src/ui/setupwizarddialog.h
     src/ui/styleselectordialog.h
     src/ui/templateeditor.h
     src/ui/torrentselectordialog.h
