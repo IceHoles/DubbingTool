@@ -1,11 +1,11 @@
 #include "fontfinder.h"
 
-#include <QFile>
-#include <QTextStream>
-#include <QFileInfo>
 #include <QDir>
+#include <QFile>
+#include <QFileInfo>
 #include <QRegularExpression>
 #include <QStringConverter>
+#include <QTextStream>
 #include <QTimer>
 
 #include <dwrite.h>
@@ -14,8 +14,7 @@
 
 using Microsoft::WRL::ComPtr;
 
-FontFinder::FontFinder(QObject* parent)
-    : QObject(parent)
+FontFinder::FontFinder(QObject* parent) : QObject(parent)
 {
     initDirectWrite();
 }
@@ -27,10 +26,8 @@ FontFinder::~FontFinder()
 
 bool FontFinder::initDirectWrite()
 {
-    HRESULT hr = DWriteCreateFactory(
-        DWRITE_FACTORY_TYPE_SHARED,
-        __uuidof(IDWriteFactory),
-        reinterpret_cast<IUnknown**>(&m_dwriteFactory));
+    HRESULT hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
+                                     reinterpret_cast<IUnknown**>(&m_dwriteFactory));
 
     if (FAILED(hr) || m_dwriteFactory == nullptr)
     {
@@ -38,8 +35,7 @@ bool FontFinder::initDirectWrite()
     }
 
     auto* factory = static_cast<IDWriteFactory*>(m_dwriteFactory);
-    hr = factory->GetSystemFontCollection(
-        reinterpret_cast<IDWriteFontCollection**>(&m_fontCollection), FALSE);
+    hr = factory->GetSystemFontCollection(reinterpret_cast<IDWriteFontCollection**>(&m_fontCollection), FALSE);
 
     return SUCCEEDED(hr) && m_fontCollection != nullptr;
 }
@@ -61,90 +57,94 @@ void FontFinder::cleanupDirectWrite()
 void FontFinder::findFontsInSubs(const QStringList& subFilesToCheck)
 {
     // Use QTimer to make this async and not block the UI
-    QTimer::singleShot(0, this, [this, subFilesToCheck]() {
-        FontFinderResult result;
-
-        if (m_dwriteFactory == nullptr || m_fontCollection == nullptr)
+    QTimer::singleShot(
+        0, this,
+        [this, subFilesToCheck]()
         {
-            emit logMessage("Ошибка: не удалось инициализировать DirectWrite", LogCategory::APP);
-            emit finished(result);
-            return;
-        }
+            FontFinderResult result;
 
-        if (subFilesToCheck.isEmpty())
-        {
-            emit finished(result);
-            return;
-        }
-
-        // Collect additional font directories (attached_fonts next to ASS files)
-        QStringList additionalFontDirs;
-        for (const QString& assPath : subFilesToCheck)
-        {
-            QFileInfo fileInfo(assPath);
-            QString attachedFontsDir = fileInfo.absolutePath() + "/attached_fonts";
-            if (QDir(attachedFontsDir).exists())
+            if (m_dwriteFactory == nullptr || m_fontCollection == nullptr)
             {
-                additionalFontDirs.append(attachedFontsDir);
+                emit logMessage("Ошибка: не удалось инициализировать DirectWrite", LogCategory::APP);
+                emit finished(result);
+                return;
             }
-        }
 
-        // Load additional fonts
-        QMap<QString, QString> additionalFonts = loadAdditionalFonts(additionalFontDirs);
-
-        // Parse all ASS files and collect unique font styles
-        QSet<AssStyleInfo> allStyles;
-        for (const QString& assPath : subFilesToCheck)
-        {
-            QSet<AssStyleInfo> fileStyles = parseAssFile(assPath);
-            allStyles.unite(fileStyles);
-        }
-
-        emit logMessage(QString("Найдено %1 уникальных шрифтовых стилей для поиска").arg(allStyles.size()), LogCategory::APP);
-
-        // Track which fonts we've already found to avoid duplicates
-        QSet<QString> foundPaths;
-
-        // Find each font
-        for (const AssStyleInfo& style : allStyles)
-        {
-            QString fontPath = findFontFile(style, additionalFontDirs);
-
-            if (!fontPath.isEmpty() && !foundPaths.contains(fontPath))
+            if (subFilesToCheck.isEmpty())
             {
-                foundPaths.insert(fontPath);
-                FoundFontInfo info;
-                info.path = fontPath;
-                info.familyName = style.fontName;
-                result.foundFonts.append(info);
-                emit logMessage(QString("Найден шрифт: %1 -> %2").arg(style.fontName, fontPath), LogCategory::APP);
+                emit finished(result);
+                return;
             }
-            else if (fontPath.isEmpty())
+
+            // Collect additional font directories (attached_fonts next to ASS files)
+            QStringList additionalFontDirs;
+            for (const QString& assPath : subFilesToCheck)
             {
-                // Only add to not found if we haven't found any variant of this font
-                bool alreadyFound = false;
-                for (const FoundFontInfo& found : result.foundFonts)
+                QFileInfo fileInfo(assPath);
+                QString attachedFontsDir = fileInfo.absolutePath() + "/attached_fonts";
+                if (QDir(attachedFontsDir).exists())
                 {
-                    if (found.familyName.compare(style.fontName, Qt::CaseInsensitive) == 0)
+                    additionalFontDirs.append(attachedFontsDir);
+                }
+            }
+
+            // Load additional fonts
+            QMap<QString, QString> additionalFonts = loadAdditionalFonts(additionalFontDirs);
+
+            // Parse all ASS files and collect unique font styles
+            QSet<AssStyleInfo> allStyles;
+            for (const QString& assPath : subFilesToCheck)
+            {
+                QSet<AssStyleInfo> fileStyles = parseAssFile(assPath);
+                allStyles.unite(fileStyles);
+            }
+
+            emit logMessage(QString("Найдено %1 уникальных шрифтовых стилей для поиска").arg(allStyles.size()),
+                            LogCategory::APP);
+
+            // Track which fonts we've already found to avoid duplicates
+            QSet<QString> foundPaths;
+
+            // Find each font
+            for (const AssStyleInfo& style : allStyles)
+            {
+                QString fontPath = findFontFile(style, additionalFontDirs);
+
+                if (!fontPath.isEmpty() && !foundPaths.contains(fontPath))
+                {
+                    foundPaths.insert(fontPath);
+                    FoundFontInfo info;
+                    info.path = fontPath;
+                    info.familyName = style.fontName;
+                    result.foundFonts.append(info);
+                    emit logMessage(QString("Найден шрифт: %1 -> %2").arg(style.fontName, fontPath), LogCategory::APP);
+                }
+                else if (fontPath.isEmpty())
+                {
+                    // Only add to not found if we haven't found any variant of this font
+                    bool alreadyFound = false;
+                    for (const FoundFontInfo& found : result.foundFonts)
                     {
-                        alreadyFound = true;
-                        break;
+                        if (found.familyName.compare(style.fontName, Qt::CaseInsensitive) == 0)
+                        {
+                            alreadyFound = true;
+                            break;
+                        }
+                    }
+                    if (!alreadyFound && !result.notFoundFontNames.contains(style.fontName))
+                    {
+                        result.notFoundFontNames.append(style.fontName);
+                        emit logMessage(QString("Шрифт не найден: %1 (Bold: %2, Italic: %3)")
+                                            .arg(style.fontName)
+                                            .arg(style.bold ? "да" : "нет")
+                                            .arg(style.italic ? "да" : "нет"),
+                                        LogCategory::APP);
                     }
                 }
-                if (!alreadyFound && !result.notFoundFontNames.contains(style.fontName))
-                {
-                    result.notFoundFontNames.append(style.fontName);
-                    emit logMessage(QString("Шрифт не найден: %1 (Bold: %2, Italic: %3)")
-                                        .arg(style.fontName)
-                                        .arg(style.bold ? "да" : "нет")
-                                        .arg(style.italic ? "да" : "нет"),
-                        LogCategory::APP);
-                }
             }
-        }
 
-        emit finished(result);
-    });
+            emit finished(result);
+        });
 }
 
 QSet<AssStyleInfo> FontFinder::parseAssFile(const QString& filePath)
@@ -522,7 +522,10 @@ QMap<QString, QString> FontFinder::loadAdditionalFonts(const QStringList& dirs) 
             // Use filename without extension as family name (rough approximation)
             QString baseName = fileInfo.baseName().toLower();
             // Remove common suffixes like -Bold, -Italic, etc.
-            baseName = baseName.replace(QRegularExpression(R"([-_](bold|italic|regular|light|medium|semibold|black|thin|heavy|oblique|condensed|expanded))"), "");
+            baseName = baseName.replace(
+                QRegularExpression(
+                    R"([-_](bold|italic|regular|light|medium|semibold|black|thin|heavy|oblique|condensed|expanded))"),
+                "");
             fonts[baseName] = fileInfo.absoluteFilePath();
         }
     }

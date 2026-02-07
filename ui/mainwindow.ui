@@ -81,7 +81,7 @@
             <item>
              <widget class="QLineEdit" name="mkvPathLineEdit">
               <property name="placeholderText">
-               <string>Выберите .mkv файл</string>
+               <string>Выберите .mkv или .mp4 файл</string>
               </property>
              </widget>
             </item>

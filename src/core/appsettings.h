@@ -62,6 +62,7 @@ public:
     void setMkvextractPath(const QString &path);
     QString ffmpegPath() const;
     void setFfmpegPath(const QString &path);
+    QString ffprobePath() const;
     QString qbittorrentPath() const;
     void setQbittorrentPath(const QString &path);
     QString nugenAmbPath() const;

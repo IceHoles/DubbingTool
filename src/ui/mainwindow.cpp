@@ -376,7 +376,7 @@ void MainWindow::on_startButton_clicked()
 
 void MainWindow::on_selectMkvButton_clicked()
 {
-    QString filePath = QFileDialog::getOpenFileName(this, "Выберите MKV файл", "", "MKV файлы (*.mkv)");
+    QString filePath = QFileDialog::getOpenFileName(this, "Выберите видеофайл", "", "Видеофайлы (*.mkv *.mp4)");
     if (filePath.isEmpty()) {
         return;
     }

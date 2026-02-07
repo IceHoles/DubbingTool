@@ -25,12 +25,10 @@ void RenderHelper::startCheck()
 
     emit logMessage("Проверка битрейта финального файла...");
     QByteArray jsonData;
-    QString ffmpegPath = AppSettings::instance().ffmpegPath();
-    QFileInfo ffmpegInfo(ffmpegPath);
-    QString ffprobePath = QDir(ffmpegInfo.absolutePath()).filePath("ffprobe.exe");
+    QString ffprobePath = AppSettings::instance().ffprobePath();
 
     if (!QFileInfo::exists(ffprobePath)) {
-        emit logMessage("Не удалось найти ffprobe.exe рядом с ffmpeg.exe по пути: " + ffprobePath);
+        emit logMessage("Не удалось найти ffprobe.exe. Проверьте настройки пути к ffmpeg.");
         emit finished(RerenderDecision::Accept, m_preset);
         this->deleteLater();
         return;

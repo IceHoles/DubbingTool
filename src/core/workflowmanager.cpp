@@ -96,17 +96,24 @@ void WorkflowManager::startWithManualFile(const QString &filePath)
     m_paths = new PathManager(baseDownloadPath);
     emit logMessage("Структура папок создана в: " + m_paths->basePath, LogCategory::APP);
 
-    QString newMkvPath = handleUserFile(filePath, m_paths->sourcesPath);
-    if (newMkvPath.isEmpty()) {
-        emit logMessage("Критическая ошибка: не удалось переместить указанный MKV файл.", LogCategory::APP);
+    QString newPath = handleUserFile(filePath, m_paths->sourcesPath);
+    if (newPath.isEmpty()) {
+        emit logMessage("Критическая ошибка: не удалось переместить указанный видеофайл.", LogCategory::APP);
         emit workflowAborted();
         return;
     }
 
-    m_mkvFilePath = newMkvPath;
+    m_mkvFilePath = newPath;
+    m_sourceFormat = detectSourceFormat(m_mkvFilePath);
     m_mainWindow->findChild<QLineEdit*>("mkvPathLineEdit")->setText(m_mkvFilePath);
-    emit logMessage("Работа mkv с файлом, указанным вручную: " + m_mkvFilePath, LogCategory::APP);
-    getMkvInfo();
+
+    if (m_sourceFormat == SourceFormat::MP4) {
+        emit logMessage("Работа с MP4 файлом, указанным вручную: " + m_mkvFilePath, LogCategory::APP);
+        getMp4Info();
+    } else {
+        emit logMessage("Работа с MKV файлом, указанным вручную: " + m_mkvFilePath, LogCategory::APP);
+        getMkvInfo();
+    }
 }
 
 void WorkflowManager::onRssDownloaded(QNetworkReply *reply)
@@ -617,6 +624,7 @@ void WorkflowManager::getMkvInfo()
 {
     prepareUserFiles();
 
+    m_sourceFormat = SourceFormat::MKV;
     emit logMessage("Шаг 2: Получение информации о файле MKV...", LogCategory::APP);
 
     m_currentStep = Step::GettingMkvInfo;
@@ -901,7 +909,11 @@ void WorkflowManager::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
         case Step::ExtractingAttachments:
         {
             emit logMessage("Извлечение вложений завершено.", LogCategory::APP);
-            extractTracks();
+            if (m_sourceFormat == SourceFormat::MP4) {
+                extractTracksMp4();
+            } else {
+                extractTracks();
+            }
             break;
         }
         case Step::ExtractingTracks:
@@ -1469,11 +1481,14 @@ void WorkflowManager::onProcessStdOut(const QString &output)
         LogCategory category = LogCategory::DEBUG;
         switch (m_currentStep) {
         case Step::AssemblingMkv:
-        case Step::ExtractingTracks:
-        case Step::ExtractingAttachments:
         case Step::AssemblingSrtMaster:
         case Step::GettingMkvInfo:
             category = LogCategory::MKVTOOLNIX;
+            break;
+
+        case Step::ExtractingTracks:
+        case Step::ExtractingAttachments:
+            category = (m_sourceFormat == SourceFormat::MP4) ? LogCategory::FFMPEG : LogCategory::MKVTOOLNIX;
             break;
 
         case Step::ConvertingAudio:
@@ -1506,11 +1521,14 @@ void WorkflowManager::onProcessStdErr(const QString &output)
         LogCategory category = LogCategory::DEBUG;
         switch (m_currentStep) {
         case Step::AssemblingMkv:
-        case Step::ExtractingTracks:
-        case Step::ExtractingAttachments:
         case Step::AssemblingSrtMaster:
         case Step::GettingMkvInfo:
             category = LogCategory::MKVTOOLNIX;
+            break;
+
+        case Step::ExtractingTracks:
+        case Step::ExtractingAttachments:
+            category = (m_sourceFormat == SourceFormat::MP4) ? LogCategory::FFMPEG : LogCategory::MKVTOOLNIX;
             break;
 
         case Step::ConvertingAudio:
@@ -1610,6 +1628,164 @@ QString WorkflowManager::getExtensionForCodec(const QString &codecId)
     return "bin";
 }
 
+QString WorkflowManager::getExtensionForFfprobeCodec(const QString &codecName)
+{
+    // Видео
+    if (codecName == "h264") return "h264";
+    if (codecName == "hevc") return "h265";
+    if (codecName == "av1") return "ivf";
+    if (codecName == "vp8") return "ivf";
+    if (codecName == "vp9") return "ivf";
+
+    // Аудио
+    if (codecName == "aac") return "aac";
+    if (codecName == "ac3") return "ac3";
+    if (codecName == "eac3") return "eac3";
+    if (codecName == "dts") return "dts";
+    if (codecName == "flac") return "flac";
+    if (codecName == "opus") return "opus";
+    if (codecName == "vorbis") return "ogg";
+    if (codecName == "mp3") return "mp3";
+
+    // Фоллбэк
+    emit logMessage(QString("Предупреждение: неизвестный кодек ffprobe '%1', будет использовано расширение .bin").arg(codecName), LogCategory::APP);
+    return "bin";
+}
+
+SourceFormat WorkflowManager::detectSourceFormat(const QString &filePath)
+{
+    QString ext = QFileInfo(filePath).suffix().toLower();
+    if (ext == "mkv") return SourceFormat::MKV;
+    if (ext == "mp4") return SourceFormat::MP4;
+    return SourceFormat::Unknown;
+}
+
+void WorkflowManager::getMp4Info()
+{
+    prepareUserFiles();
+
+    emit logMessage("Шаг 2: Получение информации о файле MP4 (ffprobe)...", LogCategory::APP);
+    m_currentStep = Step::GettingMkvInfo;
+
+    QString ffprobePath = AppSettings::instance().ffprobePath();
+
+    if (!QFileInfo::exists(ffprobePath)) {
+        emit logMessage("Критическая ошибка: ffprobe.exe не найден. Проверьте настройки пути к ffmpeg.", LogCategory::APP);
+        emit workflowAborted();
+        return;
+    }
+
+    QByteArray jsonData;
+    QStringList args = {"-v", "quiet", "-print_format", "json", "-show_streams", "-show_format", m_mkvFilePath};
+    bool success = m_processManager->executeAndWait(ffprobePath, args, jsonData);
+
+    if (!success || jsonData.isEmpty()) {
+        emit logMessage("Не удалось получить информацию о MP4 файле через ffprobe.", LogCategory::APP);
+        emit workflowAborted();
+        return;
+    }
+
+    QJsonDocument doc = QJsonDocument::fromJson(jsonData);
+    QJsonObject root = doc.object();
+    QJsonArray streams = root["streams"].toArray();
+
+    // Получаем длительность из format
+    if (root.contains("format")) {
+        m_sourceDurationS = static_cast<qint64>(root["format"].toObject()["duration"].toString().toDouble());
+    }
+
+    m_foundAudioTracks.clear();
+    for (const auto &val : streams) {
+        QJsonObject stream = val.toObject();
+        QString codecType = stream["codec_type"].toString();
+        QString codecName = stream["codec_name"].toString();
+        int streamIndex = stream["index"].toInt();
+
+        if (codecType == "video" && m_videoTrack.id == -1) {
+            m_videoTrack.id = streamIndex;
+            m_videoTrack.codecId = codecName;
+            m_videoTrack.extension = getExtensionForFfprobeCodec(codecName);
+            emit logMessage(QString("Видеодорожка найдена: индекс %1, кодек %2").arg(streamIndex).arg(codecName), LogCategory::APP);
+        }
+        else if (codecType == "audio") {
+            // Для MP4 от режиссёра берём все аудиодорожки
+            QString language = "und";
+            if (stream.contains("tags")) {
+                language = stream["tags"].toObject()["language"].toString("und");
+            }
+
+            AudioTrackInfo info;
+            info.id = streamIndex;
+            info.codec = codecName;
+            info.language = language;
+            info.name = stream.contains("tags") ? stream["tags"].toObject()["title"].toString() : "";
+            m_foundAudioTracks.append(info);
+        }
+    }
+
+    if (m_videoTrack.id == -1) {
+        emit logMessage("Критическая ошибка: в MP4 файле не найдена видеодорожка.", LogCategory::APP);
+        emit workflowAborted();
+        return;
+    }
+
+    // Обработка аудиодорожек
+    if (m_foundAudioTracks.isEmpty()) {
+        emit logMessage("Предупреждение: в MP4 файле не найдено аудиодорожек. Оригинал не будет добавлен в сборку.", LogCategory::APP);
+    } else if (m_foundAudioTracks.size() == 1) {
+        const auto &track = m_foundAudioTracks.first();
+        m_originalAudioTrack.id = track.id;
+        m_originalAudioTrack.codecId = track.codec;
+        m_originalAudioTrack.extension = getExtensionForFfprobeCodec(track.codec);
+        emit logMessage(QString("Найдена одна аудиодорожка (индекс: %1, кодек: %2).").arg(track.id).arg(track.codec), LogCategory::APP);
+    } else {
+        emit logMessage(QString("Найдено %1 аудиодорожек. Требуется выбор пользователя...").arg(m_foundAudioTracks.size()), LogCategory::APP);
+        emit multipleAudioTracksFound(m_foundAudioTracks);
+        return;
+    }
+
+    // MP4 не содержит attachments (шрифтов) - пропускаем этот шаг
+    emit logMessage("MP4 файл не содержит вложенных шрифтов. Пропускаем извлечение вложений.", LogCategory::APP);
+    m_currentStep = Step::ExtractingAttachments;
+    QMetaObject::invokeMethod(this, "onProcessFinished", Qt::QueuedConnection, Q_ARG(int, 0), Q_ARG(QProcess::ExitStatus, QProcess::NormalExit));
+}
+
+void WorkflowManager::extractTracksMp4()
+{
+    emit logMessage("Шаг 4: Извлечение дорожек из MP4 (ffmpeg)...", LogCategory::APP);
+    m_currentStep = Step::ExtractingTracks;
+
+    if (m_videoTrack.id == -1) {
+        emit logMessage("Критическая ошибка: в файле отсутствует видеодорожка. Извлечение невозможно.", LogCategory::APP);
+        emit workflowAborted();
+        return;
+    }
+
+    // Извлекаем видео и аудио одной командой ffmpeg
+    QStringList args;
+    args << "-y" << "-i" << m_mkvFilePath;
+
+    // Видео
+    QString videoOutPath = m_paths->extractedVideo(m_videoTrack.extension);
+    args << "-map" << QString("0:%1").arg(m_videoTrack.id) << "-c" << "copy" << videoOutPath;
+
+    // Аудио
+    if (m_originalAudioTrack.id != -1) {
+        QString audioOutPath = m_paths->extractedAudio(m_originalAudioTrack.extension);
+        args << "-map" << QString("0:%1").arg(m_originalAudioTrack.id) << "-c" << "copy" << audioOutPath;
+    }
+
+    // Субтитры в MP4 не извлекаем — используем override subs
+    if (!m_overrideSubsPath.isEmpty()) {
+        emit logMessage("Используются внешние субтитры: " + m_overrideSubsPath, LogCategory::APP);
+    } else if (m_template.sourceHasSubtitles) {
+        emit logMessage("Предупреждение: MP4 файл не содержит субтитров формата ASS. Укажите субтитры через 'Свои субтитры'.", LogCategory::APP);
+    }
+
+    emit progressUpdated(-1, "Извлечение дорожек (ffmpeg)");
+    m_processManager->startProcess(m_ffmpegPath, args);
+}
+
 void WorkflowManager::resumeWithUserInput(const UserInputResponse &response)
 {
     if (!response.isValid()) {
@@ -1683,7 +1859,9 @@ void WorkflowManager::resumeWithSelectedAudioTrack(int trackId)
         if (track.id == trackId) {
             m_originalAudioTrack.id = track.id;
             m_originalAudioTrack.codecId = track.codec;
-            m_originalAudioTrack.extension = getExtensionForCodec(track.codec);
+            m_originalAudioTrack.extension = (m_sourceFormat == SourceFormat::MP4)
+                ? getExtensionForFfprobeCodec(track.codec)
+                : getExtensionForCodec(track.codec);
             found = true;
             break;
         }
@@ -1697,15 +1875,22 @@ void WorkflowManager::resumeWithSelectedAudioTrack(int trackId)
 
     emit logMessage("Пользователь выбрал аудиодорожку с ID: " + QString::number(trackId) + ". Продолжаем...", LogCategory::APP);
 
-    QByteArray jsonData;
-    m_processManager->executeAndWait(m_mkvmergePath, {"-J", m_mkvFilePath}, jsonData);
-    QJsonDocument doc = QJsonDocument::fromJson(jsonData);
-    if (doc.object().contains("attachments")) {
-        extractAttachments(doc.object()["attachments"].toArray());
-    } else {
-        emit logMessage("Вложений в файле не найдено.", LogCategory::APP);
+    if (m_sourceFormat == SourceFormat::MP4) {
+        // MP4 не содержит attachments — сразу переходим к извлечению треков
+        emit logMessage("MP4 файл не содержит вложенных шрифтов. Пропускаем извлечение вложений.", LogCategory::APP);
         m_currentStep = Step::ExtractingAttachments;
         QMetaObject::invokeMethod(this, "onProcessFinished", Qt::QueuedConnection, Q_ARG(int, 0), Q_ARG(QProcess::ExitStatus, QProcess::NormalExit));
+    } else {
+        QByteArray jsonData;
+        m_processManager->executeAndWait(m_mkvmergePath, {"-J", m_mkvFilePath}, jsonData);
+        QJsonDocument doc = QJsonDocument::fromJson(jsonData);
+        if (doc.object().contains("attachments")) {
+            extractAttachments(doc.object()["attachments"].toArray());
+        } else {
+            emit logMessage("Вложений в файле не найдено.", LogCategory::APP);
+            m_currentStep = Step::ExtractingAttachments;
+            QMetaObject::invokeMethod(this, "onProcessFinished", Qt::QueuedConnection, Q_ARG(int, 0), Q_ARG(QProcess::ExitStatus, QProcess::NormalExit));
+        }
     }
 }
 

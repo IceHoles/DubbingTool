@@ -1,6 +1,7 @@
 #include "appsettings.h"
 #include <QStandardPaths>
 #include <QDir>
+#include <QFileInfo>
 
 
 static QString findExecutablePath(const QString &exeName) {
@@ -174,6 +175,25 @@ QString AppSettings::mkvextractPath() const { return m_mkvextractPath; }
 void AppSettings::setMkvextractPath(const QString &path) { m_mkvextractPath = path; }
 QString AppSettings::ffmpegPath() const { return m_ffmpegPath; }
 void AppSettings::setFfmpegPath(const QString &path) { m_ffmpegPath = path; }
+
+QString AppSettings::ffprobePath() const
+{
+    // 1. Ищем рядом с ffmpeg
+    QFileInfo ffmpegInfo(m_ffmpegPath);
+    QString candidate = QDir(ffmpegInfo.absolutePath()).filePath("ffprobe.exe");
+    if (QFileInfo::exists(candidate)) {
+        return candidate;
+    }
+
+    // 2. Ищем в PATH
+    QString inPath = QStandardPaths::findExecutable("ffprobe.exe");
+    if (!inPath.isEmpty()) {
+        return inPath;
+    }
+
+    // 3. Фоллбэк — вернём предполагаемый путь (вызывающий код проверит существование)
+    return candidate;
+}
 QString AppSettings::qbittorrentPath() const { return m_qbittorrentPath; }
 void AppSettings::setQbittorrentPath(const QString &path) { m_qbittorrentPath = path; }
 QString AppSettings::nugenAmbPath() const { return m_nugenAmbPath; }

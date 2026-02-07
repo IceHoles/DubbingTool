@@ -26,6 +26,8 @@ class AssProcessor;
 class MainWindow;
 class ProcessManager;
 
+enum class SourceFormat { MKV, MP4, Unknown };
+
 struct UserInputRequest {
     bool audioFileRequired = false;
     bool isWavRequired = false;
@@ -55,9 +57,31 @@ struct PathManager {
     QString ruAudioPath;
     QString resultPath;
 
+    /**
+     * @brief Replaces characters that are forbidden in Windows file/directory names.
+     *
+     * Forbidden characters: : " < > | ? *
+     * Apostrophe (') is also replaced as it causes issues with ffmpeg filter paths.
+     */
+    static QString sanitizeForPath(const QString& name)
+    {
+        QString result = name;
+        result.replace(':', ' ');
+        result.replace('"', ' ');
+        result.replace('<', ' ');
+        result.replace('>', ' ');
+        result.replace('|', ' ');
+        result.replace('?', ' ');
+        result.replace('*', ' ');
+        result.replace('\'', ' ');
+        // Collapse multiple spaces into one
+        result = result.simplified();
+        return result;
+    }
+
     // Конструктор, который создает все папки
     PathManager(const QString& baseSavePath) {
-        basePath = baseSavePath;
+        basePath = sanitizeForPath(baseSavePath);
         sourcesPath = QDir(basePath).filePath("Sources");
         subsPath = QDir(basePath).filePath("Processed Subs");
         ruAudioPath = QDir(basePath).filePath("RU Audio");
@@ -82,9 +106,9 @@ struct PathManager {
 
     QString convertedRuAudio(const QString& extension) const { return QDir(ruAudioPath).filePath("russian_audio." + extension); }
 
-    QString finalMkv(const QString& fileName) const { return QDir(resultPath).filePath(fileName); }
-    QString finalMp4(const QString& fileName) const { return QDir(resultPath).filePath(fileName); }
-    QString masterMkv(const QString& fileName) const { return QDir(resultPath).filePath(fileName); }
+    QString finalMkv(const QString& fileName) const { return QDir(resultPath).filePath(sanitizeForPath(fileName)); }
+    QString finalMp4(const QString& fileName) const { return QDir(resultPath).filePath(sanitizeForPath(fileName)); }
+    QString masterMkv(const QString& fileName) const { return QDir(resultPath).filePath(sanitizeForPath(fileName)); }
 };
 
 class WorkflowManager : public QObject
@@ -182,8 +206,10 @@ private:
     void getTorrentFiles();
     QString findMkvFileInSavePath();
     void getMkvInfo();
+    void getMp4Info();
     QString parseChaptersWithMkvExtract();
     void extractTracks();
+    void extractTracksMp4();
     void extractAttachments(const QJsonArray &attachments);
     void audioPreparation();
     void convertAudioIfNeeded();
@@ -199,6 +225,8 @@ private:
 
     QStringList prepareCommandArguments(const QString &commandTemplate);
     QString getExtensionForCodec(const QString& codecId);
+    QString getExtensionForFfprobeCodec(const QString& codecName);
+    static SourceFormat detectSourceFormat(const QString& filePath);
     QString handleUserFile(const QString& sourcePath, const QString& destDir, const QString& newName = "");
     QString getInfohashFromMagnet(const QString& magnetLink) const;
 
@@ -224,6 +252,7 @@ private:
     QString m_overrideSignsPath;
     QString m_originalAudioPathBeforeNormalization;
 
+    SourceFormat m_sourceFormat = SourceFormat::Unknown;
     bool m_wasUserInputRequested = false;
     bool m_wereStylesRequested = false;
     bool m_wereFontsRequested = false;

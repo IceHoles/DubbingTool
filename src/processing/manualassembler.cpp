@@ -107,8 +107,7 @@ void ManualAssembler::convertAudio()
 
     emit logMessage("Определение длительности аудиофайла...", LogCategory::APP);
     QByteArray jsonData;
-    QFileInfo ffmpegInfo(AppSettings::instance().ffmpegPath());
-    QString ffprobePath = QDir(ffmpegInfo.absolutePath()).filePath("ffprobe.exe");
+    QString ffprobePath = AppSettings::instance().ffprobePath();
     QStringList ffprobeArgs = {"-v", "error", "-show_format", "-print_format", "json", audioPath};
 
     m_sourceAudioDurationS = 0.0;
