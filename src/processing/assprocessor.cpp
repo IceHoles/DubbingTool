@@ -932,35 +932,73 @@ bool AssProcessor::applySubstitutions(const QString &filePath, const QMap<QStrin
 
 int AssProcessor::calculateTbLineCount(const ReleaseTemplate &t)
 {
-    if (!t.generateTb) {
+    if (!t.generateTb)
+    {
         return 0;
     }
+
     int lineCount = 0;
-    lineCount++;
-    if (!t.cast.isEmpty()) {
+
+    // 1. Title line ("Дублировано/Озвучено ТО Дубляжная в YYYY году")
+    ++lineCount;
+
+    // 2. Cast chunks (same chunking logic as generateTbLines)
+    if (!t.cast.isEmpty())
+    {
         int castSize = t.cast.size();
-        while (castSize > 0) {
-            lineCount++;
+        while (castSize > 0)
+        {
+            ++lineCount;
             int chunkSize = 4;
-            if (castSize == 3) {
-                chunkSize = 3;
-            } else if (castSize == 5) {
+            if (castSize == 5)
+            {
                 chunkSize = 5;
-            } else if (castSize == 6) {
+            }
+            else if (castSize == 6)
+            {
                 chunkSize = 3;
             }
             castSize -= chunkSize;
         }
     }
-    if (!t.director.isEmpty()) lineCount++;
-    if (!t.soundEngineer.isEmpty()) lineCount++;
-    bool hasAuthorsBlock = !t.timingAuthor.isEmpty() ||
-                           !t.signsAuthor.isEmpty() ||
-                           !t.translationEditor.isEmpty() ||
-                           !t.subAuthor.isEmpty();
-    if (hasAuthorsBlock) {
-        lineCount++;
+
+    // 3. Director block (director + optional assistant director)
+    if (!t.director.isEmpty())
+    {
+        ++lineCount;
     }
-    if (!t.releaseBuilder.isEmpty()) lineCount++;
+
+    // 4. Sound engineers block (soundEngineer and/or songsSoundEngineer)
+    if (!t.soundEngineer.isEmpty() || !t.songsSoundEngineer.isEmpty())
+    {
+        ++lineCount;
+    }
+
+    // 5. Studio sound engineers block (episodeSoundEngineer and/or recordingSoundEngineer)
+    if (!t.episodeSoundEngineer.isEmpty() || !t.recordingSoundEngineer.isEmpty())
+    {
+        ++lineCount;
+    }
+
+    // 6. Video localization author
+    if (!t.videoLocalizationAuthor.isEmpty())
+    {
+        ++lineCount;
+    }
+
+    // 7. Authors block (timing, signs, translation editor, sub author)
+    bool hasAuthorsBlock = !t.timingAuthor.isEmpty() || !t.signsAuthor.isEmpty()
+                           || !t.translationEditor.isEmpty() || !t.subAuthor.isEmpty();
+    if (hasAuthorsBlock)
+    {
+        ++lineCount;
+    }
+
+    // 8. Release builder
+    if (!t.releaseBuilder.isEmpty())
+    {
+        ++lineCount;
+    }
+
     return lineCount;
 }
