@@ -354,6 +354,7 @@ void MissingFilesDialog::advancePlayback()
 
     if (m_playbackTimeS > m_videoDurationS)
     {
+        m_extractionInProgress = false;
         stopPlayback();
         return;
     }
@@ -388,12 +389,20 @@ void MissingFilesDialog::startExtraction(double timeS)
     QString ffmpegPath = AppSettings::instance().ffmpegPath();
     if (ffmpegPath.isEmpty() || !QFileInfo::exists(ffmpegPath))
     {
+        m_extractionInProgress = false;
         ui->previewImageLabel->setText("FFmpeg не найден, превью недоступно");
+        if (m_isPlaying)
+        {
+            stopPlayback();
+        }
         return;
     }
 
     m_extractionInProgress = true;
-    m_pendingSeekTimeS = -1.0;
+    // Do NOT reset m_pendingSeekTimeS here — it is consumed exclusively
+    // by slotExtractionFinished.  Clearing it here creates a race where
+    // a user click between singleShot scheduling and execution loses its
+    // pending request.
 
     QString timeStr = formatTime(timeS);
 
@@ -411,8 +420,6 @@ void MissingFilesDialog::startExtraction(double timeS)
 
 void MissingFilesDialog::slotExtractionFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
-    m_extractionInProgress = false;
-
     if (exitStatus == QProcess::NormalExit && exitCode == 0)
     {
         showExtractedFrame();
@@ -421,9 +428,16 @@ void MissingFilesDialog::slotExtractionFinished(int exitCode, QProcess::ExitStat
     // Defer next extraction to the next event loop iteration.
     // Restarting QProcess from within its own finished() handler
     // can fail silently on Windows if the process handle isn't fully released yet.
+    //
+    // IMPORTANT: keep m_extractionInProgress == true while chaining to
+    // the next extraction so that user clicks during the singleShot gap
+    // are properly queued via m_pendingSeekTimeS instead of racing to
+    // call startExtraction on an already-running QProcess.
     if (m_pendingSeekTimeS >= 0.0)
     {
         double pending = m_pendingSeekTimeS;
+        m_pendingSeekTimeS = -1.0;
+        // m_extractionInProgress stays true — chaining to next extraction
         QTimer::singleShot(0, this, [this, pending]() {
             startExtraction(pending);
         });
@@ -432,13 +446,23 @@ void MissingFilesDialog::slotExtractionFinished(int exitCode, QProcess::ExitStat
 
     if (m_isPlaying)
     {
+        // m_extractionInProgress stays true — playback will chain next extraction
         QTimer::singleShot(0, this, [this]() {
             if (m_isPlaying)
             {
                 advancePlayback();
             }
+            else
+            {
+                // User paused during the singleShot gap — release the lock
+                m_extractionInProgress = false;
+            }
         });
+        return;
     }
+
+    // No pending work and not playing — release the extraction lock
+    m_extractionInProgress = false;
 }
 
 void MissingFilesDialog::slotExtractionError(QProcess::ProcessError error)
@@ -454,7 +478,8 @@ void MissingFilesDialog::slotExtractionError(QProcess::ProcessError error)
             stopPlayback();
         }
     }
-    // Other errors (Crashed, Timedout) are followed by finished() signal
+    // Other errors (Crashed, Timedout) are followed by finished() signal,
+    // which will release m_extractionInProgress.
 }
 
 void MissingFilesDialog::showExtractedFrame()
