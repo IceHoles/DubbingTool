@@ -215,30 +215,30 @@ QString AppSettings::ffprobePath() const
     const QString kAppDir = QCoreApplication::applicationDirPath();
     QString candidate = QDir(kAppDir).filePath("tools/ffprobe.exe");
     if (QFileInfo::exists(candidate)) {
-        return candidate;
+        return QDir::toNativeSeparators(candidate);
     }
 
     // 2. Ищем рядом с exe
     candidate = QDir(kAppDir).filePath("ffprobe.exe");
     if (QFileInfo::exists(candidate)) {
-        return candidate;
+        return QDir::toNativeSeparators(candidate);
     }
 
     // 3. Ищем рядом с ffmpeg
     QFileInfo ffmpegInfo(m_ffmpegPath);
     candidate = QDir(ffmpegInfo.absolutePath()).filePath("ffprobe.exe");
     if (QFileInfo::exists(candidate)) {
-        return candidate;
+        return QDir::toNativeSeparators(candidate);
     }
 
     // 4. Ищем в PATH
     QString inPath = QStandardPaths::findExecutable("ffprobe.exe");
     if (!inPath.isEmpty()) {
-        return inPath;
+        return QDir::toNativeSeparators(inPath);
     }
 
     // 5. Фоллбэк — вернём предполагаемый путь (вызывающий код проверит существование)
-    return candidate;
+    return QDir::toNativeSeparators(candidate);
 }
 QString AppSettings::qbittorrentPath() const { return m_qbittorrentPath; }
 void AppSettings::setQbittorrentPath(const QString &path) { m_qbittorrentPath = path; }
