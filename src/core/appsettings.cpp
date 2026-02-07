@@ -29,6 +29,17 @@ static QString findExecutablePath(const QString &exeName) {
     return exeName;
 }
 
+/**
+ * @brief Load a tool path from settings, re-detecting if the stored path no longer exists.
+ */
+static QString loadToolPath(const QSettings &settings, const QString &key, const QString &exeName) {
+    QString stored = settings.value(key).toString();
+    if (!stored.isEmpty() && QFileInfo::exists(stored)) {
+        return stored;
+    }
+    return findExecutablePath(exeName);
+}
+
 AppSettings& AppSettings::instance() {
     static AppSettings self;
     return self;
@@ -44,10 +55,10 @@ void AppSettings::load() {
     m_qbittorrentPort = settings.value("webUi/port", 8080).toInt();
     m_qbittorrentUser = settings.value("webUi/user", "admin").toString();
     m_qbittorrentPassword = settings.value("webUi/password", "").toString();
-    m_mkvmergePath = settings.value("paths/mkvmerge", findExecutablePath("mkvmerge.exe")).toString();
-    m_mkvextractPath = settings.value("paths/mkvextract", findExecutablePath("mkvextract.exe")).toString();
-    m_ffmpegPath = settings.value("paths/ffmpeg", findExecutablePath("ffmpeg.exe")).toString();
-    m_qbittorrentPath = settings.value("paths/qbittorrent", findExecutablePath("qbittorrent.exe")).toString();
+    m_mkvmergePath = loadToolPath(settings, "paths/mkvmerge", "mkvmerge.exe");
+    m_mkvextractPath = loadToolPath(settings, "paths/mkvextract", "mkvextract.exe");
+    m_ffmpegPath = loadToolPath(settings, "paths/ffmpeg", "ffmpeg.exe");
+    m_qbittorrentPath = loadToolPath(settings, "paths/qbittorrent", "qbittorrent.exe");
     m_nugenAmbPath = settings.value("paths/nugenAmb", "").toString();
     m_deleteTempFiles = settings.value("general/deleteTempFiles", true).toBool();
     m_userFileAction = static_cast<UserFileAction>(settings.value("general/userFileAction", static_cast<int>(UserFileAction::UseOriginalPath)).toInt());
