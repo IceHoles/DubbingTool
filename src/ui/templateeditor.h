@@ -1,23 +1,24 @@
 #ifndef TEMPLATEEDITOR_H
 #define TEMPLATEEDITOR_H
 
-#include <QDialog>
 #include "releasetemplate.h"
 
+#include <QDialog>
 
-namespace Ui {
+namespace Ui
+{
 class TemplateEditor;
-}
+} // namespace Ui
 
 class TemplateEditor : public QDialog
 {
     Q_OBJECT
 
 public:
-    explicit TemplateEditor(QWidget *parent = nullptr);
+    explicit TemplateEditor(QWidget* parent = nullptr);
     ~TemplateEditor();
 
-    void setTemplate(const ReleaseTemplate &t);
+    void setTemplate(const ReleaseTemplate& t);
     ReleaseTemplate getTemplate() const;
 
 private slots:
@@ -26,10 +27,10 @@ private slots:
     void slotValidateAndAccept();
 
 private:
-    static bool containsForbiddenChars(const QString &text);
-    static QString forbiddenCharsFound(const QString &text);
+    static bool containsForbiddenChars(const QString& text);
+    static QString forbiddenCharsFound(const QString& text);
 
-    Ui::TemplateEditor *ui;
+    Ui::TemplateEditor* ui;
 };
 
 #endif // TEMPLATEEDITOR_H

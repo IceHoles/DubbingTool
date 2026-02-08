@@ -1,35 +1,41 @@
 #include "releasetemplate.h"
+
 #include <QJsonArray>
 #include <QJsonObject>
 
-
-ReleaseTemplate::ReleaseTemplate() {}
+ReleaseTemplate::ReleaseTemplate()
+{
+}
 
 // Вспомогательная функция для чтения QMap<QString, QUrl> из QJsonObject
-static QMap<QString, QUrl> readUrlMap(const QJsonObject &json) {
+static QMap<QString, QUrl> readUrlMap(const QJsonObject& json)
+{
     QMap<QString, QUrl> map;
-    for (auto it = json.constBegin(); it != json.constEnd(); ++it) {
+    for (auto it = json.constBegin(); it != json.constEnd(); ++it)
+    {
         map.insert(it.key(), QUrl(it.value().toString()));
     }
     return map;
 }
 
 // Вспомогательная функция для записи QMap<QString, QUrl> в QJsonObject
-static QJsonObject writeUrlMap(const QMap<QString, QUrl> &map) {
+static QJsonObject writeUrlMap(const QMap<QString, QUrl>& map)
+{
     QJsonObject json;
-    for (auto it = map.constBegin(); it != map.constEnd(); ++it) {
+    for (auto it = map.constBegin(); it != map.constEnd(); ++it)
+    {
         json[it.key()] = it.value().toString();
     }
     return json;
 }
 
-
-void ReleaseTemplate::read(const QJsonObject &json)
+void ReleaseTemplate::read(const QJsonObject& json)
 {
     templateName = json["templateName"].toString();
     seriesTitle = json["seriesTitle"].toString();
     QJsonArray tagsArray = json["releaseTags"].toArray();
-    for (const QJsonValue &value : tagsArray) {
+    for (const QJsonValue& value : tagsArray)
+    {
         releaseTags.append(value.toString());
     }
     rssUrl = QUrl(json["rssUrl"].toString());
@@ -69,35 +75,40 @@ void ReleaseTemplate::read(const QJsonObject &json)
     posterPath = json["posterPath"].toString();
 
     QJsonArray castArray = json["cast"].toArray();
-    for (const QJsonValue &value : castArray) {
+    for (const QJsonValue& value : castArray)
+    {
         cast.append(value.toString());
     }
 
     substitutions.clear();
     const QJsonObject substitutionsObj = json["substitutions"].toObject();
-    for (const QString &key : substitutionsObj.keys()) {
+    for (const QString& key : substitutionsObj.keys())
+    {
         substitutions.insert(key, substitutionsObj[key].toString());
     }
 
     postTemplates.clear();
     const QJsonObject postTemplatesObj = json["postTemplates"].toObject();
-    for (const QString &key : postTemplatesObj.keys()) {
+    for (const QString& key : postTemplatesObj.keys())
+    {
         postTemplates.insert(key, postTemplatesObj[key].toString());
     }
 
     linkTemplates.clear();
     const QJsonObject linkTemplatesObj = json["linkTemplates"].toObject();
-    for (const QString &key : linkTemplatesObj.keys()) {
+    for (const QString& key : linkTemplatesObj.keys())
+    {
         linkTemplates.insert(key, linkTemplatesObj[key].toString());
     }
 
     QJsonArray urlsArray = json["uploadUrls"].toArray();
-    for (const QJsonValue &value : urlsArray) {
+    for (const QJsonValue& value : urlsArray)
+    {
         uploadUrls.append(value.toString());
     }
 }
 
-void ReleaseTemplate::write(QJsonObject &json) const
+void ReleaseTemplate::write(QJsonObject& json) const
 {
     json["templateName"] = templateName;
     json["seriesTitle"] = seriesTitle;
@@ -141,26 +152,30 @@ void ReleaseTemplate::write(QJsonObject &json) const
     json["posterPath"] = posterPath;
 
     QJsonObject substitutionsObj;
-    for (auto it = substitutions.constBegin(); it != substitutions.constEnd(); ++it) {
+    for (auto it = substitutions.constBegin(); it != substitutions.constEnd(); ++it)
+    {
         substitutionsObj.insert(it.key(), it.value());
     }
     json["substitutions"] = substitutionsObj;
 
     QJsonObject postTemplatesObj;
-    for (auto it = postTemplates.constBegin(); it != postTemplates.constEnd(); ++it) {
+    for (auto it = postTemplates.constBegin(); it != postTemplates.constEnd(); ++it)
+    {
         postTemplatesObj.insert(it.key(), it.value());
     }
     json["postTemplates"] = postTemplatesObj;
 
     QJsonObject linkTemplatesObj;
-    for (auto it = linkTemplates.constBegin(); it != linkTemplates.constEnd(); ++it) {
+    for (auto it = linkTemplates.constBegin(); it != linkTemplates.constEnd(); ++it)
+    {
         linkTemplatesObj.insert(it.key(), it.value());
     }
     json["linkTemplates"] = linkTemplatesObj;
     json["uploadUrls"] = QJsonArray::fromStringList(uploadUrls);
 }
 
-void TbStyleInfo::read(const QJsonObject &json) {
+void TbStyleInfo::read(const QJsonObject& json)
+{
     name = json["name"].toString("default_1080p");
     resolutionX = json["resolutionX"].toInt();
     tags = json["tags"].toString("{\\fad(500,500)\\b1\\an3\\fnTahoma\\fs50\\shad3\\bord1.3\\4c&H000000&\\4a&H00&}");
@@ -170,7 +185,8 @@ void TbStyleInfo::read(const QJsonObject &json) {
     styleName = json["styleName"].toString("Основной");
 }
 
-void TbStyleInfo::write(QJsonObject &json) const {
+void TbStyleInfo::write(QJsonObject& json) const
+{
     json["name"] = name;
     json["resolutionX"] = resolutionX;
     json["tags"] = tags;

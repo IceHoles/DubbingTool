@@ -1,13 +1,13 @@
 #ifndef MANUALRENDERER_H
 #define MANUALRENDERER_H
 
-#include <QObject>
-#include <QVariantMap>
-#include <QProcess>
-#include <QDir>
 #include "appsettings.h"
 #include "renderhelper.h"
 
+#include <QDir>
+#include <QObject>
+#include <QProcess>
+#include <QVariantMap>
 
 class ProcessManager;
 
@@ -22,8 +22,9 @@ static QString escapePathForFfmpegFilter(const QString& path)
 class ManualRenderer : public QObject
 {
     Q_OBJECT
+
 public:
-    explicit ManualRenderer(const QVariantMap &params, QObject *parent = nullptr);
+    explicit ManualRenderer(const QVariantMap& params, QObject* parent = nullptr);
     ~ManualRenderer();
     void start();
     ProcessManager* getProcessManager() const;
@@ -35,21 +36,26 @@ signals:
     void logMessage(const QString&, LogCategory);
     void finished();
     void progressUpdated(int percentage, const QString& stageName = "");
-    void bitrateCheckRequest(const RenderPreset &preset, double actualBitrate);
+    void bitrateCheckRequest(const RenderPreset& preset, double actualBitrate);
 
 private slots:
     void onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
-    void onProcessText(const QString &output);
-    void onBitrateCheckFinished(RerenderDecision decision, const RenderPreset &newPreset);
+    void onProcessText(const QString& output);
+    void onBitrateCheckFinished(RerenderDecision decision, const RenderPreset& newPreset);
 
 private:
-    enum class Step { Idle, Pass1, Pass2 };
+    enum class Step
+    {
+        Idle,
+        Pass1,
+        Pass2
+    };
     void runPass(Step pass);
     QStringList prepareCommandArguments(const QString& commandTemplate);
 
     Step m_currentStep = Step::Idle;
     QVariantMap m_params;
-    ProcessManager *m_processManager;
+    ProcessManager* m_processManager;
     qint64 m_sourceDurationS = 0;
     RenderPreset m_preset;
 };

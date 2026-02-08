@@ -2,26 +2,27 @@
 #define RERENDERDIALOG_H
 
 #include "appsettings.h"
+
 #include <QDialog>
 
-
-namespace Ui {
+namespace Ui
+{
 class RerenderDialog;
-}
+} // namespace Ui
 
 class RerenderDialog : public QDialog
 {
     Q_OBJECT
 
 public:
-    explicit RerenderDialog(const RenderPreset &preset, double actualBitrate, QWidget *parent = nullptr);
+    explicit RerenderDialog(const RenderPreset& preset, double actualBitrate, QWidget* parent = nullptr);
     ~RerenderDialog();
 
     QString getCommandPass1() const;
     QString getCommandPass2() const;
 
 private:
-    Ui::RerenderDialog *ui;
+    Ui::RerenderDialog* ui;
 };
 
 #endif // RERENDERDIALOG_H

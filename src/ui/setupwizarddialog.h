@@ -1,14 +1,14 @@
 #ifndef SETUPWIZARDDIALOG_H
 #define SETUPWIZARDDIALOG_H
 
+#include <QComboBox>
 #include <QDialog>
+#include <QGridLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
-#include <QComboBox>
 #include <QSpinBox>
 #include <QStackedWidget>
-#include <QGridLayout>
 
 /**
  * @brief Setup wizard dialog shown on first launch or when required tools are missing.
@@ -23,7 +23,7 @@ class SetupWizardDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit SetupWizardDialog(QWidget *parent = nullptr);
+    explicit SetupWizardDialog(QWidget* parent = nullptr);
 
 private:
     void buildToolsPage();
@@ -35,37 +35,38 @@ private:
     void buildQBittorrentPage();
     void buildPresetPage();
     void detectTools();
-    void updateToolStatus(int32_t toolIndex, const QString &path);
+    void updateToolStatus(int32_t toolIndex, const QString& path);
     void updateNextButtonState();
 
-    QStackedWidget *m_stack = nullptr;
+    QStackedWidget* m_stack = nullptr;
 
     // Navigation buttons
-    QPushButton *m_backButton = nullptr;
-    QPushButton *m_nextButton = nullptr;
-    QPushButton *m_finishButton = nullptr;
-    QPushButton *m_skipButton = nullptr;
+    QPushButton* m_backButton = nullptr;
+    QPushButton* m_nextButton = nullptr;
+    QPushButton* m_finishButton = nullptr;
+    QPushButton* m_skipButton = nullptr;
 
     // Page 1: Tools
-    struct ToolRow {
+    struct ToolRow
+    {
         QString exeName;
         QString displayName;
         bool required = true;
-        QLabel *statusIcon = nullptr;
-        QLineEdit *pathEdit = nullptr;
-        QPushButton *browseButton = nullptr;
+        QLabel* statusIcon = nullptr;
+        QLineEdit* pathEdit = nullptr;
+        QPushButton* browseButton = nullptr;
     };
     QList<ToolRow> m_tools;
-    QGridLayout *m_toolsGrid = nullptr;
+    QGridLayout* m_toolsGrid = nullptr;
 
     // Page 2: qBittorrent
-    QLineEdit *m_qbtHostEdit = nullptr;
-    QSpinBox *m_qbtPortSpin = nullptr;
-    QLineEdit *m_qbtUserEdit = nullptr;
-    QLineEdit *m_qbtPasswordEdit = nullptr;
+    QLineEdit* m_qbtHostEdit = nullptr;
+    QSpinBox* m_qbtPortSpin = nullptr;
+    QLineEdit* m_qbtUserEdit = nullptr;
+    QLineEdit* m_qbtPasswordEdit = nullptr;
 
     // Page 3: Render preset
-    QComboBox *m_presetCombo = nullptr;
+    QComboBox* m_presetCombo = nullptr;
 };
 
 #endif // SETUPWIZARDDIALOG_H

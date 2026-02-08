@@ -1,20 +1,21 @@
 #ifndef SETTINGSDIALOG_H
 #define SETTINGSDIALOG_H
 
-#include <QDialog>
 #include "appsettings.h"
 
+#include <QDialog>
 
-namespace Ui {
+namespace Ui
+{
 class SettingsDialog;
-}
+} // namespace Ui
 
 class SettingsDialog : public QDialog
 {
     Q_OBJECT
 
 public:
-    explicit SettingsDialog(QWidget *parent = nullptr);
+    explicit SettingsDialog(QWidget* parent = nullptr);
     ~SettingsDialog();
 
 private slots:
@@ -35,7 +36,7 @@ private:
     void loadSettings();
     void saveSettings();
 
-    Ui::SettingsDialog *ui;
+    Ui::SettingsDialog* ui;
     QList<RenderPreset> m_renderPresets;
 };
 

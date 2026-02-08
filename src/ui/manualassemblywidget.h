@@ -1,22 +1,23 @@
 #ifndef MANUALASSEMBLYWIDGET_H
 #define MANUALASSEMBLYWIDGET_H
 
-#include <QWidget>
-#include "releasetemplate.h"
 #include "fontfinder.h"
+#include "releasetemplate.h"
+
 #include <QLineEdit>
+#include <QWidget>
 
-
-namespace Ui {
+namespace Ui
+{
 class ManualAssemblyWidget;
-}
+} // namespace Ui
 
 class ManualAssemblyWidget : public QWidget
 {
     Q_OBJECT
 
 public:
-    explicit ManualAssemblyWidget(QWidget *parent = nullptr);
+    explicit ManualAssemblyWidget(QWidget* parent = nullptr);
     ~ManualAssemblyWidget();
 
     QVariantMap getParameters() const;
@@ -38,13 +39,13 @@ private slots:
     void onModeSwitched(bool isManualMode);
 
 private:
-    void browseForFile(QLineEdit *lineEdit, const QString &caption, const QString &filter);
+    void browseForFile(QLineEdit* lineEdit, const QString& caption, const QString& filter);
     void updateUiState(bool isManualMode);
     FontFinder* m_fontFinder;
     QIcon m_templateModeIcon;
     QIcon m_manualModeIcon;
 
-    Ui::ManualAssemblyWidget *ui;
+    Ui::ManualAssemblyWidget* ui;
 signals:
     void templateDataRequested(const QString& templateName);
     void assemblyRequested();

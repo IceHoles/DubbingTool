@@ -2,16 +2,17 @@
 #define MISSINGFILESDIALOG_H
 
 #include <QDialog>
-#include <QMap>
 #include <QListWidgetItem>
+#include <QMap>
 #include <QMediaPlayer>
 
 class QAudioOutput;
 class QVideoWidget;
 
-namespace Ui {
+namespace Ui
+{
 class MissingFilesDialog;
-}
+} // namespace Ui
 
 /**
  * @brief Dialog for requesting missing data from user, including TB time viewfinder
@@ -25,21 +26,21 @@ class MissingFilesDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit MissingFilesDialog(QWidget *parent = nullptr);
+    explicit MissingFilesDialog(QWidget* parent = nullptr);
     ~MissingFilesDialog();
 
     void setAudioPathVisible(bool visible);
-    void setMissingFonts(const QStringList &fontNames);
+    void setMissingFonts(const QStringList& fontNames);
     void setTimeInputVisible(bool visible);
-    void setAudioPrompt(const QString &text);
-    void setTimePrompt(const QString &text);
+    void setAudioPrompt(const QString& text);
+    void setTimePrompt(const QString& text);
 
     /**
      * @brief Configure the viewfinder with video file and duration
      * @param videoPath Path to the source video file
      * @param durationS Duration of the video in seconds
      */
-    void setVideoFile(const QString &videoPath, double durationS);
+    void setVideoFile(const QString& videoPath, double durationS);
 
     [[nodiscard]] QString getAudioPath() const;
     [[nodiscard]] QMap<QString, QString> getResolvedFonts() const;
@@ -47,7 +48,7 @@ public:
 
 private slots:
     void on_browseAudioButton_clicked();
-    void on_fontsListWidget_itemDoubleClicked(QListWidgetItem *item);
+    void on_fontsListWidget_itemDoubleClicked(QListWidgetItem* item);
     void slotOpenInPlayer();
     void slotSliderValueChanged(int value);
     void slotSliderPressed();
@@ -68,16 +69,16 @@ private:
     [[nodiscard]] int secondsToSliderValue(double seconds) const;
     void setViewfinderEnabled(bool enabled);
 
-    Ui::MissingFilesDialog *ui;
+    Ui::MissingFilesDialog* ui;
     QMap<QString, QString> m_resolvedFonts;
     QString m_videoFilePath;
     double m_videoDurationS = 0.0;
     bool m_syncInProgress = false;
 
     // Qt Multimedia player
-    QMediaPlayer *m_mediaPlayer = nullptr;
-    QVideoWidget *m_videoWidget = nullptr;
-    QAudioOutput *m_audioOutput = nullptr;
+    QMediaPlayer* m_mediaPlayer = nullptr;
+    QVideoWidget* m_videoWidget = nullptr;
+    QAudioOutput* m_audioOutput = nullptr;
 
     // Frame rate (detected from video via ffprobe, fallback 25fps)
     double m_fps = 25.0;

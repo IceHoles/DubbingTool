@@ -1,73 +1,87 @@
 #include "templateeditor.h"
-#include "ui_templateeditor.h"
-#include "styleselectordialog.h"
+
 #include "appsettings.h"
-#include <QFileDialog>
-#include <QTableWidgetItem>
+#include "styleselectordialog.h"
+#include "ui_templateeditor.h"
+
+#include <QApplication>
+#include <QClipboard>
 #include <QDialog>
-#include <QTextBrowser>
-#include <QVBoxLayout>
 #include <QDialogButtonBox>
-#include <QScrollArea>
-#include <QWidget>
+#include <QFileDialog>
 #include <QGridLayout>
 #include <QLabel>
 #include <QLineEdit>
-#include <QRegularExpression>
-#include <QTextDocumentFragment>
-#include <QApplication>
-#include <QClipboard>
 #include <QMessageBox>
 #include <QPropertyAnimation>
+#include <QRegularExpression>
+#include <QScrollArea>
+#include <QTableWidgetItem>
+#include <QTextBrowser>
+#include <QTextDocumentFragment>
+#include <QVBoxLayout>
+#include <QWidget>
 
-
-class ClickableLabel : public QLabel {
+class ClickableLabel : public QLabel
+{
 public:
-    explicit ClickableLabel(const QString& text, QWidget* parent = nullptr) : QLabel(text, parent) {
+    explicit ClickableLabel(const QString& text, QWidget* parent = nullptr) : QLabel(text, parent)
+    {
         setCursor(Qt::PointingHandCursor);
-        setStyleSheet("QLabel { background-color: #2d2d2d; border: 1px solid #ccc; border-radius: 4px; padding: 2px; }");
+        setStyleSheet(
+            "QLabel { background-color: #2d2d2d; border: 1px solid #ccc; border-radius: 4px; padding: 2px; }");
         setToolTip("Нажмите, чтобы скопировать");
     }
 
 protected:
-    void mousePressEvent(QMouseEvent *event) override {
+    void mousePressEvent(QMouseEvent* event) override
+    {
         QApplication::clipboard()->setText(this->text());
 
-        QPropertyAnimation *animation = new QPropertyAnimation(this, "styleSheet", this);
+        QPropertyAnimation* animation = new QPropertyAnimation(this, "styleSheet", this);
         animation->setDuration(500);
-        animation->setStartValue("QLabel { background-color: #4f4f4f; border: 1px solid #5a9e5a; border-radius: 4px; padding: 2px; }"); // Зеленый
-        animation->setEndValue("QLabel { background-color: #2d2d2d; border: 1px solid #ccc; border-radius: 4px; padding: 2px; }");   // Исходный
+        animation->setStartValue("QLabel { background-color: #4f4f4f; border: 1px solid #5a9e5a; border-radius: 4px; "
+                                 "padding: 2px; }"); // Зеленый
+        animation->setEndValue("QLabel { background-color: #2d2d2d; border: 1px solid #ccc; border-radius: 4px; "
+                               "padding: 2px; }"); // Исходный
 
         QLabel::mousePressEvent(event);
     }
 };
 
-TemplateEditor::TemplateEditor(QWidget *parent) :
-    QDialog(parent),
-    ui(new Ui::TemplateEditor)
+TemplateEditor::TemplateEditor(QWidget* parent) : QDialog(parent), ui(new Ui::TemplateEditor)
 {
     ui->setupUi(this);
 
-    connect(ui->addSubstitutionButton, &QPushButton::clicked, this, [this](){
-        int row = ui->substitutionsTableWidget->rowCount();
-        ui->substitutionsTableWidget->insertRow(row);
-        ui->substitutionsTableWidget->setItem(row, 0, new QTableWidgetItem("Текст для поиска"));
-        ui->substitutionsTableWidget->setItem(row, 1, new QTableWidgetItem("Текст для замены"));
-    });
+    connect(ui->addSubstitutionButton, &QPushButton::clicked, this,
+            [this]()
+            {
+                int row = ui->substitutionsTableWidget->rowCount();
+                ui->substitutionsTableWidget->insertRow(row);
+                ui->substitutionsTableWidget->setItem(row, 0, new QTableWidgetItem("Текст для поиска"));
+                ui->substitutionsTableWidget->setItem(row, 1, new QTableWidgetItem("Текст для замены"));
+            });
 
-    connect(ui->removeSubstitutionButton, &QPushButton::clicked, this, [this](){
-        int currentRow = ui->substitutionsTableWidget->currentRow();
-        if (currentRow >= 0) {
-            ui->substitutionsTableWidget->removeRow(currentRow);
-        }
-    });
+    connect(ui->removeSubstitutionButton, &QPushButton::clicked, this,
+            [this]()
+            {
+                int currentRow = ui->substitutionsTableWidget->currentRow();
+                if (currentRow >= 0)
+                {
+                    ui->substitutionsTableWidget->removeRow(currentRow);
+                }
+            });
 
-    connect(ui->browsePosterButton, &QPushButton::clicked, this, [this](){
-        QString path = QFileDialog::getOpenFileName(this, "Выберите файл постера", "", "Изображения (*.png *.jpg *.jpeg *.webp)");
-        if (!path.isEmpty()) {
-            ui->posterPathEdit->setText(path);
-        }
-    });
+    connect(ui->browsePosterButton, &QPushButton::clicked, this,
+            [this]()
+            {
+                QString path = QFileDialog::getOpenFileName(this, "Выберите файл постера", "",
+                                                            "Изображения (*.png *.jpg *.jpeg *.webp)");
+                if (!path.isEmpty())
+                {
+                    ui->posterPathEdit->setText(path);
+                }
+            });
 
     connect(ui->buttonBox, &QDialogButtonBox::accepted, this, &TemplateEditor::slotValidateAndAccept);
     connect(ui->buttonBox, &QDialogButtonBox::rejected, this, &TemplateEditor::reject);
@@ -78,7 +92,7 @@ TemplateEditor::~TemplateEditor()
     delete ui;
 }
 
-void TemplateEditor::setTemplate(const ReleaseTemplate &t)
+void TemplateEditor::setTemplate(const ReleaseTemplate& t)
 {
     // Вкладка "Основные"
     ui->templateNameEdit->setText(t.templateName);
@@ -93,7 +107,8 @@ void TemplateEditor::setTemplate(const ReleaseTemplate &t)
     ui->isCustomTranslationCheckBox->setChecked(t.isCustomTranslation);
     ui->useConcatRenderCheckBox->setChecked(t.useConcatRender);
     ui->renderPresetComboBox->clear();
-    for(const auto& preset : AppSettings::instance().renderPresets()) {
+    for (const auto& preset : AppSettings::instance().renderPresets())
+    {
         ui->renderPresetComboBox->addItem(preset.name);
     }
     ui->renderPresetComboBox->setCurrentText(t.renderPresetName);
@@ -104,13 +119,17 @@ void TemplateEditor::setTemplate(const ReleaseTemplate &t)
     ui->endingStartTimeEdit->setTime(QTime::fromString(t.endingStartTime, "H:mm:ss.zzz"));
     ui->useManualTimeCheckBox->setChecked(t.useManualTime);
     ui->defaultTbStyleComboBox->clear();
-    for(const auto& style : AppSettings::instance().tbStyles()) {
+    for (const auto& style : AppSettings::instance().tbStyles())
+    {
         ui->defaultTbStyleComboBox->addItem(style.name);
     }
     ui->defaultTbStyleComboBox->setCurrentText(t.defaultTbStyleName);
-    if (t.voiceoverType == ReleaseTemplate::VoiceoverType::Voiceover) {
+    if (t.voiceoverType == ReleaseTemplate::VoiceoverType::Voiceover)
+    {
         ui->voiceoverTypeComboBox->setCurrentText("Закадр");
-    } else {
+    }
+    else
+    {
         ui->voiceoverTypeComboBox->setCurrentText("Дубляж");
     }
     ui->castEdit->setPlainText(t.cast.join(", "));
@@ -132,7 +151,8 @@ void TemplateEditor::setTemplate(const ReleaseTemplate &t)
     ui->signStylesEdit->setPlainText(t.signStyles.join('\n'));
     ui->pauseForSubEditCheckBox->setChecked(t.pauseForSubEdit);
     ui->substitutionsTableWidget->setRowCount(0);
-    for (auto it = t.substitutions.constBegin(); it != t.substitutions.constEnd(); ++it) {
+    for (auto it = t.substitutions.constBegin(); it != t.substitutions.constEnd(); ++it)
+    {
         int row = ui->substitutionsTableWidget->rowCount();
         ui->substitutionsTableWidget->insertRow(row);
         ui->substitutionsTableWidget->setItem(row, 0, new QTableWidgetItem(it.key()));
@@ -160,7 +180,8 @@ ReleaseTemplate TemplateEditor::getTemplate() const
     t.templateName = ui->templateNameEdit->text().trimmed();
     t.seriesTitle = ui->seriesTitleEdit->text().trimmed();
     QStringList tags = ui->releaseTagsEdit->text().split(',', Qt::SkipEmptyParts);
-    for(QString& tag : tags) {
+    for (QString& tag : tags)
+    {
         t.releaseTags.append(tag.trimmed());
     }
     t.rssUrl = QUrl(ui->rssUrlEdit->text().trimmed());
@@ -179,9 +200,12 @@ ReleaseTemplate TemplateEditor::getTemplate() const
     t.endingStartTime = ui->endingStartTimeEdit->time().toString("H:mm:ss.zzz");
     t.useManualTime = ui->useManualTimeCheckBox->isChecked();
     t.defaultTbStyleName = ui->defaultTbStyleComboBox->currentText();
-    if (ui->voiceoverTypeComboBox->currentText() == "Закадр") {
+    if (ui->voiceoverTypeComboBox->currentText() == "Закадр")
+    {
         t.voiceoverType = ReleaseTemplate::VoiceoverType::Voiceover;
-    } else {
+    }
+    else
+    {
         t.voiceoverType = ReleaseTemplate::VoiceoverType::Dubbing;
     }
     QRegularExpression rx("((\\, )|\\,|\\n)");
@@ -204,10 +228,12 @@ ReleaseTemplate TemplateEditor::getTemplate() const
     t.signStyles = ui->signStylesEdit->toPlainText().split('\n', Qt::SkipEmptyParts);
     t.pauseForSubEdit = ui->pauseForSubEditCheckBox->isChecked();
     t.substitutions.clear();
-    for (int row = 0; row < ui->substitutionsTableWidget->rowCount(); ++row) {
+    for (int row = 0; row < ui->substitutionsTableWidget->rowCount(); ++row)
+    {
         QString findText = ui->substitutionsTableWidget->item(row, 0)->text();
         QString replaceText = ui->substitutionsTableWidget->item(row, 1)->text();
-        if (!findText.isEmpty()) {
+        if (!findText.isEmpty())
+        {
             t.substitutions.insert(findText, replaceText);
         }
     }
@@ -230,13 +256,16 @@ ReleaseTemplate TemplateEditor::getTemplate() const
 
 void TemplateEditor::on_selectStylesButton_clicked()
 {
-    QString filePath = QFileDialog::getOpenFileName(this, "Выберите .ass файл для анализа", "", "ASS Subtitles (*.ass)");
-    if (filePath.isEmpty()) return;
+    QString filePath =
+        QFileDialog::getOpenFileName(this, "Выберите .ass файл для анализа", "", "ASS Subtitles (*.ass)");
+    if (filePath.isEmpty())
+        return;
 
     StyleSelectorDialog dialog(this);
     dialog.analyzeFile(filePath);
 
-    if (dialog.exec() == QDialog::Accepted) {
+    if (dialog.exec() == QDialog::Accepted)
+    {
         QStringList selectedStyles = dialog.getSelectedStyles();
         ui->signStylesEdit->setPlainText(selectedStyles.join('\n'));
     }
@@ -245,7 +274,8 @@ void TemplateEditor::on_selectStylesButton_clicked()
 void TemplateEditor::on_helpButton_clicked()
 {
     static QDialog* helpDialog = nullptr;
-    if (helpDialog && helpDialog->isVisible()) {
+    if (helpDialog && helpDialog->isVisible())
+    {
         helpDialog->activateWindow();
         return;
     }
@@ -255,14 +285,15 @@ void TemplateEditor::on_helpButton_clicked()
     helpDialog->setWindowTitle("Справка по шаблонам и форматированию");
     helpDialog->setMinimumSize(500, 800);
 
-    QScrollArea *scrollArea = new QScrollArea(helpDialog);
+    QScrollArea* scrollArea = new QScrollArea(helpDialog);
     scrollArea->setWidgetResizable(true);
     scrollArea->setStyleSheet("QScrollArea { border: none; }");
-    QWidget *scrollWidget = new QWidget();
+    QWidget* scrollWidget = new QWidget();
     scrollArea->setWidget(scrollWidget);
-    QVBoxLayout *mainLayout = new QVBoxLayout(scrollWidget);
+    QVBoxLayout* mainLayout = new QVBoxLayout(scrollWidget);
 
-    auto addRow = [&](QGridLayout* layout, int row, const QString& code, const QString& description) {
+    auto addRow = [&](QGridLayout* layout, int row, const QString& code, const QString& description)
+    {
         layout->addWidget(new ClickableLabel(code), row, 0);
         layout->addWidget(new QLabel(description), row, 1);
     };
@@ -327,15 +358,15 @@ void TemplateEditor::on_helpButton_clicked()
 
     // --- Блок 3: Форматирование VK ---
     mainLayout->addWidget(new QLabel("<h3>Форматирование VK (для ссылок):</h3>"));
-    QWidget *vkWidget = new QWidget();
-    QGridLayout *vkLayout = new QGridLayout(vkWidget);
+    QWidget* vkWidget = new QWidget();
+    QGridLayout* vkLayout = new QGridLayout(vkWidget);
     addRow(vkLayout, 0, "[https://vk.com/dublyajnaya|ТО Дубляжная]", "Ссылка на внешний ресурс");
     vkLayout->setColumnStretch(1, 1);
     mainLayout->addWidget(vkWidget);
 
     mainLayout->addStretch(1);
 
-    QVBoxLayout *dialogLayout = new QVBoxLayout(helpDialog);
+    QVBoxLayout* dialogLayout = new QVBoxLayout(helpDialog);
     dialogLayout->addWidget(scrollArea);
     helpDialog->setLayout(dialogLayout);
     helpDialog->show();
@@ -350,10 +381,11 @@ void TemplateEditor::slotValidateAndAccept()
     {
         QString found = forbiddenCharsFound(seriesTitle);
         QMessageBox::warning(this, "Недопустимые символы",
-            QString("Название серии содержит символы, запрещённые в именах файлов Windows:\n\n"
-                    "  %1\n\n"
-                    "Запрещённые символы:  : \" < > | ? * '\n\n"
-                    "Пожалуйста, уберите их из названия.").arg(found));
+                             QString("Название серии содержит символы, запрещённые в именах файлов Windows:\n\n"
+                                     "  %1\n\n"
+                                     "Запрещённые символы:  : \" < > | ? * '\n\n"
+                                     "Пожалуйста, уберите их из названия.")
+                                 .arg(found));
         ui->seriesTitleEdit->setFocus();
         return;
     }
@@ -361,10 +393,10 @@ void TemplateEditor::slotValidateAndAccept()
     accept();
 }
 
-bool TemplateEditor::containsForbiddenChars(const QString &text)
+bool TemplateEditor::containsForbiddenChars(const QString& text)
 {
     static const QString kForbidden = ":\"<>|?*'";
-    for (const QChar &ch : text)
+    for (const QChar& ch : text)
     {
         if (kForbidden.contains(ch))
         {
@@ -374,11 +406,11 @@ bool TemplateEditor::containsForbiddenChars(const QString &text)
     return false;
 }
 
-QString TemplateEditor::forbiddenCharsFound(const QString &text)
+QString TemplateEditor::forbiddenCharsFound(const QString& text)
 {
     static const QString kForbidden = ":\"<>|?*'";
     QStringList found;
-    for (const QChar &ch : text)
+    for (const QChar& ch : text)
     {
         if (kForbidden.contains(ch))
         {

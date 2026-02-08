@@ -1,4 +1,6 @@
 #include "missingfilesdialog.h"
+
+#include "appsettings.h"
 #include "ui_missingfilesdialog.h"
 
 #include <QAudioOutput>
@@ -13,12 +15,7 @@
 #include <QVBoxLayout>
 #include <QVideoWidget>
 
-#include "appsettings.h"
-
-
-MissingFilesDialog::MissingFilesDialog(QWidget *parent) :
-    QDialog(parent),
-    ui(new Ui::MissingFilesDialog)
+MissingFilesDialog::MissingFilesDialog(QWidget* parent) : QDialog(parent), ui(new Ui::MissingFilesDialog)
 {
     ui->setupUi(this);
     ui->audioGroupBox->setVisible(false);
@@ -26,26 +23,19 @@ MissingFilesDialog::MissingFilesDialog(QWidget *parent) :
     ui->timeGroupBox->setVisible(false);
 
     // Prepare the container layout for the video widget (widget added later in setVideoFile)
-    auto *containerLayout = new QVBoxLayout(ui->videoContainer);
+    auto* containerLayout = new QVBoxLayout(ui->videoContainer);
     containerLayout->setContentsMargins(0, 0, 0, 0);
 
     // Viewfinder connections
-    connect(ui->openInPlayerButton, &QPushButton::clicked,
-            this, &MissingFilesDialog::slotOpenInPlayer);
-    connect(ui->timeSlider, &QSlider::valueChanged,
-            this, &MissingFilesDialog::slotSliderValueChanged);
-    connect(ui->timeSlider, &QSlider::sliderPressed,
-            this, &MissingFilesDialog::slotSliderPressed);
-    connect(ui->timeEdit, &QTimeEdit::timeChanged,
-            this, &MissingFilesDialog::slotTimeEditChanged);
+    connect(ui->openInPlayerButton, &QPushButton::clicked, this, &MissingFilesDialog::slotOpenInPlayer);
+    connect(ui->timeSlider, &QSlider::valueChanged, this, &MissingFilesDialog::slotSliderValueChanged);
+    connect(ui->timeSlider, &QSlider::sliderPressed, this, &MissingFilesDialog::slotSliderPressed);
+    connect(ui->timeEdit, &QTimeEdit::timeChanged, this, &MissingFilesDialog::slotTimeEditChanged);
 
     // Transport controls
-    connect(ui->prevFrameButton, &QPushButton::clicked,
-            this, &MissingFilesDialog::slotPrevFrame);
-    connect(ui->playPauseButton, &QPushButton::clicked,
-            this, &MissingFilesDialog::slotPlayPause);
-    connect(ui->nextFrameButton, &QPushButton::clicked,
-            this, &MissingFilesDialog::slotNextFrame);
+    connect(ui->prevFrameButton, &QPushButton::clicked, this, &MissingFilesDialog::slotPrevFrame);
+    connect(ui->playPauseButton, &QPushButton::clicked, this, &MissingFilesDialog::slotPlayPause);
+    connect(ui->nextFrameButton, &QPushButton::clicked, this, &MissingFilesDialog::slotNextFrame);
 }
 
 MissingFilesDialog::~MissingFilesDialog()
@@ -62,7 +52,7 @@ void MissingFilesDialog::setAudioPathVisible(bool visible)
     ui->audioGroupBox->setVisible(visible);
 }
 
-void MissingFilesDialog::setMissingFonts(const QStringList &fontNames)
+void MissingFilesDialog::setMissingFonts(const QStringList& fontNames)
 {
     if (fontNames.isEmpty())
     {
@@ -72,9 +62,9 @@ void MissingFilesDialog::setMissingFonts(const QStringList &fontNames)
 
     ui->fontsGroupBox->setVisible(true);
     ui->fontsListWidget->clear();
-    for (const QString &name : fontNames)
+    for (const QString& name : fontNames)
     {
-        auto *item = new QListWidgetItem(name);
+        auto* item = new QListWidgetItem(name);
         item->setForeground(Qt::red);
         ui->fontsListWidget->addItem(item);
     }
@@ -100,7 +90,7 @@ QString MissingFilesDialog::getTime() const
     return ui->timeEdit->time().toString("H:mm:ss.zzz");
 }
 
-void MissingFilesDialog::setVideoFile(const QString &videoPath, double durationS)
+void MissingFilesDialog::setVideoFile(const QString& videoPath, double durationS)
 {
     m_videoFilePath = videoPath;
     m_videoDurationS = durationS;
@@ -119,7 +109,7 @@ void MissingFilesDialog::setVideoFile(const QString &videoPath, double durationS
         // Slider range: 1 tick = 1 frame at the detected fps
         int maxSlider = static_cast<int>(m_videoDurationS * m_fps);
         ui->timeSlider->setMaximum(maxSlider);
-        ui->timeSlider->setSingleStep(1);    // 1 frame
+        ui->timeSlider->setSingleStep(1);                            // 1 frame
         ui->timeSlider->setPageStep(static_cast<int>(m_fps * 10.0)); // 10 seconds
 
         // Set initial position to ~last 3 minutes (most likely TB location)
@@ -153,10 +143,8 @@ void MissingFilesDialog::setVideoFile(const QString &videoPath, double durationS
         // Add QVideoWidget to the container (which is now visible)
         ui->videoContainer->layout()->addWidget(m_videoWidget);
 
-        connect(m_mediaPlayer, &QMediaPlayer::positionChanged,
-                this, &MissingFilesDialog::slotPlayerPositionChanged);
-        connect(m_mediaPlayer, &QMediaPlayer::mediaStatusChanged,
-                this, &MissingFilesDialog::slotMediaStatusChanged);
+        connect(m_mediaPlayer, &QMediaPlayer::positionChanged, this, &MissingFilesDialog::slotPlayerPositionChanged);
+        connect(m_mediaPlayer, &QMediaPlayer::mediaStatusChanged, this, &MissingFilesDialog::slotMediaStatusChanged);
     }
 
     // Load video into QMediaPlayer
@@ -177,21 +165,19 @@ void MissingFilesDialog::setViewfinderEnabled(bool enabled)
 
 void MissingFilesDialog::on_browseAudioButton_clicked()
 {
-    QString filePath = QFileDialog::getOpenFileName(
-        this, "Выберите аудиофайл", "",
-        "Аудиофайлы (*.wav *.flac *.aac *.eac3)");
+    QString filePath =
+        QFileDialog::getOpenFileName(this, "Выберите аудиофайл", "", "Аудиофайлы (*.wav *.flac *.aac *.eac3)");
     if (!filePath.isEmpty())
     {
         ui->audioPathEdit->setText(filePath);
     }
 }
 
-void MissingFilesDialog::on_fontsListWidget_itemDoubleClicked(QListWidgetItem *item)
+void MissingFilesDialog::on_fontsListWidget_itemDoubleClicked(QListWidgetItem* item)
 {
     QString fontName = item->text();
-    QString path = QFileDialog::getOpenFileName(
-        this, "Выберите файл для шрифта '" + fontName + "'", "",
-        "Файлы шрифтов (*.ttf *.otf *.ttc);;Все файлы (*)");
+    QString path = QFileDialog::getOpenFileName(this, "Выберите файл для шрифта '" + fontName + "'", "",
+                                                "Файлы шрифтов (*.ttf *.otf *.ttc);;Все файлы (*)");
     if (!path.isEmpty())
     {
         item->setText(fontName + " -> " + path);
@@ -200,12 +186,12 @@ void MissingFilesDialog::on_fontsListWidget_itemDoubleClicked(QListWidgetItem *i
     }
 }
 
-void MissingFilesDialog::setAudioPrompt(const QString &text)
+void MissingFilesDialog::setAudioPrompt(const QString& text)
 {
     ui->audioLabel->setText(text);
 }
 
-void MissingFilesDialog::setTimePrompt(const QString &text)
+void MissingFilesDialog::setTimePrompt(const QString& text)
 {
     ui->timeLabel->setText(text);
 }
@@ -225,8 +211,7 @@ void MissingFilesDialog::slotOpenInPlayer()
 void MissingFilesDialog::slotSliderPressed()
 {
     // User started dragging — pause playback
-    if (m_mediaPlayer != nullptr
-        && m_mediaPlayer->playbackState() == QMediaPlayer::PlayingState)
+    if (m_mediaPlayer != nullptr && m_mediaPlayer->playbackState() == QMediaPlayer::PlayingState)
     {
         stopPlayback();
     }
@@ -373,8 +358,7 @@ void MissingFilesDialog::slotPlayerPositionChanged(qint64 position)
 
 void MissingFilesDialog::slotMediaStatusChanged(QMediaPlayer::MediaStatus status)
 {
-    if (!m_initialSeekDone
-        && (status == QMediaPlayer::LoadedMedia || status == QMediaPlayer::BufferedMedia))
+    if (!m_initialSeekDone && (status == QMediaPlayer::LoadedMedia || status == QMediaPlayer::BufferedMedia))
     {
         m_initialSeekDone = true;
 
@@ -405,8 +389,7 @@ double MissingFilesDialog::detectFps() const
     args << "-v" << "quiet"
          << "-select_streams" << "v:0"
          << "-show_entries" << "stream=r_frame_rate"
-         << "-of" << "default=noprint_wrappers=1:nokey=1"
-         << m_videoFilePath;
+         << "-of" << "default=noprint_wrappers=1:nokey=1" << m_videoFilePath;
 
     QProcess probe;
     probe.start(ffprobePath, args);
@@ -462,10 +445,7 @@ QString MissingFilesDialog::formatTime(double timeS) const
     int hours = static_cast<int>(timeS) / 3600;
     int minutes = (static_cast<int>(timeS) % 3600) / 60;
     double seconds = timeS - hours * 3600 - minutes * 60;
-    return QString("%1:%2:%3")
-        .arg(hours)
-        .arg(minutes, 2, 10, QChar('0'))
-        .arg(seconds, 6, 'f', 3, QChar('0'));
+    return QString("%1:%2:%3").arg(hours).arg(minutes, 2, 10, QChar('0')).arg(seconds, 6, 'f', 3, QChar('0'));
 }
 
 void MissingFilesDialog::syncSliderFromTimeEdit()

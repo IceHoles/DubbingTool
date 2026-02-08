@@ -1,10 +1,12 @@
 #include "postgenerator.h"
+
 #include <QRegularExpression>
 
+PostGenerator::PostGenerator(QObject* parent) : QObject(parent)
+{
+}
 
-PostGenerator::PostGenerator(QObject *parent) : QObject(parent) {}
-
-QMap<QString, PostVersions> PostGenerator::generate(const ReleaseTemplate &t, const EpisodeData &data)
+QMap<QString, PostVersions> PostGenerator::generate(const ReleaseTemplate& t, const EpisodeData& data)
 {
     QMap<QString, PostVersions> generatedPosts;
 
@@ -26,7 +28,8 @@ QMap<QString, PostVersions> PostGenerator::generate(const ReleaseTemplate &t, co
     const QString anilibLink = data.viewLinks.value("Anilib", "");
     const QString anime365Link = data.viewLinks.value("Anime365", "");
 
-    for(auto it = t.postTemplates.constBegin(); it != t.postTemplates.constEnd(); ++it) {
+    for (auto it = t.postTemplates.constBegin(); it != t.postTemplates.constEnd(); ++it)
+    {
         QString markdownTemplate = it.value();
 
         QString markdownPost = markdownTemplate;
@@ -53,7 +56,8 @@ QMap<QString, PostVersions> PostGenerator::generate(const ReleaseTemplate &t, co
         htmlPost.replace(QRegularExpression("\\*(.*?)\\*"), "<i>\\1</i>");
         htmlPost.replace(QRegularExpression("__(.*?)__"), "<u>\\1</u>");
         htmlPost.replace(QRegularExpression("~~(.*?)~~"), "<s>\\1</s>");
-        htmlPost.replace(QRegularExpression("\\|\\|(.*?)\\|\\|"), "<span style='background-color: #555; color: #555;'>\\1</span>");
+        htmlPost.replace(QRegularExpression("\\|\\|(.*?)\\|\\|"),
+                         "<span style='background-color: #555; color: #555;'>\\1</span>");
         htmlPost.replace(QRegularExpression("`(.*?)`"), "<code>\\1</code>");
         htmlPost.replace(QRegularExpression("\\[(.*?)\\]\\((.*?)\\)"), "<a href=\"\\2\">\\1</a>");
         htmlPost.replace("\n", "<br>");

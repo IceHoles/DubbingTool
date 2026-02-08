@@ -1,82 +1,114 @@
 #include "telegramformatter.h"
-#include <QRegularExpression>
-#include <QList>
-#include <QPair>
-#include <QMap>
+
 #include <QClipboard>
-#include <QMimeData>
 #include <QDataStream>
 #include <QGuiApplication>
 #include <QIODevice>
+#include <QList>
+#include <QMap>
+#include <QMimeData>
+#include <QPair>
+#include <QRegularExpression>
 #include <algorithm>
 
-struct FinalTag {
+struct FinalTag
+{
     qsizetype position;
     qsizetype length;
     QString tagData;
-    bool operator<(const FinalTag& other) const { return position < other.position; }
+    bool operator<(const FinalTag& other) const
+    {
+        return position < other.position;
+    }
 };
 
-struct MatchInfo {
+struct MatchInfo
+{
     qsizetype start;
     qsizetype length;
     QString content;
     QString tag;
 };
 
-namespace {
+namespace
+{
 
-QPair<QString, QList<FinalTag>> parseText(const QString& text, const QList<QPair<QRegularExpression, QString>>& rules) {
+QPair<QString, QList<FinalTag>> parseText(const QString& text, const QList<QPair<QRegularExpression, QString>>& rules)
+{
     QString cleanText;
     QList<FinalTag> tags;
 
     QList<MatchInfo> allMatches;
-    for (const auto& rulePair : rules) {
+    for (const auto& rulePair : rules)
+    {
         auto it = rulePair.first.globalMatch(text);
-        while (it.hasNext()) {
+        while (it.hasNext())
+        {
             QRegularExpressionMatch match = it.next();
-            if (rulePair.second == "code-block") {
+            if (rulePair.second == "code-block")
+            {
                 QString lang = match.captured(1);
                 QString code = match.captured(2);
                 allMatches.append({match.capturedStart(0), match.capturedLength(0), code, "```" + lang});
-            } else if (rulePair.second == "custom-emoji") {
-                allMatches.append({match.capturedStart(0), match.capturedLength(0), match.captured(1), "custom-emoji://" + match.captured(2)});
-            } else if (rulePair.second == "link") {
-                allMatches.append({match.capturedStart(0), match.capturedLength(0), match.captured(1), match.captured(2)});
-            } else {
-                allMatches.append({match.capturedStart(0), match.capturedLength(0), match.captured(1), rulePair.second});
+            }
+            else if (rulePair.second == "custom-emoji")
+            {
+                allMatches.append({match.capturedStart(0), match.capturedLength(0), match.captured(1),
+                                   "custom-emoji://" + match.captured(2)});
+            }
+            else if (rulePair.second == "link")
+            {
+                allMatches.append(
+                    {match.capturedStart(0), match.capturedLength(0), match.captured(1), match.captured(2)});
+            }
+            else
+            {
+                allMatches.append(
+                    {match.capturedStart(0), match.capturedLength(0), match.captured(1), rulePair.second});
             }
         }
     }
 
     QList<MatchInfo> topLevelMatches;
-    for (const auto& matchA : allMatches) {
+    for (const auto& matchA : allMatches)
+    {
         bool isNested = false;
-        for (const auto& matchB : allMatches) {
-            if (&matchA == &matchB) continue;
-            if (matchA.start >= matchB.start && (matchA.start + matchA.length) <= (matchB.start + matchB.length)) {
+        for (const auto& matchB : allMatches)
+        {
+            if (&matchA == &matchB)
+                continue;
+            if (matchA.start >= matchB.start && (matchA.start + matchA.length) <= (matchB.start + matchB.length))
+            {
                 isNested = true;
                 break;
             }
         }
-        if (!isNested) {
+        if (!isNested)
+        {
             topLevelMatches.append(matchA);
         }
     }
-    std::sort(topLevelMatches.begin(), topLevelMatches.end(), [](const auto& a, const auto& b){ return a.start < b.start; });
+    std::sort(topLevelMatches.begin(), topLevelMatches.end(),
+              [](const auto& a, const auto& b) { return a.start < b.start; });
 
     qsizetype lastPos = 0;
-    for (const auto& match : topLevelMatches) {
+    for (const auto& match : topLevelMatches)
+    {
         cleanText.append(text.mid(lastPos, match.start - lastPos));
 
         QPair<QString, QList<FinalTag>> subResult;
-        if (match.tag.startsWith("```")) {
+        if (match.tag.startsWith("```"))
+        {
             subResult.first = match.content;
-        } else if (match.tag == ">" || match.tag == ">^") {
+        }
+        else if (match.tag == ">" || match.tag == ">^")
+        {
             QList<QPair<QRegularExpression, QString>> quoteRules = rules;
-            quoteRules.removeIf([](const auto& rule){ return rule.second == "`"; });
+            quoteRules.removeIf([](const auto& rule) { return rule.second == "`"; });
             subResult = parseText(match.content, quoteRules);
-        } else {
+        }
+        else
+        {
             subResult = parseText(match.content, rules);
         }
 
@@ -86,8 +118,10 @@ QPair<QString, QList<FinalTag>> parseText(const QString& text, const QList<QPair
         qsizetype lastTaggedPosInSub = 0;
         std::sort(subResult.second.begin(), subResult.second.end());
 
-        for (auto& subTag : subResult.second) {
-            if (subTag.position > lastTaggedPosInSub) {
+        for (auto& subTag : subResult.second)
+        {
+            if (subTag.position > lastTaggedPosInSub)
+            {
                 tags.append({parentTagStartPos + lastTaggedPosInSub, subTag.position - lastTaggedPosInSub, match.tag});
             }
             QStringList combined = subTag.tagData.split('\\');
@@ -97,10 +131,13 @@ QPair<QString, QList<FinalTag>> parseText(const QString& text, const QList<QPair
             tags.append({parentTagStartPos + subTag.position, subTag.length, subTag.tagData});
             lastTaggedPosInSub = subTag.position + subTag.length;
         }
-        if (lastTaggedPosInSub < subResult.first.length()) {
-            tags.append({parentTagStartPos + lastTaggedPosInSub, subResult.first.length() - lastTaggedPosInSub, match.tag});
+        if (lastTaggedPosInSub < subResult.first.length())
+        {
+            tags.append(
+                {parentTagStartPos + lastTaggedPosInSub, subResult.first.length() - lastTaggedPosInSub, match.tag});
         }
-        if (subResult.second.isEmpty() && !subResult.first.isEmpty()) {
+        if (subResult.second.isEmpty() && !subResult.first.isEmpty())
+        {
             tags.append({parentTagStartPos, subResult.first.length(), match.tag});
         }
 
@@ -113,20 +150,20 @@ QPair<QString, QList<FinalTag>> parseText(const QString& text, const QList<QPair
 
 } // end anonymous namespace
 
-void TelegramFormatter::formatAndCopyToClipboard(const QString &markdownText)
+void TelegramFormatter::formatAndCopyToClipboard(const QString& markdownText)
 {
     const QList<QPair<QRegularExpression, QString>> rules = {
-        {QRegularExpression("```(\\w*)\\r?\\n?([\\s\\S]*?)\\r?\\n?```"), "code-block"},
-        {QRegularExpression("\\[([^\\]]+)\\]\\(emoji:([^\\)]+)\\)"), "custom-emoji"},
-        {QRegularExpression(">\\^([\\s\\S]*?)<\\^"), ">^"},
-        {QRegularExpression(">([\\s\\S]*?)<"), ">"},
-        {QRegularExpression("`([^`\\r\\n]+?)`"), "`"},
-        {QRegularExpression("\\*\\*(.*?)\\*\\*"), "**"},
-        {QRegularExpression("__(.*?)__"), "__"},
-        {QRegularExpression("~~(.*?)~~"), "~~"},
-        {QRegularExpression("\\|\\|(.*?)\\|\\|"), "||"},
-        {QRegularExpression("\\^\\^(.*?)\\^\\^"), "^^"},
-        {QRegularExpression("\\[([^\\]]+)\\]\\((?!emoji:)([^\\)]+)\\)"), "link"}
+        {QRegularExpression("```(\\w*)\\r?\\n?([\\s\\S]*?)\\r?\\n?```"),   "code-block"},
+        {    QRegularExpression("\\[([^\\]]+)\\]\\(emoji:([^\\)]+)\\)"), "custom-emoji"},
+        {                    QRegularExpression(">\\^([\\s\\S]*?)<\\^"),           ">^"},
+        {                          QRegularExpression(">([\\s\\S]*?)<"),            ">"},
+        {                        QRegularExpression("`([^`\\r\\n]+?)`"),            "`"},
+        {                       QRegularExpression("\\*\\*(.*?)\\*\\*"),           "**"},
+        {                               QRegularExpression("__(.*?)__"),           "__"},
+        {                               QRegularExpression("~~(.*?)~~"),           "~~"},
+        {                       QRegularExpression("\\|\\|(.*?)\\|\\|"),           "||"},
+        {                       QRegularExpression("\\^\\^(.*?)\\^\\^"),           "^^"},
+        {QRegularExpression("\\[([^\\]]+)\\]\\((?!emoji:)([^\\)]+)\\)"),         "link"}
     };
 
     auto result = parseText(markdownText, rules);
@@ -141,10 +178,12 @@ void TelegramFormatter::formatAndCopyToClipboard(const QString &markdownText)
 
     stream << (quint32)finalTags.size();
 
-    for (const auto& tag : finalTags) {
+    for (const auto& tag : finalTags)
+    {
         const QString& tagContent = tag.tagData;
         QByteArray tagData;
-        for (const QChar& ch : tagContent) {
+        for (const QChar& ch : tagContent)
+        {
             ushort u = ch.unicode();
             tagData.append(static_cast<char>(u >> 8));
             tagData.append(static_cast<char>(u & 0xFF));

@@ -3,16 +3,17 @@
 
 #include <QWidget>
 
-namespace Ui {
+namespace Ui
+{
 class ManualRenderWidget;
-}
+} // namespace Ui
 
 class ManualRenderWidget : public QWidget
 {
     Q_OBJECT
 
 public:
-    explicit ManualRenderWidget(QWidget *parent = nullptr);
+    explicit ManualRenderWidget(QWidget* parent = nullptr);
     ~ManualRenderWidget();
 
     QVariantMap getParameters() const;
@@ -33,7 +34,7 @@ signals:
     void renderRequested();
 
 private:
-    Ui::ManualRenderWidget *ui;
+    Ui::ManualRenderWidget* ui;
 };
 
 #endif // MANUALRENDERWIDGET_H

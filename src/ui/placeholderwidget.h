@@ -8,6 +8,7 @@
 class PlaceholderWidget : public QWidget
 {
     Q_OBJECT
+
 public:
     using QWidget::QWidget; // Используем конструкторы родителя
 };

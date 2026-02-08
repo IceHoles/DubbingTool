@@ -1,14 +1,13 @@
 #include "settingsdialog.h"
-#include "ui_settingsdialog.h"
+
 #include "appsettings.h"
+#include "ui_settingsdialog.h"
+
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QTableWidgetItem>
 
-
-SettingsDialog::SettingsDialog(QWidget *parent) :
-    QDialog(parent),
-    ui(new Ui::SettingsDialog)
+SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent), ui(new Ui::SettingsDialog)
 {
     ui->setupUi(this);
     loadSettings();
@@ -37,7 +36,8 @@ void SettingsDialog::loadSettings()
     ui->userFileActionComboBox->setCurrentIndex(static_cast<int>(settings.userFileAction()));
 
     ui->tbStylesTable->setRowCount(0);
-    for (const auto& style : settings.tbStyles()) {
+    for (const auto& style : settings.tbStyles())
+    {
         int row = ui->tbStylesTable->rowCount();
         ui->tbStylesTable->insertRow(row);
         ui->tbStylesTable->setItem(row, 0, new QTableWidgetItem(style.name));
@@ -50,13 +50,17 @@ void SettingsDialog::loadSettings()
 
     m_renderPresets = settings.renderPresets();
     ui->renderPresetsList->clear();
-    for (const auto& preset : m_renderPresets) {
+    for (const auto& preset : m_renderPresets)
+    {
         ui->renderPresetsList->addItem(preset.name);
     }
 
-    if (ui->renderPresetsList->count() > 0) {
+    if (ui->renderPresetsList->count() > 0)
+    {
         ui->renderPresetsList->setCurrentRow(0);
-    } else {
+    }
+    else
+    {
         on_renderPresetsList_currentRowChanged(-1);
     }
 
@@ -86,7 +90,8 @@ void SettingsDialog::accept()
     settings.setUserFileAction(static_cast<UserFileAction>(ui->userFileActionComboBox->currentIndex()));
 
     QList<TbStyleInfo> styles;
-    for (int row = 0; row < ui->tbStylesTable->rowCount(); ++row) {
+    for (int row = 0; row < ui->tbStylesTable->rowCount(); ++row)
+    {
         TbStyleInfo style;
         style.name = ui->tbStylesTable->item(row, 0)->text();
         style.resolutionX = ui->tbStylesTable->item(row, 1)->text().toInt();
@@ -101,11 +106,16 @@ void SettingsDialog::accept()
     settings.setRenderPresets(m_renderPresets);
 
     QSet<LogCategory> enabled;
-    if (ui->logAppCheckBox->isChecked()) enabled.insert(LogCategory::APP);
-    if (ui->logMkvToolNixCheckBox->isChecked()) enabled.insert(LogCategory::MKVTOOLNIX);
-    if (ui->logFfmpegCheckBox->isChecked()) enabled.insert(LogCategory::FFMPEG);
-    if (ui->logQbittorrentCheckBox->isChecked()) enabled.insert(LogCategory::QBITTORRENT);
-    if (ui->logDebugCheckBox->isChecked()) enabled.insert(LogCategory::DEBUG);
+    if (ui->logAppCheckBox->isChecked())
+        enabled.insert(LogCategory::APP);
+    if (ui->logMkvToolNixCheckBox->isChecked())
+        enabled.insert(LogCategory::MKVTOOLNIX);
+    if (ui->logFfmpegCheckBox->isChecked())
+        enabled.insert(LogCategory::FFMPEG);
+    if (ui->logQbittorrentCheckBox->isChecked())
+        enabled.insert(LogCategory::QBITTORRENT);
+    if (ui->logDebugCheckBox->isChecked())
+        enabled.insert(LogCategory::DEBUG);
     settings.setEnabledLogCategories(enabled);
 
     settings.save();
@@ -115,28 +125,34 @@ void SettingsDialog::accept()
 void SettingsDialog::on_browseMkvToolNixButton_clicked()
 {
     QString filePath = QFileDialog::getOpenFileName(this, "Выберите mkvmerge.exe", "", "Исполняемые файлы (*.exe)");
-    if (!filePath.isEmpty()) ui->mkvToolNixPathEdit->setText(filePath);
+    if (!filePath.isEmpty())
+        ui->mkvToolNixPathEdit->setText(filePath);
 }
 void SettingsDialog::on_browseMkvExtractButton_clicked()
 {
     QString filePath = QFileDialog::getOpenFileName(this, "Выберите mkvextract.exe", "", "Исполняемые файлы (*.exe)");
-    if (!filePath.isEmpty()) ui->mkvExtractPathEdit->setText(filePath);
+    if (!filePath.isEmpty())
+        ui->mkvExtractPathEdit->setText(filePath);
 }
 void SettingsDialog::on_browseFfmpegButton_clicked()
 {
     QString filePath = QFileDialog::getOpenFileName(this, "Выберите ffmpeg.exe", "", "Исполняемые файлы (*.exe)");
-    if (!filePath.isEmpty()) ui->ffmpegPathEdit->setText(filePath);
+    if (!filePath.isEmpty())
+        ui->ffmpegPathEdit->setText(filePath);
 }
 void SettingsDialog::on_browseQbittorrentButton_clicked()
 {
     QString filePath = QFileDialog::getOpenFileName(this, "Выберите qbittorrent.exe", "", "Исполняемые файлы (*.exe)");
-    if (!filePath.isEmpty()) ui->qbittorrentPathEdit->setText(filePath);
+    if (!filePath.isEmpty())
+        ui->qbittorrentPathEdit->setText(filePath);
 }
 
 void SettingsDialog::on_browseNugenAmbButton_clicked()
 {
-    QString filePath = QFileDialog::getOpenFileName(this, "Выберите NUGEN Audio AMB.exe", "", "Исполняемые файлы (*.exe)");
-    if (!filePath.isEmpty()) ui->nugenAmbPathEdit->setText(filePath);
+    QString filePath =
+        QFileDialog::getOpenFileName(this, "Выберите NUGEN Audio AMB.exe", "", "Исполняемые файлы (*.exe)");
+    if (!filePath.isEmpty())
+        ui->nugenAmbPathEdit->setText(filePath);
 }
 
 void SettingsDialog::on_addTbStyleButton_clicked()
@@ -145,7 +161,9 @@ void SettingsDialog::on_addTbStyleButton_clicked()
     ui->tbStylesTable->insertRow(row);
     ui->tbStylesTable->setItem(row, 0, new QTableWidgetItem("Новый стиль"));
     ui->tbStylesTable->setItem(row, 1, new QTableWidgetItem("1920"));
-    ui->tbStylesTable->setItem(row, 2, new QTableWidgetItem("{\\fad(500,500)\\b1\\an3\\fnTahoma\\fs50\\shad3\\bord1.3\\4c&H000000&\\4a&H00&}"));
+    ui->tbStylesTable->setItem(
+        row, 2,
+        new QTableWidgetItem("{\\fad(500,500)\\b1\\an3\\fnTahoma\\fs50\\shad3\\bord1.3\\4c&H000000&\\4a&H00&}"));
     ui->tbStylesTable->setItem(row, 3, new QTableWidgetItem("10"));
     ui->tbStylesTable->setItem(row, 4, new QTableWidgetItem("30"));
     ui->tbStylesTable->setItem(row, 5, new QTableWidgetItem("10"));
@@ -154,14 +172,16 @@ void SettingsDialog::on_addTbStyleButton_clicked()
 void SettingsDialog::on_removeTbStyleButton_clicked()
 {
     int currentRow = ui->tbStylesTable->currentRow();
-    if (currentRow >= 0) {
+    if (currentRow >= 0)
+    {
         ui->tbStylesTable->removeRow(currentRow);
     }
 }
 
 void SettingsDialog::on_renderPresetsList_currentRowChanged(int currentRow)
 {
-    if (currentRow < 0 || currentRow >= m_renderPresets.size()) {
+    if (currentRow < 0 || currentRow >= m_renderPresets.size())
+    {
         ui->renderPresetNameEdit->clear();
         ui->renderPresetCommandEdit_Pass1->clear();
         ui->renderPresetCommandEdit_Pass2->clear();
@@ -180,10 +200,12 @@ void SettingsDialog::on_renderPresetsList_currentRowChanged(int currentRow)
 void SettingsDialog::on_saveRenderPresetButton_clicked()
 {
     int currentRow = ui->renderPresetsList->currentRow();
-    if (currentRow < 0) return;
+    if (currentRow < 0)
+        return;
 
     QString name = ui->renderPresetNameEdit->text().trimmed();
-    if (name.isEmpty()) {
+    if (name.isEmpty())
+    {
         QMessageBox::warning(this, "Ошибка", "Имя пресета не может быть пустым.");
         return;
     }
@@ -203,7 +225,8 @@ void SettingsDialog::on_newRenderPresetButton_clicked()
 {
     RenderPreset newPreset;
     newPreset.name = "Новый пресет";
-    newPreset.commandPass1 = "ffmpeg -y -hide_banner -i \"%INPUT%\" -vf \"subtitles=%SIGNS%\" -c:v hevc_qsv ...  \"%OUTPUT%\"";
+    newPreset.commandPass1 =
+        "ffmpeg -y -hide_banner -i \"%INPUT%\" -vf \"subtitles=%SIGNS%\" -c:v hevc_qsv ...  \"%OUTPUT%\"";
     newPreset.targetBitrateKbps = 4000;
     m_renderPresets.append(newPreset);
 
@@ -220,11 +243,14 @@ void SettingsDialog::on_newRenderPresetButton_clicked()
 void SettingsDialog::on_deleteRenderPresetButton_clicked()
 {
     int currentRow = ui->renderPresetsList->currentRow();
-    if (currentRow < 0) return;
+    if (currentRow < 0)
+        return;
 
-    auto reply = QMessageBox::question(this, "Подтверждение", "Удалить пресет '" + m_renderPresets[currentRow].name + "'?",
-                                       QMessageBox::Yes | QMessageBox::No);
-    if (reply == QMessageBox::Yes) {
+    auto reply =
+        QMessageBox::question(this, "Подтверждение", "Удалить пресет '" + m_renderPresets[currentRow].name + "'?",
+                              QMessageBox::Yes | QMessageBox::No);
+    if (reply == QMessageBox::Yes)
+    {
         m_renderPresets.removeAt(currentRow);
         delete ui->renderPresetsList->takeItem(currentRow);
 

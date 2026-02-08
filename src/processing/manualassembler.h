@@ -1,12 +1,12 @@
 #ifndef MANUALASSEMBLER_H
 #define MANUALASSEMBLER_H
 
-#include <QObject>
-#include <QVariantMap>
-#include <QProcess>
-#include <QTimer>
 #include "appsettings.h"
 
+#include <QObject>
+#include <QProcess>
+#include <QTimer>
+#include <QVariantMap>
 
 class ProcessManager;
 class AssProcessor;
@@ -15,8 +15,9 @@ class ReleaseTemplate;
 class ManualAssembler : public QObject
 {
     Q_OBJECT
+
 public:
-    explicit ManualAssembler(const QVariantMap &params, QObject *parent = nullptr);
+    explicit ManualAssembler(const QVariantMap& params, QObject* parent = nullptr);
     ~ManualAssembler();
     void start();
     ProcessManager* getProcessManager() const;
@@ -31,7 +32,7 @@ signals:
 
 private slots:
     void onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
-    void onProcessText(const QString &output);
+    void onProcessText(const QString& output);
     void onConversionProgress();
 
 private:
@@ -41,10 +42,16 @@ private:
     void assemble();
 
     QVariantMap m_params;
-    ProcessManager *m_processManager;
-    AssProcessor *m_assProcessor;
+    ProcessManager* m_processManager;
+    AssProcessor* m_assProcessor;
 
-    enum class Step { Idle, NormalizingAudio, ConvertingAudio, AssemblingMkv };
+    enum class Step
+    {
+        Idle,
+        NormalizingAudio,
+        ConvertingAudio,
+        AssemblingMkv
+    };
     Step m_currentStep = Step::Idle;
 
     QString m_ffmpegPath;

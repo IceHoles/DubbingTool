@@ -1,16 +1,17 @@
 #ifndef APPSETTINGS_H
 #define APPSETTINGS_H
 
-#include <QObject>
-#include <QSettings>
-#include <QList>
-#include <QMap>
-#include <QSet>
-#include <QJsonObject>
 #include "releasetemplate.h"
 
+#include <QJsonObject>
+#include <QList>
+#include <QMap>
+#include <QObject>
+#include <QSet>
+#include <QSettings>
 
-enum class LogCategory {
+enum class LogCategory
+{
     APP,
     FFMPEG,
     MKVTOOLNIX,
@@ -18,26 +19,32 @@ enum class LogCategory {
     DEBUG
 };
 
-enum class UserFileAction {
+enum class UserFileAction
+{
     Move,
     Copy,
     UseOriginalPath
 };
 
-struct RenderPreset {
+struct RenderPreset
+{
     QString name;
     QString commandPass1;
-    QString commandPass2;       // Может быть пустой для однопроходного
-    int targetBitrateKbps = 0;  // Целевой битрейт в кбит/с. 0 - не проверять.
+    QString commandPass2;      // Может быть пустой для однопроходного
+    int targetBitrateKbps = 0; // Целевой битрейт в кбит/с. 0 - не проверять.
 
-    bool isTwoPass() const { return !commandPass2.isEmpty(); }
+    bool isTwoPass() const
+    {
+        return !commandPass2.isEmpty();
+    }
 };
 
 class AppSettings : public QObject
 {
     Q_OBJECT
+
 private:
-    explicit AppSettings(QObject *parent = nullptr);
+    explicit AppSettings(QObject* parent = nullptr);
     AppSettings(const AppSettings&) = delete;
     AppSettings& operator=(const AppSettings&) = delete;
 
@@ -47,35 +54,35 @@ public:
     void save();
 
     QSet<LogCategory> enabledLogCategories() const;
-    void setEnabledLogCategories(const QSet<LogCategory> &categories);
+    void setEnabledLogCategories(const QSet<LogCategory>& categories);
     QString qbittorrentHost() const;
-    void setQbittorrentHost(const QString &host);
+    void setQbittorrentHost(const QString& host);
     int qbittorrentPort() const;
     void setQbittorrentPort(int port);
     QString qbittorrentUser() const;
-    void setQbittorrentUser(const QString &user);
+    void setQbittorrentUser(const QString& user);
     QString qbittorrentPassword() const;
-    void setQbittorrentPassword(const QString &password);
+    void setQbittorrentPassword(const QString& password);
     QString mkvmergePath() const;
-    void setMkvmergePath(const QString &path);
+    void setMkvmergePath(const QString& path);
     QString mkvextractPath() const;
-    void setMkvextractPath(const QString &path);
+    void setMkvextractPath(const QString& path);
     QString ffmpegPath() const;
-    void setFfmpegPath(const QString &path);
+    void setFfmpegPath(const QString& path);
     QString ffprobePath() const;
     QString qbittorrentPath() const;
-    void setQbittorrentPath(const QString &path);
+    void setQbittorrentPath(const QString& path);
     QString nugenAmbPath() const;
-    void setNugenAmbPath(const QString &path);
+    void setNugenAmbPath(const QString& path);
     bool deleteTempFiles() const;
     void setDeleteTempFiles(bool enabled);
     UserFileAction userFileAction() const;
     void setUserFileAction(UserFileAction action);
     QList<TbStyleInfo> tbStyles() const;
-    void setTbStyles(const QList<TbStyleInfo> &styles);
+    void setTbStyles(const QList<TbStyleInfo>& styles);
     TbStyleInfo findTbStyle(const QString& name) const;
     QList<RenderPreset> renderPresets() const;
-    void setRenderPresets(const QList<RenderPreset> &presets);
+    void setRenderPresets(const QList<RenderPreset>& presets);
     RenderPreset findRenderPreset(const QString& name) const;
     void setManualRenderPreset();
     RenderPreset manualRenderPreset(const QString& name) const;

@@ -5,30 +5,31 @@
 #include <QList>
 #include <QString>
 
-
-struct AudioTrackInfo {
+struct AudioTrackInfo
+{
     int id;
     QString codec;
     QString name;
     QString language;
 };
 
-namespace Ui {
+namespace Ui
+{
 class TrackSelectorDialog;
-}
+} // namespace Ui
 
 class TrackSelectorDialog : public QDialog
 {
     Q_OBJECT
 
 public:
-    explicit TrackSelectorDialog(const QList<AudioTrackInfo> &tracks, QWidget *parent = nullptr);
+    explicit TrackSelectorDialog(const QList<AudioTrackInfo>& tracks, QWidget* parent = nullptr);
     ~TrackSelectorDialog();
 
     int getSelectedTrackId() const;
 
 private:
-    Ui::TrackSelectorDialog *ui;
+    Ui::TrackSelectorDialog* ui;
     QList<AudioTrackInfo> m_tracks;
 };
 

@@ -1,11 +1,11 @@
 #include "rerenderdialog.h"
+
 #include "ui_rerenderdialog.h"
+
 #include "QPushButton"
 
-
-RerenderDialog::RerenderDialog(const RenderPreset &preset, double actualBitrate, QWidget *parent) :
-    QDialog(parent),
-    ui(new Ui::RerenderDialog)
+RerenderDialog::RerenderDialog(const RenderPreset& preset, double actualBitrate, QWidget* parent)
+    : QDialog(parent), ui(new Ui::RerenderDialog)
 {
     ui->setupUi(this);
 
@@ -15,7 +15,8 @@ RerenderDialog::RerenderDialog(const RenderPreset &preset, double actualBitrate,
     ui->command1Edit->setPlainText(preset.commandPass1);
     ui->command2Edit->setPlainText(preset.commandPass2);
 
-    if (!preset.isTwoPass()) {
+    if (!preset.isTwoPass())
+    {
         ui->command2Edit->setVisible(false);
     }
 

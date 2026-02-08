@@ -3,28 +3,29 @@
 
 #include <QDialog>
 
-
-struct TorrentInfo {
+struct TorrentInfo
+{
     QString title;
     QString magnetLink;
 };
 
-namespace Ui {
+namespace Ui
+{
 class TorrentSelectorDialog;
-}
+} // namespace Ui
 
 class TorrentSelectorDialog : public QDialog
 {
     Q_OBJECT
 
 public:
-    explicit TorrentSelectorDialog(const QList<TorrentInfo> &torrents, QWidget *parent = nullptr);
+    explicit TorrentSelectorDialog(const QList<TorrentInfo>& torrents, QWidget* parent = nullptr);
     ~TorrentSelectorDialog();
 
     int getSelectedIndex() const;
 
 private:
-    Ui::TorrentSelectorDialog *ui;
+    Ui::TorrentSelectorDialog* ui;
 };
 
 #endif // TORRENTSELECTORDIALOG_H

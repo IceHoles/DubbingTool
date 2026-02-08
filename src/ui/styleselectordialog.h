@@ -4,24 +4,24 @@
 #include <QDialog>
 #include <QStringList>
 
-
-namespace Ui {
+namespace Ui
+{
 class StyleSelectorDialog;
-}
+} // namespace Ui
 
 class StyleSelectorDialog : public QDialog
 {
     Q_OBJECT
 
 public:
-    explicit StyleSelectorDialog(QWidget *parent = nullptr);
+    explicit StyleSelectorDialog(QWidget* parent = nullptr);
     ~StyleSelectorDialog();
 
-    void analyzeFile(const QString &filePath);
+    void analyzeFile(const QString& filePath);
     QStringList getSelectedStyles() const;
 
 private:
-    Ui::StyleSelectorDialog *ui;
+    Ui::StyleSelectorDialog* ui;
 };
 
 #endif // STYLESELECTORDIALOG_H

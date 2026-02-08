@@ -2,12 +2,13 @@
 #define RENDERHELPER_H
 
 #include "appsettings.h"
-#include <QObject>
 
+#include <QObject>
 
 class ProcessManager;
 
-enum class RerenderDecision {
+enum class RerenderDecision
+{
     Accept,
     Rerender
 };
@@ -15,18 +16,17 @@ enum class RerenderDecision {
 class RenderHelper : public QObject
 {
     Q_OBJECT
+
 public:
-    explicit RenderHelper(RenderPreset preset,
-                          const QString &outputMp4Path,
-                          ProcessManager* procManager,
-                          QObject *parent = nullptr);
+    explicit RenderHelper(RenderPreset preset, const QString& outputMp4Path, ProcessManager* procManager,
+                          QObject* parent = nullptr);
 
     void startCheck();
 
 signals:
-    void finished(RerenderDecision decision, const RenderPreset &newPreset);
+    void finished(RerenderDecision decision, const RenderPreset& newPreset);
     void logMessage(const QString& message, LogCategory category = LogCategory::APP);
-    void showDialogRequest(const RenderPreset &preset, double actualBitrate);
+    void showDialogRequest(const RenderPreset& preset, double actualBitrate);
 
 public slots:
     void onDialogFinished(bool accepted, const QString& pass1, const QString& pass2);

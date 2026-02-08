@@ -1,29 +1,27 @@
 #include "setupwizarddialog.h"
+
 #include "appsettings.h"
 
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QGroupBox>
+#include <QDesktopServices>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFont>
 #include <QFrame>
-#include <QDesktopServices>
+#include <QGroupBox>
+#include <QHBoxLayout>
 #include <QUrl>
+#include <QVBoxLayout>
 
-
-SetupWizardDialog::SetupWizardDialog(QWidget *parent)
-    : QDialog(parent)
-    , m_stack(new QStackedWidget(this))
+SetupWizardDialog::SetupWizardDialog(QWidget* parent) : QDialog(parent), m_stack(new QStackedWidget(this))
 {
     setWindowTitle("Мастер настройки — DubbingTool");
     setMinimumSize(600, 420);
 
-    auto *mainLayout = new QVBoxLayout(this);
+    auto* mainLayout = new QVBoxLayout(this);
     mainLayout->addWidget(m_stack, 1);
 
     // Navigation bar
-    auto *navLayout = new QHBoxLayout();
+    auto* navLayout = new QHBoxLayout();
     m_backButton = new QPushButton("← Назад", this);
     m_skipButton = new QPushButton("Пропустить", this);
     m_nextButton = new QPushButton("Далее →", this);
@@ -58,31 +56,29 @@ SetupWizardDialog::SetupWizardDialog(QWidget *parent)
 
 void SetupWizardDialog::buildToolsPage()
 {
-    auto *page = new QWidget(this);
-    auto *layout = new QVBoxLayout(page);
+    auto* page = new QWidget(this);
+    auto* layout = new QVBoxLayout(page);
 
-    auto *title = new QLabel("Шаг 1 из 3 — Проверка инструментов", page);
+    auto* title = new QLabel("Шаг 1 из 3 — Проверка инструментов", page);
     QFont titleFont = title->font();
     titleFont.setBold(true);
     titleFont.setPointSize(titleFont.pointSize() + 2);
     title->setFont(titleFont);
     layout->addWidget(title);
 
-    auto *desc = new QLabel(
-        "Для работы необходимы FFmpeg и MKVToolNix. "
-        "Программа автоматически ищет их в папке tools/, рядом с exe и в системном PATH. "
-        "Если инструмент не найден — укажите путь вручную или скачайте по ссылкам ниже.",
-        page);
+    auto* desc = new QLabel("Для работы необходимы FFmpeg и MKVToolNix. "
+                            "Программа автоматически ищет их в папке tools/, рядом с exe и в системном PATH. "
+                            "Если инструмент не найден — укажите путь вручную или скачайте по ссылкам ниже.",
+                            page);
     desc->setWordWrap(true);
     layout->addWidget(desc);
 
     // Download links
-    auto *linksLayout = new QHBoxLayout();
-    auto *ffmpegLink = new QLabel(
-        "<a href=\"https://www.gyan.dev/ffmpeg/builds/\">Скачать FFmpeg</a>", page);
+    auto* linksLayout = new QHBoxLayout();
+    auto* ffmpegLink = new QLabel("<a href=\"https://www.gyan.dev/ffmpeg/builds/\">Скачать FFmpeg</a>", page);
     ffmpegLink->setOpenExternalLinks(true);
-    auto *mkvtoolnixLink = new QLabel(
-        "<a href=\"https://mkvtoolnix.download/downloads.html\">Скачать MKVToolNix</a>", page);
+    auto* mkvtoolnixLink =
+        new QLabel("<a href=\"https://mkvtoolnix.download/downloads.html\">Скачать MKVToolNix</a>", page);
     mkvtoolnixLink->setOpenExternalLinks(true);
     linksLayout->addWidget(ffmpegLink);
     linksLayout->addWidget(mkvtoolnixLink);
@@ -94,16 +90,17 @@ void SetupWizardDialog::buildToolsPage()
     m_toolsGrid = new QGridLayout();
     m_toolsGrid->setColumnStretch(2, 1);
 
-    struct ToolDef {
+    struct ToolDef
+    {
         QString exeName;
         QString displayName;
         bool required;
     };
     const QList<ToolDef> kToolDefs = {
-        {"ffmpeg.exe",         "FFmpeg",      true},
-        {"ffprobe.exe",        "FFprobe",     true},
-        {"mkvmerge.exe",       "MKVmerge",    true},
-        {"mkvextract.exe",     "MKVextract",  true},
+        {    "ffmpeg.exe",     "FFmpeg", true},
+        {   "ffprobe.exe",    "FFprobe", true},
+        {  "mkvmerge.exe",   "MKVmerge", true},
+        {"mkvextract.exe", "MKVextract", true},
     };
 
     for (int32_t i = 0; i < kToolDefs.size(); ++i)
@@ -117,7 +114,7 @@ void SetupWizardDialog::buildToolsPage()
         row.statusIcon->setFixedWidth(24);
         row.statusIcon->setAlignment(Qt::AlignCenter);
 
-        auto *nameLabel = new QLabel(row.displayName + ":", page);
+        auto* nameLabel = new QLabel(row.displayName + ":", page);
         nameLabel->setFixedWidth(100);
 
         row.pathEdit = new QLineEdit(page);
@@ -133,21 +130,19 @@ void SetupWizardDialog::buildToolsPage()
         m_toolsGrid->addWidget(row.browseButton, i, 3);
 
         const int32_t kToolIdx = i;
-        connect(row.browseButton, &QPushButton::clicked, this, [this, kToolIdx]() {
-            slotBrowseTool(kToolIdx);
-        });
+        connect(row.browseButton, &QPushButton::clicked, this, [this, kToolIdx]() { slotBrowseTool(kToolIdx); });
 
         m_tools.append(row);
     }
 
     // Separator before optional tools
     int32_t separatorRow = kToolDefs.size();
-    auto *separator = new QFrame(page);
+    auto* separator = new QFrame(page);
     separator->setFrameShape(QFrame::HLine);
     separator->setFrameShadow(QFrame::Sunken);
     m_toolsGrid->addWidget(separator, separatorRow, 0, 1, 4);
 
-    auto *optionalLabel = new QLabel("<i>Необязательные:</i>", page);
+    auto* optionalLabel = new QLabel("<i>Необязательные:</i>", page);
     m_toolsGrid->addWidget(optionalLabel, separatorRow + 1, 0, 1, 4);
 
     // NUGEN Audio AMB — optional
@@ -162,7 +157,7 @@ void SetupWizardDialog::buildToolsPage()
         row.statusIcon->setFixedWidth(24);
         row.statusIcon->setAlignment(Qt::AlignCenter);
 
-        auto *nameLabel = new QLabel(row.displayName + ":", page);
+        auto* nameLabel = new QLabel(row.displayName + ":", page);
         nameLabel->setFixedWidth(100);
 
         row.pathEdit = new QLineEdit(page);
@@ -178,9 +173,7 @@ void SetupWizardDialog::buildToolsPage()
         m_toolsGrid->addWidget(row.browseButton, nugenRow, 3);
 
         const int32_t kToolIdx = m_tools.size();
-        connect(row.browseButton, &QPushButton::clicked, this, [this, kToolIdx]() {
-            slotBrowseTool(kToolIdx);
-        });
+        connect(row.browseButton, &QPushButton::clicked, this, [this, kToolIdx]() { slotBrowseTool(kToolIdx); });
 
         m_tools.append(row);
     }
@@ -193,29 +186,28 @@ void SetupWizardDialog::buildToolsPage()
 
 void SetupWizardDialog::buildQBittorrentPage()
 {
-    auto *page = new QWidget(this);
-    auto *layout = new QVBoxLayout(page);
+    auto* page = new QWidget(this);
+    auto* layout = new QVBoxLayout(page);
 
-    auto *title = new QLabel("Шаг 2 из 3 — qBittorrent Web API", page);
+    auto* title = new QLabel("Шаг 2 из 3 — qBittorrent Web API", page);
     QFont titleFont = title->font();
     titleFont.setBold(true);
     titleFont.setPointSize(titleFont.pointSize() + 2);
     title->setFont(titleFont);
     layout->addWidget(title);
 
-    auto *desc = new QLabel(
-        "Настройте подключение к qBittorrent для автоматической загрузки торрентов. "
-        "Если вы не используете qBittorrent — нажмите «Пропустить».",
-        page);
+    auto* desc = new QLabel("Настройте подключение к qBittorrent для автоматической загрузки торрентов. "
+                            "Если вы не используете qBittorrent — нажмите «Пропустить».",
+                            page);
     desc->setWordWrap(true);
     layout->addWidget(desc);
 
     layout->addSpacing(8);
 
-    const auto &settings = AppSettings::instance();
+    const auto& settings = AppSettings::instance();
 
-    auto *group = new QGroupBox("Подключение", page);
-    auto *form = new QGridLayout(group);
+    auto* group = new QGroupBox("Подключение", page);
+    auto* form = new QGridLayout(group);
 
     form->addWidget(new QLabel("Хост:", group), 0, 0);
     m_qbtHostEdit = new QLineEdit(settings.qbittorrentHost(), group);
@@ -245,41 +237,39 @@ void SetupWizardDialog::buildQBittorrentPage()
 
 void SetupWizardDialog::buildPresetPage()
 {
-    auto *page = new QWidget(this);
-    auto *layout = new QVBoxLayout(page);
+    auto* page = new QWidget(this);
+    auto* layout = new QVBoxLayout(page);
 
-    auto *title = new QLabel("Шаг 3 из 3 — Пресет рендера", page);
+    auto* title = new QLabel("Шаг 3 из 3 — Пресет рендера", page);
     QFont titleFont = title->font();
     titleFont.setBold(true);
     titleFont.setPointSize(titleFont.pointSize() + 2);
     title->setFont(titleFont);
     layout->addWidget(title);
 
-    auto *desc = new QLabel(
-        "Выберите пресет рендера, соответствующий вашему оборудованию. "
-        "Его можно изменить позже в настройках или в шаблоне проекта.",
-        page);
+    auto* desc = new QLabel("Выберите пресет рендера, соответствующий вашему оборудованию. "
+                            "Его можно изменить позже в настройках или в шаблоне проекта.",
+                            page);
     desc->setWordWrap(true);
     layout->addWidget(desc);
 
     layout->addSpacing(8);
 
-    auto *group = new QGroupBox("Пресет по умолчанию", page);
-    auto *groupLayout = new QVBoxLayout(group);
+    auto* group = new QGroupBox("Пресет по умолчанию", page);
+    auto* groupLayout = new QVBoxLayout(group);
 
     m_presetCombo = new QComboBox(group);
     const auto kPresets = AppSettings::instance().renderPresets();
-    for (const auto &preset : kPresets)
+    for (const auto& preset : kPresets)
     {
         m_presetCombo->addItem(preset.name);
     }
     groupLayout->addWidget(m_presetCombo);
 
-    auto *hint = new QLabel(
-        "• NVIDIA — для видеокарт NVIDIA (быстро, хорошее качество)\n"
-        "• INTEL — для встроенной графики Intel (быстро)\n"
-        "• CPU — универсальный, работает везде (медленнее, но качественнее)",
-        group);
+    auto* hint = new QLabel("• NVIDIA — для видеокарт NVIDIA (быстро, хорошее качество)\n"
+                            "• INTEL — для встроенной графики Intel (быстро)\n"
+                            "• CPU — универсальный, работает везде (медленнее, но качественнее)",
+                            group);
     hint->setWordWrap(true);
     groupLayout->addWidget(hint);
 
@@ -291,7 +281,7 @@ void SetupWizardDialog::buildPresetPage()
 
 void SetupWizardDialog::detectTools()
 {
-    const auto &settings = AppSettings::instance();
+    const auto& settings = AppSettings::instance();
 
     // ffmpeg
     updateToolStatus(0, settings.ffmpegPath());
@@ -305,14 +295,14 @@ void SetupWizardDialog::detectTools()
     updateToolStatus(4, settings.nugenAmbPath());
 }
 
-void SetupWizardDialog::updateToolStatus(int32_t toolIndex, const QString &path)
+void SetupWizardDialog::updateToolStatus(int32_t toolIndex, const QString& path)
 {
     if (toolIndex < 0 || toolIndex >= m_tools.size())
     {
         return;
     }
 
-    auto &row = m_tools[toolIndex];
+    auto& row = m_tools[toolIndex];
     bool found = !path.isEmpty() && QFileInfo::exists(path);
 
     if (found)
@@ -345,7 +335,7 @@ void SetupWizardDialog::updateNextButtonState()
 
     // Page 1: all required tools must be found
     bool allFound = true;
-    for (const auto &row : m_tools)
+    for (const auto& row : m_tools)
     {
         if (row.required && !QFileInfo::exists(row.pathEdit->text()))
         {
@@ -363,13 +353,9 @@ void SetupWizardDialog::slotBrowseTool(int32_t toolIndex)
         return;
     }
 
-    const auto &row = m_tools[toolIndex];
+    const auto& row = m_tools[toolIndex];
     QString filter = QString("%1 (%2)").arg(row.displayName, row.exeName);
-    QString path = QFileDialog::getOpenFileName(
-        this,
-        "Укажите путь к " + row.displayName,
-        QString(),
-        filter);
+    QString path = QFileDialog::getOpenFileName(this, "Укажите путь к " + row.displayName, QString(), filter);
 
     if (!path.isEmpty())
     {
@@ -385,7 +371,7 @@ void SetupWizardDialog::slotNextPage()
     // Save page 1 data before leaving
     if (current == 0)
     {
-        auto &settings = AppSettings::instance();
+        auto& settings = AppSettings::instance();
         if (m_tools.size() >= 5)
         {
             settings.setFfmpegPath(m_tools[0].pathEdit->text());
@@ -445,7 +431,7 @@ void SetupWizardDialog::slotSkipQBittorrent()
 
 void SetupWizardDialog::slotFinish()
 {
-    auto &settings = AppSettings::instance();
+    auto& settings = AppSettings::instance();
 
     // Save tool paths (page 1)
     if (m_tools.size() >= 5)

@@ -1,13 +1,13 @@
 #ifndef FONTFINDER_H
 #define FONTFINDER_H
 
-#include <QObject>
-#include <QStringList>
-#include <QList>
-#include <QSet>
-#include <QMap>
-
 #include "appsettings.h"
+
+#include <QList>
+#include <QMap>
+#include <QObject>
+#include <QSet>
+#include <QStringList>
 
 /**
  * @brief Information about a found font file
