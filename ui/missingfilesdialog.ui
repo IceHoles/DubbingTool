@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>750</width>
-    <height>640</height>
+    <width>900</width>
+    <height>700</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -95,30 +95,21 @@
        </widget>
       </item>
       <item>
-       <widget class="QLabel" name="previewImageLabel">
+       <widget class="QWidget" name="videoContainer" native="true">
         <property name="minimumSize">
          <size>
           <width>640</width>
-          <height>270</height>
+          <height>360</height>
          </size>
         </property>
         <property name="sizePolicy">
          <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
+          <horstretch>1</horstretch>
+          <verstretch>1</verstretch>
          </sizepolicy>
         </property>
-        <property name="text">
-         <string>Загрузка превью...</string>
-        </property>
-        <property name="alignment">
-         <set>Qt::AlignmentFlag::AlignCenter</set>
-        </property>
         <property name="styleSheet">
-         <string>background-color: #1a1a1a; color: #888;</string>
-        </property>
-        <property name="scaledContents">
-         <bool>false</bool>
+         <string>background-color: #1a1a1a;</string>
         </property>
        </widget>
       </item>
@@ -199,16 +190,6 @@
          </widget>
         </item>
         <item>
-         <widget class="QPushButton" name="previewFrameButton">
-          <property name="text">
-           <string>Показать кадр</string>
-          </property>
-          <property name="toolTip">
-           <string>Принудительно обновить превью</string>
-          </property>
-         </widget>
-        </item>
-        <item>
          <widget class="QPushButton" name="openInPlayerButton">
           <property name="text">
            <string>Открыть в плеере</string>
@@ -232,19 +213,6 @@
       </item>
      </layout>
     </widget>
-   </item>
-   <item>
-    <spacer name="verticalSpacer">
-     <property name="orientation">
-      <enum>Qt::Orientation::Vertical</enum>
-     </property>
-     <property name="sizeHint" stdset="0">
-      <size>
-       <width>20</width>
-       <height>40</height>
-      </size>
-     </property>
-    </spacer>
    </item>
    <item>
     <widget class="QDialogButtonBox" name="buttonBox">

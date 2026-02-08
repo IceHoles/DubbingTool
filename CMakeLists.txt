@@ -18,7 +18,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Tell AUTOUIC where to find .ui files
 set(CMAKE_AUTOUIC_SEARCH_PATHS ${CMAKE_SOURCE_DIR}/ui)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network Xml)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network Xml Multimedia MultimediaWidgets)
 
 # Source files organized by module
 set(SOURCES_CORE
@@ -166,6 +166,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt6::Widgets
     Qt6::Network
     Qt6::Xml
+    Qt6::Multimedia
+    Qt6::MultimediaWidgets
 )
 
 # Enable warnings
