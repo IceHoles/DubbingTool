@@ -2,13 +2,27 @@ name: Windows CI Build
 
 on:
   push:
-    branches:
-      - 'main'
+    branches: ['**']
   pull_request:
-    branches:
-      - 'main'
+    branches: ['main']
 
 jobs:
+  format-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install LLVM 18
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "18"
+
+      - name: Check clang-format
+        run: |
+          find src -type f \( -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \) \
+            -exec clang-format --dry-run --Werror {} +
+
   build:
     runs-on: windows-latest
 
@@ -19,8 +33,8 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@v3
         with:
-          version: '6.7.2'
-          arch: 'win64_msvc2019_64'
+          version: '6.10.2'
+          arch: 'win64_msvc2022_64'
           modules: 'qtmultimedia'
           cache: true
 
@@ -46,18 +60,20 @@ jobs:
 
       - name: Deploy Qt dependencies
         run: |
-          & "$env:Qt6_DIR\bin\windeployqt.exe" --release build\DubbingTool.exe
+          New-Item -ItemType Directory -Force -Path build\deploy
+          Copy-Item build\DubbingTool.exe build\deploy\
+          & "$env:Qt6_DIR\bin\windeployqt.exe" --release build\deploy\DubbingTool.exe
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: DubbingTool-Windows-x64
-          path: build/
-          retention-days: 90
+          path: build/deploy/
+          retention-days: 30
 
   clang-tidy:
     runs-on: windows-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -65,33 +81,25 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@v3
         with:
-          version: '6.7.2'
-          arch: 'win64_msvc2019_64'
+          version: '6.10.2'
+          arch: 'win64_msvc2022_64'
           modules: 'qtmultimedia'
           cache: true
 
       - name: Install LLVM
         uses: KyleMayes/install-llvm-action@v2
         with:
-          version: "17"
+          version: "18"
 
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
 
-      - name: Configure CMake with compile_commands.json
+      - name: Configure and Build with clang-tidy
         run: |
           cmake -B build -G Ninja `
             -DCMAKE_BUILD_TYPE=Release `
             -DCMAKE_PREFIX_PATH="$env:Qt6_DIR" `
-            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-
-      - name: Run clang-tidy
-        run: |
-          $files = Get-ChildItem -Path . -Include *.cpp -Recurse | Where-Object { $_.FullName -notmatch 'build' }
-          foreach ($file in $files) {
-            Write-Host "Checking $($file.Name)..."
-            clang-tidy $file.FullName -p build --warnings-as-errors="" 2>&1 | Out-Default
-          }
-        continue-on-error: true
+            -DENABLE_CLANG_TIDY=ON
+          cmake --build build --config Release
