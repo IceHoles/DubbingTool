@@ -1,17 +1,17 @@
 #include "missingfilesdialog.h"
 #include "ui_missingfilesdialog.h"
 
+#include <QAudioOutput>
 #include <QDesktopServices>
-#include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QListWidgetItem>
-#include <QPixmap>
+#include <QMediaPlayer>
 #include <QProcess>
-#include <QStandardPaths>
 #include <QTime>
-#include <QTimer>
 #include <QUrl>
+#include <QVBoxLayout>
+#include <QVideoWidget>
 
 #include "appsettings.h"
 
@@ -25,16 +25,11 @@ MissingFilesDialog::MissingFilesDialog(QWidget *parent) :
     ui->fontsGroupBox->setVisible(false);
     ui->timeGroupBox->setVisible(false);
 
-    // Async FFmpeg process for frame extraction
-    m_ffmpegProcess = new QProcess(this);
-    connect(m_ffmpegProcess, &QProcess::finished,
-            this, &MissingFilesDialog::slotExtractionFinished);
-    connect(m_ffmpegProcess, &QProcess::errorOccurred,
-            this, &MissingFilesDialog::slotExtractionError);
+    // Prepare the container layout for the video widget (widget added later in setVideoFile)
+    auto *containerLayout = new QVBoxLayout(ui->videoContainer);
+    containerLayout->setContentsMargins(0, 0, 0, 0);
 
     // Viewfinder connections
-    connect(ui->previewFrameButton, &QPushButton::clicked,
-            this, &MissingFilesDialog::slotPreviewFrame);
     connect(ui->openInPlayerButton, &QPushButton::clicked,
             this, &MissingFilesDialog::slotOpenInPlayer);
     connect(ui->timeSlider, &QSlider::valueChanged,
@@ -51,32 +46,13 @@ MissingFilesDialog::MissingFilesDialog(QWidget *parent) :
             this, &MissingFilesDialog::slotPlayPause);
     connect(ui->nextFrameButton, &QPushButton::clicked,
             this, &MissingFilesDialog::slotNextFrame);
-
-    // Prepare temp path for preview image
-    m_previewTempPath = QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation))
-                            .filePath("dubbing_tool_tb_preview.jpg");
 }
 
 MissingFilesDialog::~MissingFilesDialog()
 {
-    // Prevent the pipeline from restarting during cleanup
-    m_isPlaying = false;
-    m_pendingSeekTimeS = -1.0;
-
-    // Disconnect all signals before killing to avoid slotExtractionFinished
-    // starting a new process on a half-destroyed object
-    m_ffmpegProcess->disconnect();
-
-    if (m_ffmpegProcess->state() != QProcess::NotRunning)
+    if (m_mediaPlayer != nullptr)
     {
-        m_ffmpegProcess->kill();
-        m_ffmpegProcess->waitForFinished(1000);
-    }
-
-    // Clean up temp preview file
-    if (QFileInfo::exists(m_previewTempPath))
-    {
-        QFile::remove(m_previewTempPath);
+        m_mediaPlayer->stop();
     }
     delete ui;
 }
@@ -98,7 +74,7 @@ void MissingFilesDialog::setMissingFonts(const QStringList &fontNames)
     ui->fontsListWidget->clear();
     for (const QString &name : fontNames)
     {
-        QListWidgetItem *item = new QListWidgetItem(name);
+        auto *item = new QListWidgetItem(name);
         item->setForeground(Qt::red);
         ui->fontsListWidget->addItem(item);
     }
@@ -129,8 +105,9 @@ void MissingFilesDialog::setVideoFile(const QString &videoPath, double durationS
     m_videoFilePath = videoPath;
     m_videoDurationS = durationS;
 
-    // Detect actual frame rate from video (fallback to 25fps)
     bool hasVideo = !m_videoFilePath.isEmpty() && QFileInfo::exists(m_videoFilePath);
+
+    // Detect actual frame rate from video (fallback to 25fps)
     if (hasVideo)
     {
         m_fps = detectFps();
@@ -161,17 +138,36 @@ void MissingFilesDialog::setVideoFile(const QString &videoPath, double durationS
     // Enable/disable viewfinder controls
     setViewfinderEnabled(hasVideo);
 
-    // Extract initial frame at the starting position
-    if (hasVideo && m_videoDurationS > 0.0)
+    // Create and initialize the media player lazily — the video container
+    // must be visible before QVideoWidget can initialize its rendering surface
+    if (hasVideo && m_mediaPlayer == nullptr)
     {
-        double initialTimeS = sliderValueToSeconds(ui->timeSlider->value());
-        requestFrameExtraction(initialTimeS);
+        m_audioOutput = new QAudioOutput(this);
+        m_mediaPlayer = new QMediaPlayer(this);
+        m_videoWidget = new QVideoWidget();
+        m_videoWidget->setAspectRatioMode(Qt::KeepAspectRatio);
+
+        m_mediaPlayer->setAudioOutput(m_audioOutput);
+        m_mediaPlayer->setVideoOutput(m_videoWidget);
+
+        // Add QVideoWidget to the container (which is now visible)
+        ui->videoContainer->layout()->addWidget(m_videoWidget);
+
+        connect(m_mediaPlayer, &QMediaPlayer::positionChanged,
+                this, &MissingFilesDialog::slotPlayerPositionChanged);
+        connect(m_mediaPlayer, &QMediaPlayer::mediaStatusChanged,
+                this, &MissingFilesDialog::slotMediaStatusChanged);
+    }
+
+    // Load video into QMediaPlayer
+    if (hasVideo && m_mediaPlayer != nullptr)
+    {
+        m_mediaPlayer->setSource(QUrl::fromLocalFile(m_videoFilePath));
     }
 }
 
 void MissingFilesDialog::setViewfinderEnabled(bool enabled)
 {
-    ui->previewFrameButton->setEnabled(enabled);
     ui->openInPlayerButton->setEnabled(enabled);
     ui->prevFrameButton->setEnabled(enabled);
     ui->playPauseButton->setEnabled(enabled);
@@ -218,12 +214,6 @@ void MissingFilesDialog::setTimePrompt(const QString &text)
 // Viewfinder slots
 // =============================================================================
 
-void MissingFilesDialog::slotPreviewFrame()
-{
-    double timeS = sliderValueToSeconds(ui->timeSlider->value());
-    requestFrameExtraction(timeS);
-}
-
 void MissingFilesDialog::slotOpenInPlayer()
 {
     if (!m_videoFilePath.isEmpty())
@@ -234,8 +224,9 @@ void MissingFilesDialog::slotOpenInPlayer()
 
 void MissingFilesDialog::slotSliderPressed()
 {
-    // User started dragging — stop playback
-    if (m_isPlaying)
+    // User started dragging — pause playback
+    if (m_mediaPlayer != nullptr
+        && m_mediaPlayer->playbackState() == QMediaPlayer::PlayingState)
     {
         stopPlayback();
     }
@@ -251,9 +242,13 @@ void MissingFilesDialog::slotSliderValueChanged(int value)
     syncTimeEditFromSlider(value);
     m_syncInProgress = false;
 
-    // Pipeline: request extraction at the new position
-    // If extraction is already running, this queues the latest position
-    requestFrameExtraction(sliderValueToSeconds(value));
+    // Seek the player to the new position
+    if (m_mediaPlayer != nullptr)
+    {
+        double timeS = sliderValueToSeconds(value);
+        qint64 positionMs = static_cast<qint64>(timeS * 1000.0);
+        m_mediaPlayer->setPosition(positionMs);
+    }
 }
 
 void MissingFilesDialog::slotTimeEditChanged()
@@ -266,10 +261,14 @@ void MissingFilesDialog::slotTimeEditChanged()
     syncSliderFromTimeEdit();
     m_syncInProgress = false;
 
-    // Request extraction at the new time
-    QTime t = ui->timeEdit->time();
-    double timeS = t.hour() * 3600.0 + t.minute() * 60.0 + t.second() + t.msec() / 1000.0;
-    requestFrameExtraction(timeS);
+    // Seek the player to the new time
+    if (m_mediaPlayer != nullptr)
+    {
+        QTime t = ui->timeEdit->time();
+        double timeS = t.hour() * 3600.0 + t.minute() * 60.0 + t.second() + t.msec() / 1000.0;
+        qint64 positionMs = static_cast<qint64>(timeS * 1000.0);
+        m_mediaPlayer->setPosition(positionMs);
+    }
 }
 
 // =============================================================================
@@ -278,222 +277,113 @@ void MissingFilesDialog::slotTimeEditChanged()
 
 void MissingFilesDialog::slotPrevFrame()
 {
-    if (m_isPlaying)
+    if (m_mediaPlayer == nullptr)
+    {
+        return;
+    }
+
+    if (m_mediaPlayer->playbackState() == QMediaPlayer::PlayingState)
     {
         stopPlayback();
     }
 
-    double currentTimeS = sliderValueToSeconds(ui->timeSlider->value());
-    double newTimeS = currentTimeS - m_frameStepS;
-    if (newTimeS < 0.0)
+    qint64 currentMs = m_mediaPlayer->position();
+    qint64 frameDurationMs = static_cast<qint64>(m_frameStepS * 1000.0);
+    qint64 newMs = currentMs - frameDurationMs;
+    if (newMs < 0)
     {
-        newTimeS = 0.0;
+        newMs = 0;
     }
 
-    m_syncInProgress = true;
-    int newSlider = secondsToSliderValue(newTimeS);
-    ui->timeSlider->setValue(newSlider);
-    syncTimeEditFromSlider(newSlider);
-    m_syncInProgress = false;
-
-    requestFrameExtraction(newTimeS);
+    m_mediaPlayer->setPosition(newMs);
 }
 
 void MissingFilesDialog::slotNextFrame()
 {
-    if (m_isPlaying)
+    if (m_mediaPlayer == nullptr)
+    {
+        return;
+    }
+
+    if (m_mediaPlayer->playbackState() == QMediaPlayer::PlayingState)
     {
         stopPlayback();
     }
 
-    double currentTimeS = sliderValueToSeconds(ui->timeSlider->value());
-    double newTimeS = currentTimeS + m_frameStepS;
-    if (newTimeS > m_videoDurationS)
+    qint64 currentMs = m_mediaPlayer->position();
+    qint64 frameDurationMs = static_cast<qint64>(m_frameStepS * 1000.0);
+    qint64 newMs = currentMs + frameDurationMs;
+    qint64 durationMs = static_cast<qint64>(m_videoDurationS * 1000.0);
+    if (newMs > durationMs)
     {
-        newTimeS = m_videoDurationS;
+        newMs = durationMs;
     }
 
-    m_syncInProgress = true;
-    int newSlider = secondsToSliderValue(newTimeS);
-    ui->timeSlider->setValue(newSlider);
-    syncTimeEditFromSlider(newSlider);
-    m_syncInProgress = false;
-
-    requestFrameExtraction(newTimeS);
+    m_mediaPlayer->setPosition(newMs);
 }
 
 void MissingFilesDialog::slotPlayPause()
 {
-    if (m_isPlaying)
+    if (m_mediaPlayer == nullptr)
+    {
+        return;
+    }
+
+    if (m_mediaPlayer->playbackState() == QMediaPlayer::PlayingState)
     {
         stopPlayback();
     }
     else
     {
-        m_isPlaying = true;
-        ui->playPauseButton->setText(QString::fromUtf8("⏸"));
+        m_mediaPlayer->play();
+        ui->playPauseButton->setText(QString::fromUtf8("\u23F8"));
         ui->playPauseButton->setToolTip("Пауза");
-
-        // Start playing from current position, track time precisely
-        m_playbackTimeS = sliderValueToSeconds(ui->timeSlider->value());
-        requestFrameExtraction(m_playbackTimeS);
     }
 }
 
 void MissingFilesDialog::stopPlayback()
 {
-    m_isPlaying = false;
-    ui->playPauseButton->setText(QString::fromUtf8("▶"));
+    if (m_mediaPlayer != nullptr)
+    {
+        m_mediaPlayer->pause();
+    }
+    ui->playPauseButton->setText(QString::fromUtf8("\u25B6"));
     ui->playPauseButton->setToolTip("Воспроизведение");
 }
 
-void MissingFilesDialog::advancePlayback()
-{
-    // Use precise playback time tracker (not slider value) to avoid rounding drift
-    m_playbackTimeS += m_frameStepS;
+// =============================================================================
+// Player feedback
+// =============================================================================
 
-    if (m_playbackTimeS > m_videoDurationS)
+void MissingFilesDialog::slotPlayerPositionChanged(qint64 position)
+{
+    if (m_syncInProgress)
     {
-        m_extractionInProgress = false;
-        stopPlayback();
         return;
     }
 
-    // Update slider and time edit to reflect new position
+    double timeS = static_cast<double>(position) / 1000.0;
+    int sliderValue = secondsToSliderValue(timeS);
+
     m_syncInProgress = true;
-    int nextSlider = secondsToSliderValue(m_playbackTimeS);
-    ui->timeSlider->setValue(nextSlider);
-    syncTimeEditFromSlider(nextSlider);
+    ui->timeSlider->setValue(sliderValue);
+    syncTimeEditFromSlider(sliderValue);
     m_syncInProgress = false;
-
-    startExtraction(m_playbackTimeS);
 }
 
-// =============================================================================
-// Async frame extraction pipeline
-// =============================================================================
-
-void MissingFilesDialog::requestFrameExtraction(double timeS)
+void MissingFilesDialog::slotMediaStatusChanged(QMediaPlayer::MediaStatus status)
 {
-    if (m_extractionInProgress)
+    if (!m_initialSeekDone
+        && (status == QMediaPlayer::LoadedMedia || status == QMediaPlayer::BufferedMedia))
     {
-        // Extraction running — queue the latest position (overwrites previous pending)
-        m_pendingSeekTimeS = timeS;
-        return;
+        m_initialSeekDone = true;
+
+        // Media is ready — seek to initial position and pause
+        double initialTimeS = sliderValueToSeconds(ui->timeSlider->value());
+        qint64 positionMs = static_cast<qint64>(initialTimeS * 1000.0);
+        m_mediaPlayer->pause();
+        m_mediaPlayer->setPosition(positionMs);
     }
-    startExtraction(timeS);
-}
-
-void MissingFilesDialog::startExtraction(double timeS)
-{
-    QString ffmpegPath = AppSettings::instance().ffmpegPath();
-    if (ffmpegPath.isEmpty() || !QFileInfo::exists(ffmpegPath))
-    {
-        m_extractionInProgress = false;
-        ui->previewImageLabel->setText("FFmpeg не найден, превью недоступно");
-        if (m_isPlaying)
-        {
-            stopPlayback();
-        }
-        return;
-    }
-
-    m_extractionInProgress = true;
-    // Do NOT reset m_pendingSeekTimeS here — it is consumed exclusively
-    // by slotExtractionFinished.  Clearing it here creates a race where
-    // a user click between singleShot scheduling and execution loses its
-    // pending request.
-
-    QString timeStr = formatTime(timeS);
-
-    QStringList args;
-    args << "-ss" << timeStr
-         << "-i" << m_videoFilePath
-         << "-frames:v" << "1"
-         << "-q:v" << "2"
-         << "-f" << "image2"
-         << "-y"
-         << m_previewTempPath;
-
-    m_ffmpegProcess->start(ffmpegPath, args);
-}
-
-void MissingFilesDialog::slotExtractionFinished(int exitCode, QProcess::ExitStatus exitStatus)
-{
-    if (exitStatus == QProcess::NormalExit && exitCode == 0)
-    {
-        showExtractedFrame();
-    }
-
-    // Defer next extraction to the next event loop iteration.
-    // Restarting QProcess from within its own finished() handler
-    // can fail silently on Windows if the process handle isn't fully released yet.
-    //
-    // IMPORTANT: keep m_extractionInProgress == true while chaining to
-    // the next extraction so that user clicks during the singleShot gap
-    // are properly queued via m_pendingSeekTimeS instead of racing to
-    // call startExtraction on an already-running QProcess.
-    if (m_pendingSeekTimeS >= 0.0)
-    {
-        double pending = m_pendingSeekTimeS;
-        m_pendingSeekTimeS = -1.0;
-        // m_extractionInProgress stays true — chaining to next extraction
-        QTimer::singleShot(0, this, [this, pending]() {
-            startExtraction(pending);
-        });
-        return;
-    }
-
-    if (m_isPlaying)
-    {
-        // m_extractionInProgress stays true — playback will chain next extraction
-        QTimer::singleShot(0, this, [this]() {
-            if (m_isPlaying)
-            {
-                advancePlayback();
-            }
-            else
-            {
-                // User paused during the singleShot gap — release the lock
-                m_extractionInProgress = false;
-            }
-        });
-        return;
-    }
-
-    // No pending work and not playing — release the extraction lock
-    m_extractionInProgress = false;
-}
-
-void MissingFilesDialog::slotExtractionError(QProcess::ProcessError error)
-{
-    if (error == QProcess::FailedToStart)
-    {
-        m_extractionInProgress = false;
-        m_pendingSeekTimeS = -1.0;
-        ui->previewImageLabel->setText("Не удалось запустить FFmpeg");
-
-        if (m_isPlaying)
-        {
-            stopPlayback();
-        }
-    }
-    // Other errors (Crashed, Timedout) are followed by finished() signal,
-    // which will release m_extractionInProgress.
-}
-
-void MissingFilesDialog::showExtractedFrame()
-{
-    QPixmap pixmap(m_previewTempPath);
-    if (pixmap.isNull())
-    {
-        return;
-    }
-
-    ui->previewImageLabel->setPixmap(
-        pixmap.scaled(ui->previewImageLabel->size(),
-                      Qt::KeepAspectRatio,
-                      Qt::SmoothTransformation));
 }
 
 // =============================================================================
@@ -531,7 +421,7 @@ double MissingFilesDialog::detectFps() const
         return kDefaultFps;
     }
 
-    // Parse fraction: "24000/1001" → 23.976, "25/1" → 25.0
+    // Parse fraction: "24000/1001" -> 23.976, "25/1" -> 25.0
     double fps = kDefaultFps;
     if (output.contains('/'))
     {

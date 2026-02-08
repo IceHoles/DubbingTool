@@ -18,7 +18,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Tell AUTOUIC where to find .ui files
 set(CMAKE_AUTOUIC_SEARCH_PATHS ${CMAKE_SOURCE_DIR}/ui)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network Xml)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network Xml Multimedia MultimediaWidgets)
 
 # Source files organized by module
 set(SOURCES_CORE
@@ -166,6 +166,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt6::Widgets
     Qt6::Network
     Qt6::Xml
+    Qt6::Multimedia
+    Qt6::MultimediaWidgets
 )
 
 # Enable warnings
@@ -180,8 +182,12 @@ option(ENABLE_CLANG_TIDY "Enable clang-tidy analysis" OFF)
 if(ENABLE_CLANG_TIDY)
     find_program(CLANG_TIDY_EXE NAMES clang-tidy)
     if(CLANG_TIDY_EXE)
+        set(CLANG_TIDY_COMMAND
+            "${CLANG_TIDY_EXE}"
+            "--warnings-as-errors=bugprone-*,clang-analyzer-*"
+        )
         set_target_properties(${PROJECT_NAME} PROPERTIES
-            CXX_CLANG_TIDY "${CLANG_TIDY_EXE}"
+            CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}"
         )
         message(STATUS "clang-tidy enabled: ${CLANG_TIDY_EXE}")
     else()
