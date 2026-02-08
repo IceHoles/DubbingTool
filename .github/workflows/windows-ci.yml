@@ -13,15 +13,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install LLVM 18
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: "18"
+      - name: Install clang-format-18
+        run: sudo apt-get update && sudo apt-get install -y clang-format-18
 
       - name: Check clang-format
         run: |
           find src -type f \( -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \) \
-            -exec clang-format --dry-run --Werror {} +
+            -exec clang-format-18 --dry-run --Werror {} +
 
   build:
     runs-on: windows-latest
