@@ -368,7 +368,7 @@ QString AssProcessor::balanceCastLine(const QStringList& actors, bool shouldSort
     }
 
     // --- Шаг 2: Определяем конфигурацию и готовимся к перебору ---
-    int k = n / 2; // Количество актеров в первой строке (для 3->1, 4->2, 5->2)
+    auto k = n / 2; // Количество актеров в первой строке (для 3->1, 4->2, 5->2)
 
     QStringList bestLine1, bestLine2;
     double minDiff = std::numeric_limits<double>::max();
@@ -435,8 +435,8 @@ QString AssProcessor::balanceCastLine(const QStringList& actors, bool shouldSort
     {
         // Фоллбэк на случай, если ни одна комбинация не подошла (маловероятно)
         // Просто делим отсортированный список пополам
-        int splitPoint = n / 2;
-        for (int i = 0; i < n; ++i)
+        auto splitPoint = n / 2;
+        for (decltype(n) i = 0; i < n; ++i)
         {
             if (i < splitPoint)
                 bestLine1.append(weightedActors[i].second);
@@ -511,7 +511,6 @@ QStringList AssProcessor::generateTb(const ReleaseTemplate& t, const QString& st
     if (!styleFound && !allStyles.isEmpty())
     {
         tbStyleInfo = allStyles.first();
-        styleFound = true;
         emit logMessage("Стиль по умолчанию не найден. Используется первый доступный стиль: '" + tbStyleInfo.name + "'",
                         LogCategory::APP);
     }

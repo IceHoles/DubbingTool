@@ -53,8 +53,8 @@ void ManualRenderer::start()
         QJsonObject root = QJsonDocument::fromJson(jsonData).object();
         if (root.contains("container"))
         {
-            m_sourceDurationS =
-                root["container"].toObject()["properties"].toObject()["duration"].toDouble() / 1000000000.0;
+            m_sourceDurationS = static_cast<qint64>(
+                root["container"].toObject()["properties"].toObject()["duration"].toDouble() / 1000000000.0);
         }
     }
     if (m_sourceDurationS == 0)
@@ -212,8 +212,8 @@ void ManualRenderer::onProcessText(const QString& output)
             {
                 basePercentage = (m_currentStep == Step::Pass1) ? 0 : 50;
             }
-            int percentage = basePercentage +
-                             static_cast<int>((currentTimeS / m_sourceDurationS) * (m_preset.isTwoPass() ? 50 : 100));
+            int percentage = basePercentage + static_cast<int>((currentTimeS / static_cast<double>(m_sourceDurationS)) *
+                                                               (m_preset.isTwoPass() ? 50 : 100));
             emit progressUpdated(qMin(100, percentage), "Рендер MP4");
         }
     }
