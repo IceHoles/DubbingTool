@@ -72,10 +72,10 @@ void ManualAssemblyWidget::updateTemplateList(const QStringList& templateNames)
     ui->templateComboBox->blockSignals(false);
 
     // Пытаемся восстановить выбор
-    int index = templateNames.indexOf(current);
+    auto index = templateNames.indexOf(current);
     if (index != -1)
     {
-        ui->templateComboBox->setCurrentIndex(index);
+        ui->templateComboBox->setCurrentIndex(static_cast<int>(index));
     }
     else
     {
