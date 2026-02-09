@@ -95,7 +95,7 @@ jobs:
       - name: Install LLVM
         uses: KyleMayes/install-llvm-action@v2
         with:
-          version: "19"
+          version: "21"
 
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
