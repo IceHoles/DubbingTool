@@ -136,7 +136,7 @@ void SetupWizardDialog::buildToolsPage()
     }
 
     // Separator before optional tools
-    int32_t separatorRow = kToolDefs.size();
+    auto separatorRow = static_cast<int32_t>(kToolDefs.size());
     auto* separator = new QFrame(page);
     separator->setFrameShape(QFrame::HLine);
     separator->setFrameShadow(QFrame::Sunken);
@@ -172,7 +172,7 @@ void SetupWizardDialog::buildToolsPage()
         m_toolsGrid->addWidget(row.pathEdit, nugenRow, 2);
         m_toolsGrid->addWidget(row.browseButton, nugenRow, 3);
 
-        const int32_t kToolIdx = m_tools.size();
+        const auto kToolIdx = static_cast<int32_t>(m_tools.size());
         connect(row.browseButton, &QPushButton::clicked, this, [this, kToolIdx]() { slotBrowseTool(kToolIdx); });
 
         m_tools.append(row);

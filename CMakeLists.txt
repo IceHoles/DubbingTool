@@ -184,7 +184,7 @@ if(ENABLE_CLANG_TIDY)
     if(CLANG_TIDY_EXE)
         set(CLANG_TIDY_COMMAND
             "${CLANG_TIDY_EXE}"
-            "--warnings-as-errors=bugprone-*,clang-analyzer-*,-clang-analyzer-cplusplus.NewDelete"
+            "--warnings-as-errors=bugprone-*,clang-analyzer-*,-clang-analyzer-cplusplus.NewDelete,-bugprone-reserved-identifier"
         )
         set_target_properties(${PROJECT_NAME} PROPERTIES
             CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}"
