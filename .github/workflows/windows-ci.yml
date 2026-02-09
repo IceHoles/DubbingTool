@@ -13,13 +13,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install clang-format-18
-        run: sudo apt-get update && sudo apt-get install -y clang-format-18
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install clang-format
+        run: pip install clang-format
+
+      - name: Show clang-format version
+        run: clang-format --version
 
       - name: Check clang-format
         run: |
           find src -type f \( -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \) \
-            -exec clang-format-18 --dry-run --Werror {} +
+            -exec clang-format --dry-run --Werror {} +
 
   build:
     runs-on: windows-latest
@@ -87,7 +95,7 @@ jobs:
       - name: Install LLVM
         uses: KyleMayes/install-llvm-action@v2
         with:
-          version: "18"
+          version: "19"
 
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1

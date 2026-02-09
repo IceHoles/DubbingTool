@@ -239,7 +239,7 @@ private:
         ConcatJoin,
         ConcatExtract,
         ConcatRemux,
-        _NormalizingAudio
+        NormalizingAudio
     };
 
     enum class ProcessingSubStep

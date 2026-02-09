@@ -464,7 +464,7 @@ void ManualAssembler::onConversionProgress()
     qint64 totalDurationUs = 0;
     qint64 currentTimeUs = 0;
 
-    totalDurationUs = m_sourceAudioDurationS * 1000000;
+    totalDurationUs = static_cast<qint64>(m_sourceAudioDurationS * 1000000);
 
     while (!in.atEnd())
     {
@@ -478,7 +478,7 @@ void ManualAssembler::onConversionProgress()
 
     if (totalDurationUs > 0)
     {
-        int percentage = (currentTimeUs * 100) / totalDurationUs;
+        int percentage = static_cast<int>((currentTimeUs * 100) / totalDurationUs);
         emit progressUpdated(percentage, "Конвертация аудио");
     }
 }

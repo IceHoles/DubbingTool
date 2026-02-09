@@ -348,7 +348,7 @@ QString AssProcessor::balanceCastLine(const QStringList& actors, bool shouldSort
 {
     if (actors.isEmpty())
         return "";
-    int n = actors.size();
+    auto n = actors.size();
     if (n <= 2)
         return actors.join(", ");
 
@@ -407,13 +407,13 @@ QString AssProcessor::balanceCastLine(const QStringList& actors, bool shouldSort
         // --- Детальный расчет весов с учетом разделителей ---
         if (currentLine1.size() > 1)
         {
-            line1Weight += separatorWeight * (currentLine1.size() - 1);
+            line1Weight += separatorWeight * static_cast<double>(currentLine1.size() - 1);
         }
         line1Weight += commaWeight; // Финальная запятая перед \N
 
         if (currentLine2.size() > 1)
         {
-            line2Weight += separatorWeight * (currentLine2.size() - 1);
+            line2Weight += separatorWeight * static_cast<double>(currentLine2.size() - 1);
         }
 
         // --- Проверяем условия и ищем лучший вариант ---
@@ -833,7 +833,7 @@ QString AssProcessor::convertAssTagsToSrt(const QString& assText)
     // Regex для поиска всех блоков с тегами
     QRegularExpression tagBlockRegex(R"(\{[^\}]+\})");
 
-    int lastPos = 0;
+    qsizetype lastPos = 0;
     auto it = tagBlockRegex.globalMatch(text);
 
     while (it.hasNext())
@@ -1120,7 +1120,7 @@ int AssProcessor::calculateTbLineCount(const ReleaseTemplate& t)
     // 2. Cast chunks (same chunking logic as generateTbLines)
     if (!t.cast.isEmpty())
     {
-        int castSize = t.cast.size();
+        auto castSize = t.cast.size();
         while (castSize > 0)
         {
             ++lineCount;

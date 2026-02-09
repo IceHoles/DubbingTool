@@ -765,8 +765,8 @@ void WorkflowManager::getMkvInfo()
         QJsonArray tracks = root["tracks"].toArray();
         if (root.contains("container"))
         {
-            m_sourceDurationS =
-                root["container"].toObject()["properties"].toObject()["duration"].toDouble() / 1000000000.0;
+            m_sourceDurationS = static_cast<qint64>(
+                root["container"].toObject()["properties"].toObject()["duration"].toDouble() / 1000000000.0);
         }
 
         QMap<QString, QString> languageAliases;
@@ -791,21 +791,12 @@ void WorkflowManager::getMkvInfo()
             if (!trackLanguage.isEmpty() && !templateLanguage.isEmpty())
             {
                 // 1. Прямое совпадение (например, "jpn" == "jpn")
-                if (trackLanguage == templateLanguage)
-                {
-                    languageMatch = true;
-                }
                 // 2. Проверка по карте псевдонимов (например, trackLanguage="zho", templateLanguage="zh")
-                else if (languageAliases.contains(trackLanguage) &&
-                         languageAliases.value(trackLanguage) == templateLanguage)
-                {
-                    languageMatch = true;
-                }
                 // 3. "Фоллбэк" на startsWith (например, "jpn".startsWith("jp"))
-                else if (trackLanguage.startsWith(templateLanguage))
-                {
-                    languageMatch = true;
-                }
+                languageMatch = (trackLanguage == templateLanguage) ||
+                                (languageAliases.contains(trackLanguage) &&
+                                 languageAliases.value(trackLanguage) == templateLanguage) ||
+                                trackLanguage.startsWith(templateLanguage);
             }
 
             if (track["type"].toString() == "video" && m_videoTrack.id == -1)
@@ -1114,7 +1105,7 @@ void WorkflowManager::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
         audioPreparation();
         break;
     }
-    case Step::_NormalizingAudio:
+    case Step::NormalizingAudio:
     {
         emit logMessage("Нормализация аудио завершена.", LogCategory::APP);
         if (m_didLaunchNugen)
@@ -1340,7 +1331,7 @@ void WorkflowManager::audioPreparation()
         {
             double tbStartTimeS = tbStartTime.hour() * 3600 + tbStartTime.minute() * 60 + tbStartTime.second() +
                                   tbStartTime.msec() / 1000.0;
-            double remainingTimeS = m_sourceDurationS - tbStartTimeS;
+            double remainingTimeS = static_cast<double>(m_sourceDurationS) - tbStartTimeS;
             int tbLines = AssProcessor::calculateTbLineCount(m_template);
             double requiredTimeS = tbLines * 3.0;
 
@@ -1364,7 +1355,7 @@ void WorkflowManager::audioPreparation()
     if (request.isValid())
     {
         request.videoFilePath = m_mkvFilePath;
-        request.videoDurationS = m_sourceDurationS;
+        request.videoDurationS = static_cast<double>(m_sourceDurationS);
         emit logMessage("Недостаточно данных. Запрос у пользователя...", LogCategory::APP);
         m_lastStepBeforeRequest = Step::AudioPreparation;
         emit progressUpdated(-1, "Запрос данных у пользователя");
@@ -1404,7 +1395,7 @@ void WorkflowManager::audioPreparation()
     }
     emit logMessage("Шаг 5: Подготовка аудио...", LogCategory::APP);
 
-    m_currentStep = Step::_NormalizingAudio;
+    m_currentStep = Step::NormalizingAudio;
     QFileInfo nugenInfo(nugenPath);
     QString ambCmdPath = nugenInfo.dir().filePath("AMBCmd.exe");
 
@@ -1559,7 +1550,7 @@ void WorkflowManager::onAudioConversionProgress()
 
     if (totalDurationUs > 0)
     {
-        int percentage = (currentTimeUs * 100) / totalDurationUs;
+        int percentage = static_cast<int>((currentTimeUs * 100) / totalDurationUs);
         emit progressUpdated(percentage, "Конвертация аудио");
     }
 }
@@ -2441,7 +2432,7 @@ void WorkflowManager::onProcessStdErr(const QString& output)
             double currentTimeS = (hours * 3600) + (minutes * 60) + seconds;
             if (m_sourceDurationS > 0)
             {
-                int percentage = static_cast<int>((currentTimeS / m_sourceDurationS) * 100);
+                int percentage = static_cast<int>((currentTimeS / static_cast<double>(m_sourceDurationS)) * 100);
                 emit progressUpdated(percentage);
             }
         }
