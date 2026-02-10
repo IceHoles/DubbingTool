@@ -179,6 +179,57 @@ void SetupWizardDialog::buildToolsPage()
     }
 
     layout->addLayout(m_toolsGrid);
+
+    // File handling settings
+    layout->addSpacing(8);
+    auto* fileSeparator = new QFrame(page);
+    fileSeparator->setFrameShape(QFrame::HLine);
+    fileSeparator->setFrameShadow(QFrame::Sunken);
+    layout->addWidget(fileSeparator);
+
+    auto* fileActionLayout = new QHBoxLayout();
+    auto* fileActionLabel = new QLabel("Действие с файлами, указанными вручную:", page);
+    m_userFileActionCombo = new QComboBox(page);
+    m_userFileActionCombo->addItem("Перемещать в папку проекта");
+    m_userFileActionCombo->addItem("Копировать в папку проекта");
+    m_userFileActionCombo->addItem("Использовать оригинальный путь");
+    m_userFileActionCombo->setCurrentIndex(static_cast<int>(AppSettings::instance().userFileAction()));
+    fileActionLayout->addWidget(fileActionLabel);
+    fileActionLayout->addWidget(m_userFileActionCombo, 1);
+    layout->addLayout(fileActionLayout);
+
+    layout->addSpacing(4);
+
+    auto* dirLabel = new QLabel("Директория проектов:", page);
+    layout->addWidget(dirLabel);
+
+    auto* dirRowLayout = new QHBoxLayout();
+    m_projectDirectoryEdit = new QLineEdit(page);
+    m_projectDirectoryEdit->setPlaceholderText("downloads (по умолчанию)");
+    m_projectDirectoryEdit->setText(AppSettings::instance().projectDirectory());
+    dirRowLayout->addWidget(m_projectDirectoryEdit);
+
+    auto* browseProjectDir = new QPushButton("Обзор...", page);
+    browseProjectDir->setFixedWidth(80);
+    connect(browseProjectDir, &QPushButton::clicked, this, [this]() {
+        QString dir =
+            QFileDialog::getExistingDirectory(this, "Выберите директорию проектов", m_projectDirectoryEdit->text());
+        if (!dir.isEmpty())
+        {
+            m_projectDirectoryEdit->setText(dir);
+        }
+    });
+    dirRowLayout->addWidget(browseProjectDir);
+    layout->addLayout(dirRowLayout);
+
+    auto* dirHint =
+        new QLabel("Папка, в которой создаётся структура проекта (Sources/, Result/). "
+                    "Если не указана — используется downloads/ рядом с программой.",
+                    page);
+    dirHint->setWordWrap(true);
+    dirHint->setStyleSheet("color: gray; font-size: 11px;");
+    layout->addWidget(dirHint);
+
     layout->addStretch();
 
     m_stack->addWidget(page);
@@ -380,6 +431,8 @@ void SetupWizardDialog::slotNextPage()
             settings.setMkvextractPath(m_tools[3].pathEdit->text());
             settings.setNugenAmbPath(m_tools[4].pathEdit->text());
         }
+        settings.setProjectDirectory(m_projectDirectoryEdit->text().trimmed());
+        settings.setUserFileAction(static_cast<UserFileAction>(m_userFileActionCombo->currentIndex()));
     }
 
     int32_t next = current + 1;
@@ -433,7 +486,7 @@ void SetupWizardDialog::slotFinish()
 {
     auto& settings = AppSettings::instance();
 
-    // Save tool paths (page 1)
+    // Save tool paths and project directory (page 1)
     if (m_tools.size() >= 5)
     {
         settings.setFfmpegPath(m_tools[0].pathEdit->text());
@@ -442,6 +495,8 @@ void SetupWizardDialog::slotFinish()
         settings.setMkvextractPath(m_tools[3].pathEdit->text());
         settings.setNugenAmbPath(m_tools[4].pathEdit->text());
     }
+    settings.setProjectDirectory(m_projectDirectoryEdit->text().trimmed());
+    settings.setUserFileAction(static_cast<UserFileAction>(m_userFileActionCombo->currentIndex()));
 
     // Save qBittorrent settings (page 2) — only if user didn't skip
     if (m_qbtHostEdit != nullptr)

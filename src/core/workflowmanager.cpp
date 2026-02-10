@@ -71,8 +71,9 @@ WorkflowManager::~WorkflowManager()
 
 void WorkflowManager::start()
 {
+    QString baseDir = AppSettings::instance().effectiveProjectDirectory();
     QString baseDownloadPath =
-        QString("downloads/%1/Episode %2").arg(m_template.seriesTitle).arg(m_episodeNumberForSearch);
+        QString("%1/%2/Episode %3").arg(baseDir, m_template.seriesTitle, m_episodeNumberForSearch);
 
     delete m_paths;
     m_paths = new PathManager(baseDownloadPath);
@@ -93,9 +94,24 @@ void WorkflowManager::downloadRss()
 void WorkflowManager::startWithManualFile(const QString& filePath)
 {
     delete m_paths;
-    QString baseDownloadPath =
-        QString("downloads/%1/Episode %2").arg(m_template.seriesTitle).arg(m_episodeNumberForSearch);
-    m_paths = new PathManager(baseDownloadPath);
+
+    UserFileAction fileAction = AppSettings::instance().userFileAction();
+    bool useOriginal = (fileAction == UserFileAction::UseOriginalPath);
+    QString baseDownloadPath;
+
+    if (useOriginal)
+    {
+        QFileInfo fileInfo(filePath);
+        baseDownloadPath = fileInfo.absolutePath();
+    }
+    else
+    {
+        QString baseDir = AppSettings::instance().effectiveProjectDirectory();
+        baseDownloadPath =
+            QString("%1/%2/Episode %3").arg(baseDir, m_template.seriesTitle, m_episodeNumberForSearch);
+    }
+
+    m_paths = new PathManager(baseDownloadPath, useOriginal);
     emit logMessage("Структура папок создана в: " + m_paths->basePath, LogCategory::APP);
 
     QString newPath = handleUserFile(filePath, m_paths->sourcesPath);
@@ -1495,7 +1511,7 @@ void WorkflowManager::convertAudioIfNeeded()
     m_finalAudioPath = m_paths->convertedRuAudio(targetFormat);
     emit logMessage(QString("Запуск конвертации в %1...").arg(targetFormat.toUpper()), LogCategory::APP);
 
-    m_ffmpegProgressFile = QDir(m_paths->ruAudioPath).filePath("ffmpeg_progress.log");
+    m_ffmpegProgressFile = QDir(m_paths->sourcesPath).filePath("ffmpeg_progress.log");
 
     QStringList args;
     args << "-y" << "-i" << m_mainRuAudioPath;
@@ -2764,7 +2780,7 @@ void WorkflowManager::resumeWithUserInput(const UserInputResponse& response)
     if (!response.audioPath.isEmpty())
     {
         emit logMessage("Пользователь предоставил аудиофайл. Обработка...", LogCategory::APP);
-        QString newAudioPath = handleUserFile(response.audioPath, m_paths->ruAudioPath);
+        QString newAudioPath = handleUserFile(response.audioPath, m_paths->sourcesPath);
         if (!newAudioPath.isEmpty())
         {
             if (m_mainRuAudioPath.isEmpty())
@@ -3125,7 +3141,7 @@ void WorkflowManager::prepareUserFiles()
 
     // 1. Русская аудиодорожка
     QString oldAudioPath = m_mainWindow->getAudioPath();
-    QString newAudioPath = handleUserFile(oldAudioPath, m_paths->ruAudioPath);
+    QString newAudioPath = handleUserFile(oldAudioPath, m_paths->sourcesPath);
 
     if (newAudioPath != oldAudioPath && !newAudioPath.isEmpty())
     {

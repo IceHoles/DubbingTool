@@ -73,6 +73,7 @@ void AppSettings::load()
     m_deleteTempFiles = settings.value("general/deleteTempFiles", true).toBool();
     m_userFileAction = static_cast<UserFileAction>(
         settings.value("general/userFileAction", static_cast<int>(UserFileAction::UseOriginalPath)).toInt());
+    m_projectDirectory = settings.value("general/projectDirectory", "").toString();
 
     m_tbStyles.clear();
     int tbStylesCount = settings.beginReadArray("tbStyles");
@@ -135,6 +136,7 @@ void AppSettings::save()
     settings.setValue("general/setupCompleted", m_setupCompleted);
     settings.setValue("general/deleteTempFiles", m_deleteTempFiles);
     settings.setValue("general/userFileAction", static_cast<int>(m_userFileAction));
+    settings.setValue("general/projectDirectory", m_projectDirectory);
 
     settings.beginWriteArray("tbStyles");
     for (int i = 0; i < m_tbStyles.size(); ++i)
@@ -372,6 +374,18 @@ UserFileAction AppSettings::userFileAction() const
 void AppSettings::setUserFileAction(UserFileAction action)
 {
     m_userFileAction = action;
+}
+QString AppSettings::projectDirectory() const
+{
+    return m_projectDirectory;
+}
+void AppSettings::setProjectDirectory(const QString& directory)
+{
+    m_projectDirectory = directory;
+}
+QString AppSettings::effectiveProjectDirectory() const
+{
+    return m_projectDirectory.isEmpty() ? QStringLiteral("downloads") : m_projectDirectory;
 }
 QList<TbStyleInfo> AppSettings::tbStyles() const
 {

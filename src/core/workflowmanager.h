@@ -65,8 +65,6 @@ struct PathManager
 {
     QString basePath;
     QString sourcesPath;
-    QString subsPath;
-    QString ruAudioPath;
     QString resultPath;
 
     /**
@@ -91,18 +89,20 @@ struct PathManager
         return result;
     }
 
-    // Конструктор, который создает все папки
-    PathManager(const QString& baseSavePath)
+    /**
+     * @brief Creates directory structure for the project.
+     *
+     * @param baseSavePath Base directory for the project.
+     * @param useOriginalPath When true, result files are placed directly in basePath
+     *        (no Result/ subdirectory). Used when working next to source files.
+     */
+    PathManager(const QString& baseSavePath, bool useOriginalPath = false)
     {
         basePath = sanitizeForPath(baseSavePath);
         sourcesPath = QDir(basePath).filePath("Sources");
-        subsPath = QDir(basePath).filePath("Processed Subs");
-        ruAudioPath = QDir(basePath).filePath("RU Audio");
-        resultPath = QDir(basePath).filePath("Result");
+        resultPath = useOriginalPath ? basePath : QDir(basePath).filePath("Result");
 
         QDir(sourcesPath).mkpath(".");
-        QDir(subsPath).mkpath(".");
-        QDir(ruAudioPath).mkpath(".");
         QDir(resultPath).mkpath(".");
     }
 
@@ -130,20 +130,20 @@ struct PathManager
 
     QString processedFullSubs() const
     {
-        return QDir(subsPath).filePath("subtitles_processed_full.ass");
+        return QDir(sourcesPath).filePath("subtitles_processed_full.ass");
     }
     QString processedSignsSubs() const
     {
-        return QDir(subsPath).filePath("subtitles_processed_signs.ass");
+        return QDir(sourcesPath).filePath("subtitles_processed_signs.ass");
     }
     QString masterSrt() const
     {
-        return QDir(subsPath).filePath("master_subtitles.srt");
+        return QDir(sourcesPath).filePath("master_subtitles.srt");
     }
 
     QString convertedRuAudio(const QString& extension) const
     {
-        return QDir(ruAudioPath).filePath("russian_audio." + extension);
+        return QDir(sourcesPath).filePath("russian_audio." + extension);
     }
 
     QString finalMkv(const QString& fileName) const

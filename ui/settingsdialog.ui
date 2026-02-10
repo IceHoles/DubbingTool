@@ -187,7 +187,7 @@
           <string>Настройки работы с файлами</string>
          </property>
          <layout class="QGridLayout" name="gridLayout_2">
-          <item row="0" column="0" colspan="2">
+          <item row="0" column="0" colspan="3">
            <widget class="QCheckBox" name="deleteTempFilesCheckBox">
             <property name="text">
              <string>Удалять временные видео- и аудиофайлы после сборки</string>
@@ -201,7 +201,7 @@
             </property>
            </widget>
           </item>
-          <item row="1" column="1">
+          <item row="1" column="1" colspan="2">
            <widget class="QComboBox" name="userFileActionComboBox">
             <item>
              <property name="text">
@@ -218,6 +218,27 @@
               <string>Использовать оригинальный путь</string>
              </property>
             </item>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="projectDirectoryLabel">
+            <property name="text">
+             <string>Директория проектов:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QLineEdit" name="projectDirectoryEdit">
+            <property name="placeholderText">
+             <string>downloads (по умолчанию)</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="2">
+           <widget class="QPushButton" name="browseProjectDirectoryButton">
+            <property name="text">
+             <string>Обзор...</string>
+            </property>
            </widget>
           </item>
          </layout>

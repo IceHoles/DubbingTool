@@ -34,6 +34,7 @@ void SettingsDialog::loadSettings()
     ui->nugenAmbPathEdit->setText(settings.nugenAmbPath());
     ui->deleteTempFilesCheckBox->setChecked(settings.deleteTempFiles());
     ui->userFileActionComboBox->setCurrentIndex(static_cast<int>(settings.userFileAction()));
+    ui->projectDirectoryEdit->setText(settings.projectDirectory());
 
     ui->tbStylesTable->setRowCount(0);
     for (const auto& style : settings.tbStyles())
@@ -88,6 +89,7 @@ void SettingsDialog::accept()
     settings.setNugenAmbPath(ui->nugenAmbPathEdit->text());
     settings.setDeleteTempFiles(ui->deleteTempFilesCheckBox->isChecked());
     settings.setUserFileAction(static_cast<UserFileAction>(ui->userFileActionComboBox->currentIndex()));
+    settings.setProjectDirectory(ui->projectDirectoryEdit->text().trimmed());
 
     QList<TbStyleInfo> styles;
     for (int row = 0; row < ui->tbStylesTable->rowCount(); ++row)
@@ -153,6 +155,15 @@ void SettingsDialog::on_browseNugenAmbButton_clicked()
         QFileDialog::getOpenFileName(this, "Выберите NUGEN Audio AMB.exe", "", "Исполняемые файлы (*.exe)");
     if (!filePath.isEmpty())
         ui->nugenAmbPathEdit->setText(filePath);
+}
+
+void SettingsDialog::on_browseProjectDirectoryButton_clicked()
+{
+    QString dir = QFileDialog::getExistingDirectory(this, "Выберите директорию проектов", ui->projectDirectoryEdit->text());
+    if (!dir.isEmpty())
+    {
+        ui->projectDirectoryEdit->setText(dir);
+    }
 }
 
 void SettingsDialog::on_addTbStyleButton_clicked()

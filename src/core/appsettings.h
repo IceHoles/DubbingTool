@@ -78,6 +78,9 @@ public:
     void setDeleteTempFiles(bool enabled);
     UserFileAction userFileAction() const;
     void setUserFileAction(UserFileAction action);
+    QString projectDirectory() const;
+    void setProjectDirectory(const QString& directory);
+    [[nodiscard]] QString effectiveProjectDirectory() const;
     QList<TbStyleInfo> tbStyles() const;
     void setTbStyles(const QList<TbStyleInfo>& styles);
     TbStyleInfo findTbStyle(const QString& name) const;
@@ -104,6 +107,7 @@ private:
     QString m_nugenAmbPath;
     bool m_deleteTempFiles;
     UserFileAction m_userFileAction;
+    QString m_projectDirectory;
     QList<TbStyleInfo> m_tbStyles;
     QList<RenderPreset> m_renderPresets;
 };

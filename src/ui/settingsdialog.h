@@ -25,6 +25,7 @@ private slots:
     void on_browseFfmpegButton_clicked();
     void on_browseQbittorrentButton_clicked();
     void on_browseNugenAmbButton_clicked();
+    void on_browseProjectDirectoryButton_clicked();
     void on_addTbStyleButton_clicked();
     void on_removeTbStyleButton_clicked();
     void on_renderPresetsList_currentRowChanged(int currentRow);

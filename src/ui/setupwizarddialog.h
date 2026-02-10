@@ -59,6 +59,10 @@ private:
     QList<ToolRow> m_tools;
     QGridLayout* m_toolsGrid = nullptr;
 
+    // Page 1: File handling settings
+    QLineEdit* m_projectDirectoryEdit = nullptr;
+    QComboBox* m_userFileActionCombo = nullptr;
+
     // Page 2: qBittorrent
     QLineEdit* m_qbtHostEdit = nullptr;
     QSpinBox* m_qbtPortSpin = nullptr;
