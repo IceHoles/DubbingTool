@@ -72,8 +72,9 @@ WorkflowManager::~WorkflowManager()
 void WorkflowManager::start()
 {
     QString baseDir = AppSettings::instance().effectiveProjectDirectory();
+    QString sanitizedTitle = PathManager::sanitizeForPath(m_template.seriesTitle);
     QString baseDownloadPath =
-        QString("%1/%2/Episode %3").arg(baseDir, m_template.seriesTitle, m_episodeNumberForSearch);
+        QString("%1/%2/Episode %3").arg(baseDir, sanitizedTitle, m_episodeNumberForSearch);
 
     delete m_paths;
     m_paths = new PathManager(baseDownloadPath);
@@ -107,8 +108,9 @@ void WorkflowManager::startWithManualFile(const QString& filePath)
     else
     {
         QString baseDir = AppSettings::instance().effectiveProjectDirectory();
+        QString sanitizedTitle = PathManager::sanitizeForPath(m_template.seriesTitle);
         baseDownloadPath =
-            QString("%1/%2/Episode %3").arg(baseDir, m_template.seriesTitle, m_episodeNumberForSearch);
+            QString("%1/%2/Episode %3").arg(baseDir, sanitizedTitle, m_episodeNumberForSearch);
     }
 
     m_paths = new PathManager(baseDownloadPath, useOriginal);
@@ -2114,22 +2116,30 @@ void WorkflowManager::concatRenderSegment2()
 
     args << "-c:v" << encoder;
 
-    // Quality settings: prefer source bitrate matching, fall back to CRF
+    // Quality settings: use CRF for consistent quality on short segments.
+    // Pure ABR (-b:v) without VBV causes catastrophic rate control failure
+    // on 30-second segments: I-frames consume the entire bit budget, forcing
+    // QP to maximum (51) for all remaining frames, resulting in ~150 kbps
+    // instead of the target bitrate.
+    // CRF with maxrate/bufsize gives consistent quality AND prevents
+    // the segment from exceeding the source bitrate.
     if (m_videoTrack.bitrateKbps > 0)
     {
-        QString bitrateStr = QString::number(m_videoTrack.bitrateKbps) + "k";
-        args << "-b:v" << bitrateStr << "-preset" << "medium";
-        emit logMessage(QString("Concat рендер: кодируем ТБ с битрейтом оригинала: %1").arg(bitrateStr),
-                        LogCategory::APP);
+        QString maxrateStr = QString::number(m_videoTrack.bitrateKbps) + "k";
+        QString bufsizeStr = QString::number(m_videoTrack.bitrateKbps * 2) + "k";
 
         if (encoder == "libx264")
         {
-            args << "-profile:v" << "high";
+            args << "-crf" << "18" << "-maxrate" << maxrateStr << "-bufsize" << bufsizeStr
+                 << "-preset" << "medium" << "-profile:v" << "high";
         }
         else if (encoder == "libx265")
         {
-            args << "-tag:v" << "hvc1";
+            args << "-crf" << "18" << "-maxrate" << maxrateStr << "-bufsize" << bufsizeStr
+                 << "-preset" << "medium" << "-tag:v" << "hvc1";
         }
+        emit logMessage(QString("Concat рендер: кодируем ТБ с CRF + maxrate оригинала: %1").arg(maxrateStr),
+                        LogCategory::APP);
     }
     else
     {
@@ -2140,7 +2150,7 @@ void WorkflowManager::concatRenderSegment2()
         }
         else if (encoder == "libx265")
         {
-            args << "-crf" << "22" << "-preset" << "medium" << "-tag:v" << "hvc1";
+            args << "-crf" << "18" << "-preset" << "medium" << "-tag:v" << "hvc1";
         }
     }
 

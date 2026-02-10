@@ -93,17 +93,21 @@ struct PathManager
      * @brief Creates directory structure for the project.
      *
      * @param baseSavePath Base directory for the project.
-     * @param useOriginalPath When true, result files are placed directly in basePath
-     *        (no Result/ subdirectory). Used when working next to source files.
+     * @param useOriginalPath When true, all files (temporary and result) are placed
+     *        directly in basePath without creating subdirectories. Used when working
+     *        next to source files.
      */
     PathManager(const QString& baseSavePath, bool useOriginalPath = false)
     {
-        basePath = sanitizeForPath(baseSavePath);
-        sourcesPath = QDir(basePath).filePath("Sources");
+        basePath = baseSavePath;
+        sourcesPath = useOriginalPath ? basePath : QDir(basePath).filePath("Sources");
         resultPath = useOriginalPath ? basePath : QDir(basePath).filePath("Result");
 
         QDir(sourcesPath).mkpath(".");
-        QDir(resultPath).mkpath(".");
+        if (!useOriginalPath)
+        {
+            QDir(resultPath).mkpath(".");
+        }
     }
 
     // Методы для получения путей к конкретным файлам
