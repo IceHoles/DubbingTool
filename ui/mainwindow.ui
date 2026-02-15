@@ -303,11 +303,16 @@
         </item>
        </layout>
       </widget>
-      <widget class="QWidget" name="manualModeTab">
+      <widget class="ManualExtractionWidget" name="extractTab">
+       <attribute name="title">
+        <string>Ручная разборка</string>
+       </attribute>
+      </widget>
+      <widget class="QWidget" name="assemblyTab">
        <attribute name="title">
         <string>Ручная сборка</string>
        </attribute>
-       <layout class="QVBoxLayout" name="manualTabLayout"/>
+       <layout class="QVBoxLayout" name="assemblyTabLayout"/>
       </widget>
       <widget class="QWidget" name="renderTab">
        <attribute name="title">
@@ -333,4 +338,14 @@
  </widget>
  <resources/>
  <connections/>
+<customwidgets>
+  <customwidget>
+   <!-- Имя класса, как оно написано в коде -->
+   <class>ManualExtractionWidget</class>
+   <!-- От какого класса наследуется -->
+   <extends>QWidget</extends>
+   <!-- Путь к заголовочному файлу (относительно папки сборки или инклудов) -->
+   <header>manualextractionwidget.h</header>
+  </customwidget>
+ </customwidgets>
 </ui>

@@ -124,7 +124,7 @@ void ManualAssemblyWidget::browseForFile(QLineEdit* lineEdit, const QString& cap
 void ManualAssemblyWidget::on_browseVideo_clicked()
 {
     browseForFile(ui->videoPathEdit, "Выберите видеофайл",
-                  "Видеофайлы (*.h264 *.hevc *.mkv *.mp4 *.avc);;Все файлы (*)");
+                  "Видеофайлы (*.h264 *.h265 *.avc *.hevc *.mkv *.mp4);;Все файлы (*)");
 }
 
 void ManualAssemblyWidget::on_browseOriginalAudio_clicked()

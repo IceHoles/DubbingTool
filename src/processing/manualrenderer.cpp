@@ -10,9 +10,9 @@
 #include <QProcess>
 #include <QRegularExpression>
 
-ManualRenderer::ManualRenderer(const QVariantMap& params, QObject* parent) : QObject(parent), m_params(params)
+ManualRenderer::ManualRenderer(const QVariantMap& params, QObject* parent)
+    : QObject(parent), m_params(params), m_processManager(new ProcessManager(this))
 {
-    m_processManager = new ProcessManager(this);
     connect(m_processManager, &ProcessManager::processOutput, this, &ManualRenderer::onProcessText);
     connect(m_processManager, &ProcessManager::processStdErr, this, &ManualRenderer::onProcessText);
     connect(m_processManager, &ProcessManager::processFinished, this, &ManualRenderer::onProcessFinished);
@@ -93,7 +93,6 @@ QStringList ManualRenderer::prepareCommandArguments(const QString& commandTempla
     QString inputMkv = QFileInfo(m_params.value("inputMkv").toString()).absoluteFilePath();
     QString outputMp4 = QFileInfo(m_params.value("outputMp4").toString()).absoluteFilePath();
 
-    processedTemplate.replace("%INPUT%", inputMkv);
     processedTemplate.replace("%OUTPUT%", outputMp4);
 
     // 2. Обрабатываем фильтр субтитров
@@ -108,8 +107,14 @@ QStringList ManualRenderer::prepareCommandArguments(const QString& commandTempla
         {
             QFileInfo fileInfo(inputMkv);
             m_processManager->setWorkingDirectory(fileInfo.absolutePath());
+
+            QFile::rename(fileInfo.absoluteFilePath(),
+                          fileInfo.absolutePath() + QDir::separator() + "temp_name_to_extract_subtitle.mkv");
+            QFileInfo tempFileInfo(fileInfo.absolutePath() + QDir::separator() + "temp_name_to_extract_subtitle.mkv");
+            processedTemplate.replace("%INPUT%", tempFileInfo.absoluteFilePath());
+
             int trackIndex = m_params.value("subtitleTrackIndex").toInt();
-            QString escapedName = fileInfo.fileName().replace("'", "\\'");
+            QString escapedName = tempFileInfo.fileName().replace("'", "\\'");
             // Формируем specifier 's:<index>', например 's:0' для первой дорожки субтитров
             filterValue = QString("filename='%1':si=%2").arg(escapedName).arg(trackIndex);
 
@@ -144,6 +149,7 @@ QStringList ManualRenderer::prepareCommandArguments(const QString& commandTempla
 
         emit logMessage("Hardsub отключен. Фильтр субтитров удален из команды.", LogCategory::APP);
     }
+    processedTemplate.replace("%INPUT%", inputMkv);
 
     // 3. Используем QProcess для безопасного разбора готовой строки в список аргументов
     return QProcess::splitCommand(processedTemplate);
@@ -160,6 +166,10 @@ void ManualRenderer::cancelOperation()
 
 void ManualRenderer::onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
+    QFileInfo fileInfo = QFileInfo(m_params.value("inputMkv").toString());
+    QFile::rename(fileInfo.absolutePath() + QDir::separator() + "temp_name_to_extract_subtitle.mkv",
+                  fileInfo.absoluteFilePath());
+
     if ((m_processManager != nullptr) && m_processManager->wasKilled())
     {
         emit logMessage("Ручной рендер отменен пользователем.", LogCategory::APP);

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ManualExtractionWidget</class>
+ <widget class="QWidget" name="ManualExtractionWidget">
+  <layout class="QVBoxLayout" name="mainLayout">
+   <!-- Группа выбора файла -->
+   <item>
+    <layout class="QHBoxLayout" name="fileInputLayout">
+     <item>
+      <widget class="QLabel" name="label">
+       <property name="text"><string>Исходный файл:</string></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="inputPathEdit">
+       <property name="placeholderText"><string>Путь к MKV или MP4...</string></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="browseButton">
+       <property name="text"><string>Обзор...</string></property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+
+   <!-- Таблица дорожек -->
+   <item>
+    <widget class="QTreeWidget" name="tracksTree">
+     <property name="columnCount"><number>5</number></property>
+     <column><property name="text"><string>Извлечь</string></property></column>
+     <column><property name="text"><string>ID</string></property></column>
+     <column><property name="text"><string>Тип</string></property></column>
+     <column><property name="text"><string>Язык</string></property></column>
+     <column><property name="text"><string>Информация</string></property></column>
+    </widget>
+   </item>
+
+   <!-- Опции (исправленная секция) -->
+   <item>
+    <layout class="QHBoxLayout" name="optionsLayout">
+     <item>
+      <widget class="QCheckBox" name="extractFontsCheckBox">
+       <property name="text"><string>Извлечь шрифты (вложения)</string></property>
+       <property name="checked"><bool>true</bool></property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="horizontalSpacer">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+
+   <!-- Кнопка запуска -->
+   <item>
+    <widget class="QPushButton" name="extractButton">
+     <property name="minimumSize"><size><width>0</width><height>40</height></size></property>
+     <property name="text"><string>НАЧАТЬ РАЗБОР</string></property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

@@ -2,6 +2,7 @@
 
 #include "appsettings.h"
 #include "manualassembler.h"
+#include "manualextractionwidget.h"
 #include "manualrenderer.h"
 #include "postgenerator.h"
 #include "settingsdialog.h"
@@ -49,8 +50,10 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWi
     ui->setupUi(this);
     setWindowIcon(QIcon(":/icon.png"));
 
+    m_manualExtractionWidget = ui->extractTab;
+
     m_manualAssemblyWidget = new ManualAssemblyWidget(this);
-    ui->manualTabLayout->addWidget(m_manualAssemblyWidget);
+    ui->assemblyTabLayout->addWidget(m_manualAssemblyWidget);
     m_manualRenderWidget = new ManualRenderWidget(this);
     ui->renderTabLayout->addWidget(m_manualRenderWidget);
     m_publicationWidget = new PublicationWidget(this);
@@ -69,6 +72,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWi
                 SetupWizardDialog wizard(this);
                 wizard.exec();
             });
+
+    connect(m_manualExtractionWidget, &ManualExtractionWidget::logMessage, this, &MainWindow::logMessage);
     connect(m_manualAssemblyWidget, &ManualAssemblyWidget::templateDataRequested, this,
             &MainWindow::onRequestTemplateData);
 

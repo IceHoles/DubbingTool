@@ -3,6 +3,7 @@
 
 #include "appsettings.h"
 #include "manualassemblywidget.h"
+#include "manualextractionwidget.h"
 #include "manualrenderwidget.h"
 #include "missingfilesdialog.h"
 #include "postgenerator.h"
@@ -22,6 +23,7 @@
 #include <QVariantMap>
 
 class ProcessManager;
+class ManualExtractionWidget;
 
 namespace Ui
 {
@@ -92,6 +94,7 @@ private:
     QMap<QString, ReleaseTemplate> m_templates;
     QString m_editingTemplateFileName;
 
+    ManualExtractionWidget* m_manualExtractionWidget;
     ManualAssemblyWidget* m_manualAssemblyWidget;
     ManualRenderWidget* m_manualRenderWidget;
     PublicationWidget* m_publicationWidget;

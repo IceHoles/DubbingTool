@@ -52,6 +52,7 @@ set(SOURCES_UI
     src/ui/torrentselectordialog.cpp        
     src/ui/trackselectordialog.cpp
     src/ui/telegrampasteedit.cpp
+    src/ui/manualextractionwidget.cpp
 )
 
 set(SOURCES_MODELS
@@ -89,6 +90,7 @@ set(HEADERS_UI
     src/ui/telegrampasteedit.h
     src/ui/torrentselectordialog.h
     src/ui/trackselectordialog.h
+    src/ui/manualextractionwidget.h
 )
 
 set(HEADERS_MODELS
@@ -107,6 +109,7 @@ set(FORMS
     ui/templateeditor.ui
     ui/torrentselectordialog.ui
     ui/trackselectordialog.ui
+    ui/manualextractionwidget.ui
 )
 
 set(RESOURCES
