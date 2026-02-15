@@ -73,8 +73,7 @@ void WorkflowManager::start()
 {
     QString baseDir = AppSettings::instance().effectiveProjectDirectory();
     QString sanitizedTitle = PathManager::sanitizeForPath(m_template.seriesTitle);
-    QString baseDownloadPath =
-        QString("%1/%2/Episode %3").arg(baseDir, sanitizedTitle, m_episodeNumberForSearch);
+    QString baseDownloadPath = QString("%1/%2/Episode %3").arg(baseDir, sanitizedTitle, m_episodeNumberForSearch);
 
     delete m_paths;
     m_paths = new PathManager(baseDownloadPath);
@@ -109,8 +108,7 @@ void WorkflowManager::startWithManualFile(const QString& filePath)
     {
         QString baseDir = AppSettings::instance().effectiveProjectDirectory();
         QString sanitizedTitle = PathManager::sanitizeForPath(m_template.seriesTitle);
-        baseDownloadPath =
-            QString("%1/%2/Episode %3").arg(baseDir, sanitizedTitle, m_episodeNumberForSearch);
+        baseDownloadPath = QString("%1/%2/Episode %3").arg(baseDir, sanitizedTitle, m_episodeNumberForSearch);
     }
 
     m_paths = new PathManager(baseDownloadPath, useOriginal);
@@ -791,6 +789,7 @@ void WorkflowManager::getMkvInfo()
         languageAliases["zho"] = "zh";
         languageAliases["chi"] = "zh";
         languageAliases["cmn"] = "zh";
+        languageAliases["kor"] = "ko";
         languageAliases["jpn"] = "ja";
         languageAliases["jp"] = "ja";
         languageAliases["eng"] = "en";
@@ -919,7 +918,8 @@ QString WorkflowManager::parseChaptersWithMkvExtract()
     {
         emit logMessage("Обнаружен XML-формат глав. Запуск XML-парсера...", LogCategory::APP);
         QXmlStreamReader xml(&chaptersFile);
-        QString currentTimeStart, currentChapterString;
+        QString currentTimeStart;
+        QString currentChapterString;
 
         while (!xml.atEnd() && !xml.hasError())
         {
@@ -979,7 +979,9 @@ QString WorkflowManager::parseChaptersWithMkvExtract()
                         }
                     }
                     if (!foundTime.isEmpty())
+                    {
                         break;
+                    }
                 }
             }
         }
@@ -1042,7 +1044,7 @@ void WorkflowManager::cancelOperation()
 {
     emit logMessage("Получена команда на отмену операции...", LogCategory::APP);
 
-    if (m_processManager)
+    if (m_processManager != nullptr)
     {
         m_processManager->killProcess();
     }
@@ -1053,11 +1055,11 @@ void WorkflowManager::cancelOperation()
         // Если мы скачиваем торрент, просто останавливаем таймеры и завершаем работу.
         // Мы не можем "отменить" скачивание в qBittorrent, но мы можем прекратить его отслеживать.
         emit logMessage("Отслеживание торрента прервано пользователем.", LogCategory::APP);
-        if (m_progressTimer && m_progressTimer->isActive())
+        if ((m_progressTimer != nullptr) && m_progressTimer->isActive())
         {
             m_progressTimer->stop();
         }
-        if (m_hashFindTimer && m_hashFindTimer->isActive())
+        if ((m_hashFindTimer != nullptr) && m_hashFindTimer->isActive())
         {
             m_hashFindTimer->stop();
         }
@@ -1071,7 +1073,7 @@ void WorkflowManager::cancelOperation()
 
 void WorkflowManager::onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
-    if (m_processManager && m_processManager->wasKilled())
+    if ((m_processManager != nullptr) && m_processManager->wasKilled())
     {
         emit logMessage("Операция успешно отменена пользователем.", LogCategory::APP);
         emit workflowAborted();
@@ -1200,9 +1202,13 @@ void WorkflowManager::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
             bool videoRemoved = QFile::remove(videoPath);
             bool audioRemoved = QFile::remove(audioPath);
             if (videoRemoved)
+            {
                 emit logMessage(" -> Временное видео удалено: " + videoPath, LogCategory::APP);
+            }
             if (audioRemoved)
+            {
                 emit logMessage(" -> Временное аудио удалено: " + audioPath, LogCategory::APP);
+            }
         }
 
         emit mkvFileReady(m_finalMkvPath);
@@ -1547,7 +1553,9 @@ void WorkflowManager::onAudioConversionProgress()
 {
     QFile progressFile(m_ffmpegProgressFile);
     if (!progressFile.open(QIODevice::ReadOnly))
+    {
         return;
+    }
 
     QTextStream in(&progressFile);
     qint64 totalDurationUs = 0;
@@ -1641,11 +1649,17 @@ void WorkflowManager::assembleMkv(const QString& russianAudioPath)
         args << "--attachment-name" << QFileInfo(path).fileName();
         QString mimeType = "application/octet-stream";
         if (path.endsWith(".ttf", Qt::CaseInsensitive))
+        {
             mimeType = "application/x-font-ttf";
+        }
         else if (path.endsWith(".otf", Qt::CaseInsensitive))
+        {
             mimeType = "application/vnd.ms-opentype";
+        }
         else if (path.endsWith(".ttc", Qt::CaseInsensitive))
+        {
             mimeType = "application/font-collection";
+        }
         args << "--attachment-mime-type" << mimeType;
         args << "--attach-file" << path;
     }
@@ -1665,8 +1679,19 @@ void WorkflowManager::assembleMkv(const QString& russianAudioPath)
          << russianAudioPath;
 
     // Дорожка оригинального аудио
-    args << "--default-track-flag" << "0:no" << "--language" << "0:" + m_template.originalLanguage << "--track-name"
-         << QString("0:Оригинал [%1]").arg(animStudio) << originalAudioPath;
+    if (QFileInfo::exists(originalAudioPath))
+    {
+        args << "--default-track-flag" << "0:no" << "--language" << "0:" + m_template.originalLanguage << "--track-name"
+             << QString("0:Оригинал [%1]").arg(animStudio) << originalAudioPath;
+    }
+    else if (m_template.useOriginalAudio)
+    {
+        emit logMessage("Критическая ошибка: Отсутствует оригинальная аудиодорожка, проверьте язык оригинального аудио "
+                        "в шаблоне. Сборка остановлена.",
+                        LogCategory::APP);
+        emit workflowAborted();
+        return;
+    }
 
     QString subTrackAuthorName = m_template.isCustomTranslation ? "Дубляжная" : subAuthor;
 
@@ -1729,30 +1754,30 @@ void WorkflowManager::runRenderPass(Step pass)
 QStringList WorkflowManager::prepareCommandArguments(const QString& commandTemplate)
 {
     QString processedTemplate = commandTemplate;
-
-    // Плейсхолдеры для путей
-    QString inputMkv = m_finalMkvPath;
-    QString outputMp4 = m_outputMp4Path;
+    QString inputMkv = QFileInfo(m_finalMkvPath).absoluteFilePath();
+    QString outputMp4 = QFileInfo(m_outputMp4Path).absoluteFilePath();
 
     processedTemplate.replace("%INPUT%", inputMkv);
     processedTemplate.replace("%OUTPUT%", outputMp4);
 
-    // Плейсхолдер для фильтра
     bool useHardsub = QFileInfo::exists(m_paths->processedSignsSubs());
-
     if (useHardsub)
     {
-        QString signsPath = m_paths->processedSignsSubs();
-        processedTemplate.replace("%SIGNS%", "'" + escapePathForFfmpegFilter(signsPath) + "'");
+        QFileInfo subsInfo(m_paths->processedSignsSubs());
+        m_processManager->setWorkingDirectory(subsInfo.absolutePath());
+        QString escapedFileName = subsInfo.fileName().replace("'", "\\'");
+        processedTemplate.replace("%SIGNS%", QString("filename='%1'").arg(escapedFileName));
     }
     else
     {
         // Если hardsub не нужен, надо аккуратно удалить фильтр
-        QRegularExpression filter_regex(R"(-vf\s+\"[^\"]*subtitles=%SIGNS%[^\"]*\")");
-        processedTemplate.remove(filter_regex);
+        processedTemplate.replace("subtitles=%SIGNS%", "");
+        processedTemplate.remove(QRegularExpression(R"(-vf\s+\"[^\"]*,\s*\")"));    // запятая после
+        processedTemplate.remove(QRegularExpression(R"(-vf\s+\"\s*,\s*[^\"]*\")")); // запятая перед
+        processedTemplate.remove(QRegularExpression(R"(-vf\s+\"\s*\")"));           // пустые кавычки
+        emit logMessage("Hardsub отключен. Фильтр субтитров удален из команды.", LogCategory::APP);
     }
 
-    // Используем QProcess для корректного разбора строки
     return QProcess::splitCommand(processedTemplate);
 }
 
@@ -2130,13 +2155,13 @@ void WorkflowManager::concatRenderSegment2()
 
         if (encoder == "libx264")
         {
-            args << "-crf" << "18" << "-maxrate" << maxrateStr << "-bufsize" << bufsizeStr
-                 << "-preset" << "medium" << "-profile:v" << "high";
+            args << "-crf" << "18" << "-maxrate" << maxrateStr << "-bufsize" << bufsizeStr << "-preset" << "medium"
+                 << "-profile:v" << "high";
         }
         else if (encoder == "libx265")
         {
-            args << "-crf" << "18" << "-maxrate" << maxrateStr << "-bufsize" << bufsizeStr
-                 << "-preset" << "medium" << "-tag:v" << "hvc1";
+            args << "-crf" << "18" << "-maxrate" << maxrateStr << "-bufsize" << bufsizeStr << "-preset" << "medium"
+                 << "-tag:v" << "hvc1";
         }
         emit logMessage(QString("Concat рендер: кодируем ТБ с CRF + maxrate оригинала: %1").arg(maxrateStr),
                         LogCategory::APP);
@@ -2945,6 +2970,10 @@ void WorkflowManager::processSubtitles()
 
 void WorkflowManager::runAssProcessing()
 {
+    QFile::remove(m_paths->processedFullSubs());
+    QFile::remove(m_paths->processedSignsSubs());
+    QFile::remove(m_paths->masterSrt());
+
     QString extractedSubs = m_paths->extractedSubs("ass");
     QString overrideSubs = m_overrideSubsPath;
     QString overrideSigns = m_overrideSignsPath;
@@ -2970,18 +2999,16 @@ void WorkflowManager::runAssProcessing()
             releaseSuccess = m_assProcessor->addTbToFile(overrideSigns, m_paths->processedSignsSubs(), m_template,
                                                          m_parsedEndingTime);
         }
-        else if (m_template.generateTb)
-        {
-            emit logMessage("Сценарий: диалоги не используются, надписи не указаны. Генерируем только ТБ.",
-                            LogCategory::APP);
-            QString outputPath = m_paths->processedSignsSubs();
-            m_assProcessor->generateTbOnlyFile(outputPath, m_template, m_parsedEndingTime);
-        }
         else
         {
-            emit logMessage("Сценарий: диалоги не используются, надписи не указаны. Генерация ТБ отключена. Выходной "
-                            "файл будет без субтитров и надписей",
+            emit logMessage("Свои надписи не указаны. Вырезаем надписи из основного файла субтитров для видео...",
                             LogCategory::APP);
+            releaseSuccess =
+                m_assProcessor->processExistingFile(overrideSubs, outputFileBase, m_template, m_parsedEndingTime);
+            if (releaseSuccess)
+            {
+                QFile::remove(m_paths->processedFullSubs());
+            }
         }
         if (!srtSuccess || !releaseSuccess)
         {
@@ -3078,8 +3105,10 @@ void WorkflowManager::runAssProcessing()
 
 void WorkflowManager::onFontFinderFinished(const FontFinderResult& result)
 {
-    if (m_processManager && m_processManager->wasKilled())
+    if ((m_processManager != nullptr) && m_processManager->wasKilled())
+    {
         return;
+    }
 
     emit logMessage("Поиск шрифтов завершен.", LogCategory::APP);
     m_fontResult = result;

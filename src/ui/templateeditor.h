@@ -4,7 +4,7 @@
 #include "releasetemplate.h"
 
 #include <QDialog>
-
+#include <QPointer>
 namespace Ui
 {
 class TemplateEditor;
@@ -30,6 +30,7 @@ private:
     static bool containsForbiddenChars(const QString& text);
     static QString forbiddenCharsFound(const QString& text);
 
+    QPointer<QDialog> m_helpDialog;
     Ui::TemplateEditor* ui;
 };
 

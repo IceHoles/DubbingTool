@@ -45,6 +45,7 @@ void ReleaseTemplate::read(const QJsonObject& json)
     endingChapterName = json["endingChapterName"].toString();
     endingStartTime = json["endingStartTime"].toString();
     useManualTime = json["useManualTime"].toBool(false);
+    useOriginalAudio = json["useOriginalAudio"].toBool(true);
     generateTb = json["generateTb"].toBool(true);
     createSrtMaster = json["createSrtMaster"].toBool(false);
     isCustomTranslation = json["isCustomTranslation"].toBool(false);
@@ -120,6 +121,7 @@ void ReleaseTemplate::write(QJsonObject& json) const
     json["endingChapterName"] = endingChapterName;
     json["endingStartTime"] = endingStartTime;
     json["useManualTime"] = useManualTime;
+    json["useOriginalAudio"] = useOriginalAudio;
     json["generateTb"] = generateTb;
     json["createSrtMaster"] = createSrtMaster;
     json["isCustomTranslation"] = isCustomTranslation;

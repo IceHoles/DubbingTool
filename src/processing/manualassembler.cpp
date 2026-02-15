@@ -11,12 +11,10 @@
 #include <QJsonDocument>
 #include <QTimer>
 
-ManualAssembler::ManualAssembler(const QVariantMap& params, QObject* parent) : QObject(parent), m_params(params)
+ManualAssembler::ManualAssembler(const QVariantMap& params, QObject* parent)
+    : QObject(parent), m_params(params), m_processManager(new ProcessManager(this)),
+      m_assProcessor(new AssProcessor(this)), m_progressTimer(new QTimer(this))
 {
-    m_processManager = new ProcessManager(this);
-    m_assProcessor = new AssProcessor(this);
-    m_progressTimer = new QTimer(this);
-
     connect(m_processManager, &ProcessManager::processOutput, this, &ManualAssembler::onProcessText);
     connect(m_processManager, &ProcessManager::processStdErr, this, &ManualAssembler::onProcessText);
     connect(m_assProcessor, &AssProcessor::logMessage, this, &ManualAssembler::logMessage);
@@ -59,9 +57,13 @@ void ManualAssembler::normalizeAudio()
     {
         emit logMessage("Нормализация пропущена (не указан путь к NUGEN или файл не .wav).", LogCategory::APP);
         if (m_params["convertAudio"].toBool())
+        {
             convertAudio();
+        }
         else
+        {
             processSubtitlesAndAssemble();
+        }
         return;
     }
 
@@ -78,9 +80,13 @@ void ManualAssembler::normalizeAudio()
     {
         emit logMessage("ОШИБКА: Не удалось переименовать аудиофайл. Нормализация отменена.", LogCategory::APP);
         if (m_params["convertAudio"].toBool())
+        {
             convertAudio();
+        }
         else
+        {
             processSubtitlesAndAssemble();
+        }
         return;
     }
 
@@ -95,9 +101,13 @@ void ManualAssembler::normalizeAudio()
     {
         emit logMessage("Ошибка: AMBCmd.exe не найден. Нормализация пропущена.", LogCategory::APP);
         if (m_params["convertAudio"].toBool())
+        {
             convertAudio();
+        }
         else
+        {
             processSubtitlesAndAssemble();
+        }
         return;
     }
 
@@ -154,9 +164,13 @@ void ManualAssembler::convertAudio()
     QStringList args;
     args << "-y" << "-i" << audioPath;
     if (targetFormat == "aac")
+    {
         args << "-c:a" << "aac" << "-b:a" << "256k";
+    }
     else if (targetFormat == "flac")
+    {
         args << "-c:a" << "flac";
+    }
     args << "-progress" << QDir::toNativeSeparators(m_progressLogPath) << newAudioPath;
 
     if (m_sourceAudioDurationS > 0)
@@ -269,11 +283,17 @@ void ManualAssembler::assemble()
         args << "--attachment-name" << QFileInfo(path).fileName();
         QString mimeType = "application/octet-stream";
         if (path.endsWith(".ttf", Qt::CaseInsensitive))
+        {
             mimeType = "application/x-font-ttf";
+        }
         else if (path.endsWith(".otf", Qt::CaseInsensitive))
+        {
             mimeType = "application/vnd.ms-opentype";
+        }
         else if (path.endsWith(".ttc", Qt::CaseInsensitive))
+        {
             mimeType = "application/font-collection";
+        }
         args << "--attachment-mime-type" << mimeType;
         args << "--attach-file" << path;
     }
@@ -285,44 +305,80 @@ void ManualAssembler::assemble()
         QString lang = m_params["language"].toString();
         QString subAuthor = m_params["subAuthor"].toString();
         if (m_params.contains("videoPath"))
-            args << "--language" << "0:" + lang << "--track-name" << QString("0:Видеоряд [%1]").arg(studio)
-                 << m_params["videoPath"].toString();
+        {
+            if (!lang.isEmpty())
+            {
+                args << "--language" << "0:" + lang;
+            }
+            if (!studio.isEmpty())
+            {
+                args << "--track-name" << QString("0:Видеоряд [%1]").arg(studio);
+            }
+            args << m_params["videoPath"].toString();
+        }
         if (m_params.contains("russianAudioPath"))
+        {
             args << "--default-track-flag" << "0:yes" << "--language" << "0:rus" << "--track-name"
                  << "0:Русский [Дубляжная]" << m_params["russianAudioPath"].toString();
+        }
         if (m_params.contains("originalAudioPath"))
-            args << "--language" << "0:" + lang << "--track-name" << QString("0:Оригинал [%1]").arg(studio)
-                 << m_params["originalAudioPath"].toString();
+        {
+            if (!lang.isEmpty())
+            {
+                args << "--language" << "0:" + lang;
+            }
+            if (!studio.isEmpty())
+            {
+                args << "--track-name" << QString("0:Оригинал [%1]").arg(studio);
+            }
+            args << m_params["originalAudioPath"].toString();
+        }
         if (m_params.contains("signsPath"))
+        {
             args << "--forced-display-flag" << "0:yes" << "--default-track-flag" << "0:yes" << "--language" << "0:rus"
                  << "--track-name" << QString("0:Надписи [%1]").arg(subAuthor) << m_params["signsPath"].toString();
+        }
         if (m_params.contains("subtitlesPath"))
+        {
             args << "--language" << "0:rus" << "--track-name" << QString("0:Субтитры [%1]").arg(subAuthor)
                  << m_params["subtitlesPath"].toString();
+        }
     }
     else
     {
         ReleaseTemplate t;
         QFile file("templates/" + m_params["templateName"].toString() + ".json");
         if (file.open(QIODevice::ReadOnly))
+        {
             t.read(QJsonDocument::fromJson(file.readAll()).object());
+        }
         QString subTrackAuthorName = t.isCustomTranslation ? "Дубляжная" : t.subAuthor;
         if (m_params.contains("videoPath"))
+        {
             args << "--language" << "0:" + t.originalLanguage << "--track-name"
                  << QString("0:Видеоряд [%1]").arg(t.animationStudio) << m_params["videoPath"].toString();
+        }
         if (m_params.contains("russianAudioPath"))
+        {
             args << "--default-track-flag" << "0:yes" << "--language" << "0:rus" << "--track-name"
                  << "0:Русский [Дубляжная]" << m_params["russianAudioPath"].toString();
+        }
         if (m_params.contains("originalAudioPath"))
+        {
             args << "--language" << "0:" + t.originalLanguage << "--track-name"
                  << QString("0:Оригинал [%1]").arg(t.animationStudio) << m_params["originalAudioPath"].toString();
+        }
         if (m_params.contains("signsPath"))
+        {
             args << "--forced-display-flag" << "0:yes" << "--default-track-flag" << "0:yes" << "--language" << "0:rus"
                  << "--track-name" << QString("0:Надписи [%1]").arg(subTrackAuthorName)
                  << m_params["signsPath"].toString();
+        }
         if (m_params.contains("subtitlesPath"))
+        {
             args << "--language" << "0:rus" << "--track-name" << QString("0:Субтитры [%1]").arg(subTrackAuthorName)
                  << m_params["subtitlesPath"].toString();
+        }
     }
 
     m_processManager->startProcess(mkvmergePath, args);
@@ -330,7 +386,7 @@ void ManualAssembler::assemble()
 
 void ManualAssembler::onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
-    if (m_processManager && m_processManager->wasKilled())
+    if ((m_processManager != nullptr) && m_processManager->wasKilled())
     {
         emit logMessage("Ручная сборка отменена пользователем.", LogCategory::APP);
         emit finished();
@@ -433,32 +489,13 @@ void ManualAssembler::onProcessText(const QString& output)
     }
 }
 
-// void ManualAssembler::onConversionProgress()
-// {
-//     QFile progressFile(m_progressLogPath);
-//     if (!progressFile.open(QIODevice::ReadOnly)) return;
-
-//     QTextStream in(&progressFile);
-//     QString logContent = in.readAll();
-//     progressFile.close();
-
-//     int lastPos = logContent.lastIndexOf("out_time_us=");
-//     if (lastPos == -1) return;
-
-//     QString timeUsStr = logContent.mid(lastPos + 12);
-//     qint64 currentTimeUs = timeUsStr.toLongLong();
-
-//     if (m_sourceAudioDurationS > 0) {
-//         double totalUs = m_sourceAudioDurationS * 1000000.0;
-//         int percentage = (currentTimeUs * 100)/ totalUs;
-//         emit progressUpdated(percentage, "Конвертация аудио");
-//     }
-// }
 void ManualAssembler::onConversionProgress()
 {
     QFile progressFile(m_progressLogPath);
     if (!progressFile.open(QIODevice::ReadOnly))
+    {
         return;
+    }
 
     QTextStream in(&progressFile);
     qint64 totalDurationUs = 0;
@@ -486,7 +523,7 @@ void ManualAssembler::onConversionProgress()
 void ManualAssembler::cancelOperation()
 {
     emit logMessage("Получена команда на отмену ручной сборки...", LogCategory::APP);
-    if (m_processManager)
+    if (m_processManager != nullptr)
     {
         m_processManager->killProcess();
     }

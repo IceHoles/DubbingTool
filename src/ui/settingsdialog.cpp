@@ -109,15 +109,25 @@ void SettingsDialog::accept()
 
     QSet<LogCategory> enabled;
     if (ui->logAppCheckBox->isChecked())
+    {
         enabled.insert(LogCategory::APP);
+    }
     if (ui->logMkvToolNixCheckBox->isChecked())
+    {
         enabled.insert(LogCategory::MKVTOOLNIX);
+    }
     if (ui->logFfmpegCheckBox->isChecked())
+    {
         enabled.insert(LogCategory::FFMPEG);
+    }
     if (ui->logQbittorrentCheckBox->isChecked())
+    {
         enabled.insert(LogCategory::QBITTORRENT);
+    }
     if (ui->logDebugCheckBox->isChecked())
+    {
         enabled.insert(LogCategory::DEBUG);
+    }
     settings.setEnabledLogCategories(enabled);
 
     settings.save();
@@ -128,25 +138,33 @@ void SettingsDialog::on_browseMkvToolNixButton_clicked()
 {
     QString filePath = QFileDialog::getOpenFileName(this, "Выберите mkvmerge.exe", "", "Исполняемые файлы (*.exe)");
     if (!filePath.isEmpty())
+    {
         ui->mkvToolNixPathEdit->setText(filePath);
+    }
 }
 void SettingsDialog::on_browseMkvExtractButton_clicked()
 {
     QString filePath = QFileDialog::getOpenFileName(this, "Выберите mkvextract.exe", "", "Исполняемые файлы (*.exe)");
     if (!filePath.isEmpty())
+    {
         ui->mkvExtractPathEdit->setText(filePath);
+    }
 }
 void SettingsDialog::on_browseFfmpegButton_clicked()
 {
     QString filePath = QFileDialog::getOpenFileName(this, "Выберите ffmpeg.exe", "", "Исполняемые файлы (*.exe)");
     if (!filePath.isEmpty())
+    {
         ui->ffmpegPathEdit->setText(filePath);
+    }
 }
 void SettingsDialog::on_browseQbittorrentButton_clicked()
 {
     QString filePath = QFileDialog::getOpenFileName(this, "Выберите qbittorrent.exe", "", "Исполняемые файлы (*.exe)");
     if (!filePath.isEmpty())
+    {
         ui->qbittorrentPathEdit->setText(filePath);
+    }
 }
 
 void SettingsDialog::on_browseNugenAmbButton_clicked()
@@ -154,12 +172,15 @@ void SettingsDialog::on_browseNugenAmbButton_clicked()
     QString filePath =
         QFileDialog::getOpenFileName(this, "Выберите NUGEN Audio AMB.exe", "", "Исполняемые файлы (*.exe)");
     if (!filePath.isEmpty())
+    {
         ui->nugenAmbPathEdit->setText(filePath);
+    }
 }
 
 void SettingsDialog::on_browseProjectDirectoryButton_clicked()
 {
-    QString dir = QFileDialog::getExistingDirectory(this, "Выберите директорию проектов", ui->projectDirectoryEdit->text());
+    QString dir =
+        QFileDialog::getExistingDirectory(this, "Выберите директорию проектов", ui->projectDirectoryEdit->text());
     if (!dir.isEmpty())
     {
         ui->projectDirectoryEdit->setText(dir);
@@ -212,7 +233,9 @@ void SettingsDialog::on_saveRenderPresetButton_clicked()
 {
     int currentRow = ui->renderPresetsList->currentRow();
     if (currentRow < 0)
+    {
         return;
+    }
 
     QString name = ui->renderPresetNameEdit->text().trimmed();
     if (name.isEmpty())
@@ -255,7 +278,9 @@ void SettingsDialog::on_deleteRenderPresetButton_clicked()
 {
     int currentRow = ui->renderPresetsList->currentRow();
     if (currentRow < 0)
+    {
         return;
+    }
 
     auto reply =
         QMessageBox::question(this, "Подтверждение", "Удалить пресет '" + m_renderPresets[currentRow].name + "'?",

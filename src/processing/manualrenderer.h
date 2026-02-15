@@ -14,8 +14,11 @@ class ProcessManager;
 static QString escapePathForFfmpegFilter(const QString& path)
 {
     QString escaped = QDir::toNativeSeparators(path);
-    escaped.replace('\\', "/");
-    escaped.replace(':', "\\:");
+    escaped.replace("\\", "/");
+    // "C\:/path"
+    escaped.replace(":", "\\:");
+    // Docs: "Inside a single-quoted string, a single quote can be included by escaping it with a backslash."
+    escaped.replace("'", "\\'");
     return escaped;
 }
 

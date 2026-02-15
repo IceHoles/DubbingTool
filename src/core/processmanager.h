@@ -17,6 +17,10 @@ public:
     bool executeAndWait(const QString& program, const QStringList& arguments, QByteArray& output);
     void killProcess();
     bool wasKilled() const;
+    void setWorkingDirectory(const QString& dir)
+    {
+        m_workingDir = dir;
+    }
 
 signals:
     void processOutput(const QString& output);
@@ -32,6 +36,7 @@ private:
     // Храним список всех запущенных этим менеджером процессов
     QList<QProcess*> m_activeProcesses;
     bool m_wasKilled = false;
+    QString m_workingDir;
 };
 
 #endif // PROCESSMANAGER_H

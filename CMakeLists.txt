@@ -49,8 +49,9 @@ set(SOURCES_UI
     src/ui/setupwizarddialog.cpp
     src/ui/styleselectordialog.cpp
     src/ui/templateeditor.cpp
-    src/ui/torrentselectordialog.cpp
+    src/ui/torrentselectordialog.cpp        
     src/ui/trackselectordialog.cpp
+    src/ui/telegrampasteedit.cpp
 )
 
 set(SOURCES_MODELS
@@ -85,6 +86,7 @@ set(HEADERS_UI
     src/ui/setupwizarddialog.h
     src/ui/styleselectordialog.h
     src/ui/templateeditor.h
+    src/ui/telegrampasteedit.h
     src/ui/torrentselectordialog.h
     src/ui/trackselectordialog.h
 )

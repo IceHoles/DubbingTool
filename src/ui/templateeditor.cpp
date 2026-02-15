@@ -10,9 +10,12 @@
 #include <QDialogButtonBox>
 #include <QFileDialog>
 #include <QGridLayout>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QMimeData>
+#include <QPointer>
 #include <QPropertyAnimation>
 #include <QRegularExpression>
 #include <QScrollArea>
@@ -21,6 +24,8 @@
 #include <QTextDocumentFragment>
 #include <QVBoxLayout>
 #include <QWidget>
+
+#include <qplaintextedit.h>
 
 class ClickableLabel : public QLabel
 {
@@ -53,6 +58,35 @@ TemplateEditor::TemplateEditor(QWidget* parent) : QDialog(parent), ui(new Ui::Te
 {
     ui->setupUi(this);
 
+    // Перехватываем вставку в полях Telegram-постов, чтобы уметь понимать
+    // специальный формат буфера обмена Telegram (application/x-td-field-*).
+    auto replaceEditor = [this](QPlainTextEdit* original) -> TelegramPasteEdit*
+    {
+        TelegramPasteEdit* newEdit = new TelegramPasteEdit(this);
+
+        // Копируем свойства из старого виджета
+        newEdit->setObjectName(original->objectName());
+        newEdit->setGeometry(original->geometry());
+        newEdit->setSizePolicy(original->sizePolicy());
+        newEdit->setFont(original->font());
+        // Добавьте другие свойства, если они важны (placeholderText и т.д.)
+
+        // Вставляем новый виджет в layout на место старого
+        if (original->parentWidget() && original->parentWidget()->layout())
+        {
+            QLayout* layout = original->parentWidget()->layout();
+            layout->replaceWidget(original, newEdit);
+        }
+
+        // Удаляем старый
+        delete original;
+        return newEdit;
+    };
+    auto* mp4Edit = replaceEditor(ui->postTgMp4Edit);
+    ui->postTgMp4Edit = mp4Edit; // Обновляем указатель в ui, чтобы остальной код работал
+
+    auto* mkvEdit = replaceEditor(ui->postTgMkvEdit);
+    ui->postTgMkvEdit = mkvEdit;
     connect(ui->addSubstitutionButton, &QPushButton::clicked, this,
             [this]()
             {
@@ -118,6 +152,7 @@ void TemplateEditor::setTemplate(const ReleaseTemplate& t)
     ui->endingChapterNameEdit->setText(t.endingChapterName);
     ui->endingStartTimeEdit->setTime(QTime::fromString(t.endingStartTime, "H:mm:ss.zzz"));
     ui->useManualTimeCheckBox->setChecked(t.useManualTime);
+    ui->useOriginalAudioCheckBox->setChecked(t.useOriginalAudio);
     ui->defaultTbStyleComboBox->clear();
     for (const auto& style : AppSettings::instance().tbStyles())
     {
@@ -199,6 +234,7 @@ ReleaseTemplate TemplateEditor::getTemplate() const
     t.endingChapterName = ui->endingChapterNameEdit->text().trimmed();
     t.endingStartTime = ui->endingStartTimeEdit->time().toString("H:mm:ss.zzz");
     t.useManualTime = ui->useManualTimeCheckBox->isChecked();
+    t.useOriginalAudio = ui->useOriginalAudioCheckBox->isChecked();
     t.defaultTbStyleName = ui->defaultTbStyleComboBox->currentText();
     if (ui->voiceoverTypeComboBox->currentText() == "Закадр")
     {
@@ -259,7 +295,9 @@ void TemplateEditor::on_selectStylesButton_clicked()
     QString filePath =
         QFileDialog::getOpenFileName(this, "Выберите .ass файл для анализа", "", "ASS Subtitles (*.ass)");
     if (filePath.isEmpty())
+    {
         return;
+    }
 
     StyleSelectorDialog dialog(this);
     dialog.analyzeFile(filePath);
@@ -273,19 +311,22 @@ void TemplateEditor::on_selectStylesButton_clicked()
 
 void TemplateEditor::on_helpButton_clicked()
 {
-    static QDialog* helpDialog = nullptr;
-    if (helpDialog && helpDialog->isVisible())
+    if (m_helpDialog)
     {
-        helpDialog->activateWindow();
-        return;
+        if (m_helpDialog->isVisible())
+        {
+            m_helpDialog->activateWindow();
+            return;
+        }
     }
 
-    helpDialog = new QDialog(this);
-    helpDialog->setAttribute(Qt::WA_DeleteOnClose);
-    helpDialog->setWindowTitle("Справка по шаблонам и форматированию");
-    helpDialog->setMinimumSize(500, 800);
+    m_helpDialog = new QDialog(this);
+    m_helpDialog->setAttribute(Qt::WA_DeleteOnClose);
 
-    QScrollArea* scrollArea = new QScrollArea(helpDialog);
+    m_helpDialog->setWindowTitle("Справка по шаблонам и форматированию");
+    m_helpDialog->setMinimumSize(500, 800);
+
+    QScrollArea* scrollArea = new QScrollArea(m_helpDialog);
     scrollArea->setWidgetResizable(true);
     scrollArea->setStyleSheet("QScrollArea { border: none; }");
     QWidget* scrollWidget = new QWidget();
@@ -366,10 +407,9 @@ void TemplateEditor::on_helpButton_clicked()
 
     mainLayout->addStretch(1);
 
-    QVBoxLayout* dialogLayout = new QVBoxLayout(helpDialog);
+    QVBoxLayout* dialogLayout = new QVBoxLayout(m_helpDialog);
     dialogLayout->addWidget(scrollArea);
-    helpDialog->setLayout(dialogLayout);
-    helpDialog->show();
+    m_helpDialog->show();
 }
 
 void TemplateEditor::slotValidateAndAccept()
@@ -383,7 +423,7 @@ void TemplateEditor::slotValidateAndAccept()
         QMessageBox::warning(this, "Недопустимые символы",
                              QString("Название серии содержит символы, запрещённые в именах файлов Windows:\n\n"
                                      "  %1\n\n"
-                                     "Запрещённые символы:  : \" < > | ? * '\n\n"
+                                     "Запрещённые символы:  : \" < > | ? *\n\n"
                                      "Пожалуйста, уберите их из названия.")
                                  .arg(found));
         ui->seriesTitleEdit->setFocus();
@@ -395,7 +435,7 @@ void TemplateEditor::slotValidateAndAccept()
 
 bool TemplateEditor::containsForbiddenChars(const QString& text)
 {
-    static const QString kForbidden = ":\"<>|?*'";
+    static const QString kForbidden = ":\"<>|?*";
     for (const QChar& ch : text)
     {
         if (kForbidden.contains(ch))
@@ -408,7 +448,7 @@ bool TemplateEditor::containsForbiddenChars(const QString& text)
 
 QString TemplateEditor::forbiddenCharsFound(const QString& text)
 {
-    static const QString kForbidden = ":\"<>|?*'";
+    static const QString kForbidden = ":\"<>|?*";
     QStringList found;
     for (const QChar& ch : text)
     {

@@ -231,7 +231,7 @@ void MainWindow::on_createTemplateButton_clicked()
     defaultTemplate.rssUrl = QUrl("https://example.com/rss.xml");
     defaultTemplate.animationStudio = "STUDIO (с шикимори или MAL)";
     defaultTemplate.subAuthor = "Crunchyroll (или Имя Фамилия, если перевод свой + галочка внизу \"Свой перевод\")";
-    defaultTemplate.originalLanguage = "jpn";
+    defaultTemplate.originalLanguage = "ja";
     defaultTemplate.endingChapterName = "Ending Start";
     defaultTemplate.totalEpisodes = 12;
 
@@ -266,7 +266,7 @@ void MainWindow::on_createTemplateButton_clicked()
         "Серия: %EPISODE_NUMBER%/%TOTAL_EPISODES%\n\n"
         "🎁Сериал озвучен при поддержке онлайн-кинотеатра TVOЁ, если вы хотите поддержать Дубляжную, то смотрите нашу "
         "озвучку именно там, ведь TVOЁ дарит скидку нашим подписчикам по промокоду - Dublyazhnaya, где 1 месяц 99 "
-        "рублей вместо 299 руб tvoe.cc/inby"
+        "рублей вместо 299 руб tvoe.cc/inby\n\n"
         "Роли дублировали:\n%CAST_LIST%\n\n"
         "Режиссёр дубляжа:\n%DIRECTOR%\n\n"
         "Звукорежиссёр:\n%SOUND_ENGINEER%\n\n"
@@ -280,7 +280,7 @@ void MainWindow::on_createTemplateButton_clicked()
         "ТГ: https://t.me/dublyajnaya\n\n"
         "TVOЁ (99 руб. по промокоду: Dublyazhnaya): https://tvoe.live/p/";
     defaultTemplate.uploadUrls << "https://vk.com/dublyajnaya" << "https://converter.kodik.biz/media-files"
-                               << "https://anime-365.ru/" << "https://anilib.me/ru";
+                               << "https://anime-365.ru/" << "https://v4.anilib.me/ru";
     editor.setTemplate(defaultTemplate);
 
     if (editor.exec() == QDialog::Accepted)
@@ -920,7 +920,8 @@ void MainWindow::onPauseForSubEditRequest(const QString& subFilePath)
     logMessage("Процесс приостановлен для ручного редактирования субтитров.", LogCategory::APP);
     QMessageBox msgBox(this);
     msgBox.setIcon(QMessageBox::Information);
-    msgBox.setText("Процесс приостановлен");
+    msgBox.setText("Файл готов к редактированию: <a href=\"file:///" + subFilePath + "\">Открыть в редакторе</a>");
+    msgBox.setTextFormat(Qt::RichText);
     msgBox.setInformativeText(
         QString("Вы можете отредактировать файл субтитров:\n%1\n\nНажмите 'OK' для продолжения сборки.")
             .arg(QDir::toNativeSeparators(subFilePath)));

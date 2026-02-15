@@ -11,11 +11,11 @@
 #include <QStyle>
 #include <QVariantMap>
 
-ManualAssemblyWidget::ManualAssemblyWidget(QWidget* parent) : QWidget(parent), ui(new Ui::ManualAssemblyWidget)
+ManualAssemblyWidget::ManualAssemblyWidget(QWidget* parent)
+    : QWidget(parent), m_fontFinder(new FontFinder(this)), ui(new Ui::ManualAssemblyWidget)
 {
     ui->setupUi(this);
 
-    m_fontFinder = new FontFinder(this);
     connect(m_fontFinder, &FontFinder::finished, this, &ManualAssemblyWidget::onFontFinderFinished);
 
     m_templateModeIcon = this->style()->standardIcon(QStyle::SP_FileDialogListView);
@@ -91,7 +91,9 @@ void ManualAssemblyWidget::updateTemplateList(const QStringList& templateNames)
 void ManualAssemblyWidget::on_templateComboBox_currentIndexChanged(int index)
 {
     if (index == -1)
+    {
         return;
+    }
     QString templateName = ui->templateComboBox->currentText();
     emit templateDataRequested(templateName);
 }
@@ -139,12 +141,12 @@ void ManualAssemblyWidget::on_browseRussianAudio_clicked()
 
 void ManualAssemblyWidget::on_browseSubtitles_clicked()
 {
-    browseForFile(ui->subtitlesPathEdit, "Выберите файл полных субтитров", "ASS Subtitles (*.ass)");
+    browseForFile(ui->subtitlesPathEdit, "Выберите файл полных субтитров", "Subtitles (*.ass *.srt)");
 }
 
 void ManualAssemblyWidget::on_browseSigns_clicked()
 {
-    browseForFile(ui->signsPathEdit, "Выберите файл надписей", "ASS Subtitles (*.ass)");
+    browseForFile(ui->signsPathEdit, "Выберите файл надписей", "Subtitles (*.ass *.srt)");
 }
 
 void ManualAssemblyWidget::on_analyzeSubsButton_clicked()
@@ -193,15 +195,25 @@ QVariantMap ManualAssemblyWidget::getParameters() const
     params["isManualMode"] = isManualMode;
 
     if (ui->includeVideoCheckBox->isChecked())
+    {
         params["videoPath"] = ui->videoPathEdit->text();
+    }
     if (ui->includeOriginalAudioCheckBox->isChecked())
+    {
         params["originalAudioPath"] = ui->originalAudioPathEdit->text();
+    }
     if (ui->includeRussianAudioCheckBox->isChecked())
+    {
         params["russianAudioPath"] = ui->russianAudioPathEdit->text();
+    }
     if (ui->includeSubtitlesCheckBox->isChecked())
+    {
         params["subtitlesPath"] = ui->subtitlesPathEdit->text();
+    }
     if (ui->includeSignsCheckBox->isChecked())
+    {
         params["signsPath"] = ui->signsPathEdit->text();
+    }
 
     params["normalizeAudio"] = ui->normalizeAudioCheckBox->isChecked();
     params["convertAudio"] = ui->convertAudioCheckBox->isChecked();
@@ -226,7 +238,9 @@ QVariantMap ManualAssemblyWidget::getParameters() const
     {
         QString path = ui->fontsListWidget->item(i)->data(Qt::UserRole).toString();
         if (!path.isEmpty())
+        {
             fontPaths.append(path);
+        }
     }
     params["fontPaths"] = fontPaths;
 

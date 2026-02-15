@@ -1,5 +1,7 @@
 #include "telegramformatter.h"
 
+#include <QByteArray>
+#include <QChar>
 #include <QClipboard>
 #include <QDataStream>
 #include <QGuiApplication>
@@ -9,6 +11,9 @@
 #include <QMimeData>
 #include <QPair>
 #include <QRegularExpression>
+#include <QSet>
+#include <QStringList>
+#include <QVector>
 #include <algorithm>
 
 struct FinalTag
@@ -32,6 +37,13 @@ struct MatchInfo
 
 namespace
 {
+
+struct TagRecord
+{
+    qsizetype position{};
+    qsizetype length{};
+    QString tagContent; // already decoded UTF-16 BE string
+};
 
 QPair<QString, QList<FinalTag>> parseText(const QString& text, const QList<QPair<QRegularExpression, QString>>& rules)
 {
@@ -76,7 +88,9 @@ QPair<QString, QList<FinalTag>> parseText(const QString& text, const QList<QPair
         for (const auto& matchB : allMatches)
         {
             if (&matchA == &matchB)
+            {
                 continue;
+            }
             if (matchA.start >= matchB.start && (matchA.start + matchA.length) <= (matchB.start + matchB.length))
             {
                 isNested = true;
@@ -148,6 +162,159 @@ QPair<QString, QList<FinalTag>> parseText(const QString& text, const QList<QPair
     return {cleanText, tags};
 }
 
+QVector<TagRecord> parseTelegramTagsBinary(const QByteArray& tagsData)
+{
+    QVector<TagRecord> tags;
+    if (tagsData.isEmpty())
+        return tags;
+
+    QDataStream stream(tagsData);
+    stream.setByteOrder(QDataStream::BigEndian); // Заголовки (pos, len, size) всегда BE
+
+    quint32 count = 0;
+    stream >> count;
+
+    for (quint32 i = 0; i < count && !stream.atEnd(); ++i)
+    {
+        quint32 pos = 0;
+        quint32 len = 0;
+        quint32 size = 0;
+        stream >> pos >> len >> size;
+
+        QByteArray tagBytes(size, 0);
+        if (stream.readRawData(tagBytes.data(), size) != (int)size)
+            break;
+
+        // ИСПРАВЛЕНИЕ: Читаем UTF-16 Big Endian вручную
+        QString content;
+        content.reserve(size / 2);
+        for (int j = 0; j < (int)size; j += 2)
+        {
+            // Собираем символ из двух байт: [high][low]
+            uchar high = static_cast<uchar>(tagBytes[j]);
+            uchar low = static_cast<uchar>(tagBytes[j + 1]);
+            content.append(QChar((high << 8) | low));
+        }
+
+        tags.append({static_cast<qsizetype>(pos), static_cast<qsizetype>(len), content});
+    }
+    return tags;
+}
+
+QString applyTokensToSegment(const QString& segment, const QStringList& tokens)
+{
+    if (segment.isEmpty())
+    {
+        return segment;
+    }
+
+    // Разбираем токены по типам
+    bool hasBold = false;
+    bool hasUnderline = false;
+    bool hasStrike = false;
+    bool hasSpoiler = false;
+    bool hasSup = false;
+    bool hasCode = false;
+
+    QString quoteType; // ">" или ">^"
+    QString linkUrl;
+    QString emojiSpec; // custom-emoji://...
+
+    for (const QString& t : tokens)
+    {
+        if (t == QStringLiteral("**"))
+        {
+            hasBold = true;
+        }
+        else if (t == QStringLiteral("__"))
+        {
+            hasUnderline = true;
+        }
+        else if (t == QStringLiteral("~~"))
+        {
+            hasStrike = true;
+        }
+        else if (t == QStringLiteral("||"))
+        {
+            hasSpoiler = true;
+        }
+        else if (t == QStringLiteral("^^"))
+        {
+            hasSup = true;
+        }
+        else if (t == QStringLiteral("`"))
+        {
+            hasCode = true;
+        }
+        else if (t == QStringLiteral(">") || t == QStringLiteral(">^"))
+        {
+            quoteType = t;
+        }
+        else if (t.startsWith(QStringLiteral("custom-emoji://")))
+        {
+            emojiSpec = t;
+        }
+        else if (t.contains(QStringLiteral("://")))
+        {
+            linkUrl = t;
+        }
+    }
+
+    QString text = segment;
+
+    // Custom emoji: восстанавливаем наш псевдо-markdown [X](emoji:<id>?<size>)
+    if (!emojiSpec.isEmpty())
+    {
+        const QString kPrefix = QStringLiteral("custom-emoji://");
+        QString core = emojiSpec.mid(kPrefix.size()); // <document_id>?size
+        text = QStringLiteral("[%1](emoji:%2)").arg(text, core);
+    }
+
+    // Ссылка: [text](url)
+    if (!linkUrl.isEmpty())
+    {
+        text = QStringLiteral("[%1](%2)").arg(text, linkUrl);
+    }
+
+    // Внутренние стили. Фиксированный порядок, чтобы была стабильность.
+    if (hasCode)
+    {
+        text = QStringLiteral("`%1`").arg(text);
+    }
+    if (hasBold)
+    {
+        text = QStringLiteral("**%1**").arg(text);
+    }
+    if (hasUnderline)
+    {
+        text = QStringLiteral("__%1__").arg(text);
+    }
+    if (hasStrike)
+    {
+        text = QStringLiteral("~~%1~~").arg(text);
+    }
+    if (hasSpoiler)
+    {
+        text = QStringLiteral("||%1||").arg(text);
+    }
+    if (hasSup)
+    {
+        text = QStringLiteral("^^%1^^").arg(text);
+    }
+
+    // Цитаты – наружный уровень
+    if (quoteType == QStringLiteral(">"))
+    {
+        text = QStringLiteral(">%1<").arg(text);
+    }
+    else if (quoteType == QStringLiteral(">^"))
+    {
+        text = QStringLiteral(">^%1<^").arg(text);
+    }
+
+    return text;
+}
+
 } // end anonymous namespace
 
 void TelegramFormatter::formatAndCopyToClipboard(const QString& markdownText)
@@ -200,4 +367,100 @@ void TelegramFormatter::formatAndCopyToClipboard(const QString& markdownText)
     mimeData->setText(cleanText);
 
     QGuiApplication::clipboard()->setMimeData(mimeData);
+}
+
+QString TelegramFormatter::fromTelegramClipboardToPseudoMarkdown(const QMimeData* mimeData)
+{
+    if (!mimeData || !mimeData->hasFormat("application/x-td-field-text"))
+    {
+        return {};
+    }
+
+    // 1. Извлекаем текст
+    QByteArray textBytes = mimeData->data("application/x-td-field-text");
+    QString cleanText = QString::fromUtf8(textBytes);
+    if (!cleanText.isEmpty() && cleanText.back() == QChar(0))
+        cleanText.chop(1);
+
+    // 2. Извлекаем теги (используя наш Helper)
+    QVector<TagRecord> tags;
+    if (mimeData->hasFormat("application/x-td-field-tags"))
+    {
+        tags = parseTelegramTagsBinary(mimeData->data("application/x-td-field-tags"));
+    }
+
+    if (tags.isEmpty())
+        return cleanText;
+
+    // 3. Собираем границы сегментов
+    QSet<qsizetype> boundaries = {0, cleanText.length()};
+    for (const auto& tag : tags)
+    {
+        boundaries.insert(std::clamp(tag.position, 0LL, cleanText.length()));
+        boundaries.insert(std::clamp(tag.position + tag.length, 0LL, cleanText.length()));
+    }
+
+    QList<qsizetype> sortedBoundaries = boundaries.values();
+    std::sort(sortedBoundaries.begin(), sortedBoundaries.end());
+    struct StyledSegment
+    {
+        QString text;
+        QStringList tokens;
+    };
+    QList<StyledSegment> mergedSegments;
+
+    for (int i = 0; i < sortedBoundaries.size() - 1; ++i)
+    {
+        qsizetype start = sortedBoundaries[i];
+        qsizetype end = sortedBoundaries[i + 1];
+        if (start >= end)
+            continue;
+
+        QString segmentText = cleanText.mid(start, end - start);
+        QStringList activeTokens;
+        for (const auto& tag : tags)
+        {
+            if (tag.position <= start && (tag.position + tag.length) >= end)
+            {
+                activeTokens.append(tag.tagContent.split('\\', Qt::SkipEmptyParts));
+            }
+        }
+        activeTokens.removeDuplicates();
+        activeTokens.sort(); // Сортируем для корректного сравнения списков
+
+        // Если токены такие же, как у предыдущего сегмента — просто добавляем текст
+        if (!mergedSegments.isEmpty() && mergedSegments.last().tokens == activeTokens)
+        {
+            mergedSegments.last().text += segmentText;
+        }
+        else
+        {
+            mergedSegments.append({segmentText, activeTokens});
+        }
+    }
+
+    QString result;
+    for (const auto& seg : mergedSegments)
+    {
+        // Добавляем проверку: если в сегменте только пробелы/переносы,
+        // и это не ссылка/эмодзи, то не оборачиваем в стили (жирный/курсив),
+        // чтобы не плодить лишние символы в пустых строках.
+        if (seg.text.trimmed().isEmpty() && !seg.tokens.isEmpty())
+        {
+            bool isMedia = false;
+            for (const auto& t : seg.tokens)
+                if (t.contains("://") || t.startsWith("custom-emoji"))
+                    isMedia = true;
+
+            if (!isMedia)
+            {
+                result.append(seg.text);
+                continue;
+            }
+        }
+
+        result.append(applyTokensToSegment(seg.text, seg.tokens));
+    }
+
+    return result;
 }

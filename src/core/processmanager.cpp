@@ -17,6 +17,10 @@ void ProcessManager::startProcess(const QString& program, const QStringList& arg
     emit processOutput(QString("Запуск (асинхронный): %1 %2").arg(program, arguments.join(" ")));
 
     QProcess* newProcess = new QProcess(this);
+    if (!m_workingDir.isEmpty())
+    {
+        newProcess->setWorkingDirectory(m_workingDir);
+    }
     m_activeProcesses.append(newProcess);
 
     connect(newProcess, &QProcess::readyReadStandardOutput, this, &ProcessManager::onReadyReadStandardOutput);
@@ -41,6 +45,7 @@ void ProcessManager::startProcess(const QString& program, const QStringList& arg
             });
 
     newProcess->start(program, arguments);
+    m_workingDir.clear();
 }
 
 bool ProcessManager::executeAndWait(const QString& program, const QStringList& arguments, QByteArray& output)

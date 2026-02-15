@@ -90,8 +90,8 @@ QStringList ManualRenderer::prepareCommandArguments(const QString& commandTempla
     QString processedTemplate = commandTemplate;
 
     // 1. Подставляем пути
-    QString inputMkv = m_params.value("inputMkv").toString();
-    QString outputMp4 = m_params.value("outputMp4").toString();
+    QString inputMkv = QFileInfo(m_params.value("inputMkv").toString()).absoluteFilePath();
+    QString outputMp4 = QFileInfo(m_params.value("outputMp4").toString()).absoluteFilePath();
 
     processedTemplate.replace("%INPUT%", inputMkv);
     processedTemplate.replace("%OUTPUT%", outputMp4);
@@ -106,17 +106,25 @@ QStringList ManualRenderer::prepareCommandArguments(const QString& commandTempla
 
         if (hardsubMode == "internal")
         {
+            QFileInfo fileInfo(inputMkv);
+            m_processManager->setWorkingDirectory(fileInfo.absolutePath());
             int trackIndex = m_params.value("subtitleTrackIndex").toInt();
+            QString escapedName = fileInfo.fileName().replace("'", "\\'");
             // Формируем specifier 's:<index>', например 's:0' для первой дорожки субтитров
-            filterValue = QString("'%1':si=%2").arg(escapePathForFfmpegFilter(inputMkv)).arg(trackIndex);
-            emit logMessage(QString("Hardsub: используется внутренняя дорожка субтитров #%1.").arg(trackIndex),
+            filterValue = QString("filename='%1':si=%2").arg(escapedName).arg(trackIndex);
+
+            emit logMessage(QString("Hardsub: внутренняя дорожка #%1 (относительный путь).").arg(trackIndex),
                             LogCategory::APP);
         }
         else
         { // "external"
-            QString externalPath = m_params.value("externalSubsPath").toString();
-            filterValue = QString("'%1'").arg(escapePathForFfmpegFilter(externalPath));
-            emit logMessage(QString("Hardsub: используется внешний файл: %1").arg(externalPath), LogCategory::APP);
+            QFileInfo fileInfo(m_params.value("externalSubsPath").toString());
+            m_processManager->setWorkingDirectory(fileInfo.absolutePath());
+            QString escapedName = fileInfo.fileName().replace("'", "\\'");
+            filterValue = QString("filename='%1'").arg(escapedName);
+
+            emit logMessage(QString("Hardsub: внешний файл %1 (относительный путь).").arg(fileInfo.fileName()),
+                            LogCategory::APP);
         }
 
         // Подставляем готовый фильтр в плейсхолдер
@@ -127,8 +135,13 @@ QStringList ManualRenderer::prepareCommandArguments(const QString& commandTempla
         // Если hardsub отключен, нужно аккуратно удалить сам плейсхолдер и опцию -vf, если она относится только к нему.
         // Простой вариант - заменить плейсхолдер на пустую строку, но это может оставить -vf "" в команде.
         // Надежный вариант:
-        QRegularExpression filterRegex(R"(-vf\s+\"[^\"]*%SIGNS%[^\"]*\")");
-        processedTemplate.remove(filterRegex);
+        // QRegularExpression filterRegex(R"(-vf\s+\"[^\"]*%SIGNS%[^\"]*\")");
+        // processedTemplate.remove(filterRegex);
+
+        processedTemplate.replace("subtitles=%SIGNS%", "");
+        processedTemplate.remove(QRegularExpression(R"(-vf\s+\"\s*,\s*\")"));
+        processedTemplate.remove(QRegularExpression(R"(-vf\s+\"\s*\")"));
+
         emit logMessage("Hardsub отключен. Фильтр субтитров удален из команды.", LogCategory::APP);
     }
 
@@ -139,7 +152,7 @@ QStringList ManualRenderer::prepareCommandArguments(const QString& commandTempla
 void ManualRenderer::cancelOperation()
 {
     emit logMessage("Получена команда на отмену ручного рендера...", LogCategory::APP);
-    if (m_processManager)
+    if (m_processManager != nullptr)
     {
         m_processManager->killProcess();
     }
@@ -147,7 +160,7 @@ void ManualRenderer::cancelOperation()
 
 void ManualRenderer::onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
-    if (m_processManager && m_processManager->wasKilled())
+    if ((m_processManager != nullptr) && m_processManager->wasKilled())
     {
         emit logMessage("Ручной рендер отменен пользователем.", LogCategory::APP);
         emit finished();

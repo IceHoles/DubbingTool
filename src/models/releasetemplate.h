@@ -49,6 +49,7 @@ public:
     QString endingChapterName;        // Название главы MKV, обозначающей эндинг
     QString endingStartTime;          // Тайминг эндинга, если нет главы
     bool useManualTime = false;       // Использовать тайминг по парсингу главы
+    bool useOriginalAudio = false;    // Использовать оригинальную аудиодорожку
     bool generateTb = true;           // Генерировать ТБ?
     bool isCustomTranslation = false; // Свой перевод или нет
     bool createSrtMaster = false;     // Нужен ли .mkv с .srt и аудио без сжатия

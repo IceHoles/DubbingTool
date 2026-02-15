@@ -3,7 +3,6 @@
 #include "appsettings.h"
 
 #include <QDate>
-#include <QDebug>
 #include <QFile>
 #include <QFileInfo>
 #include <QMap>

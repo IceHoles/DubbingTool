@@ -91,28 +91,38 @@
        <item row="5" column="1">
         <widget class="QLineEdit" name="subAuthorEdit"/>
        </item>
-       <item row="6" column="0">
+       <item row="6" column="0" colspan="2">
+        <widget class="QCheckBox" name="useOriginalAudioCheckBox">
+         <property name="text">
+          <string>Использовать оригинальную аудиодорожку при сборке MKV</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+        </item>
+       <item row="7" column="0">
         <widget class="QLabel" name="label_17">
          <property name="text">
           <string>Язык оригинала (код):</string>
          </property>
         </widget>
        </item>
-       <item row="6" column="1">
+       <item row="7" column="1">
         <widget class="QLineEdit" name="originalLanguageEdit">
          <property name="text">
-          <string>jpn</string>
+          <string>ja</string>
          </property>
         </widget>
        </item>
-       <item row="7" column="0">
+       <item row="8" column="0">
         <widget class="QLabel" name="label_17_2">
          <property name="text">
           <string>Формат аудио для сборки:</string>
          </property>
         </widget>
        </item>
-       <item row="7" column="1">
+       <item row="8" column="1">
         <widget class="QComboBox" name="targetAudioFormatComboBox">
          <item>
           <property name="text">
@@ -126,14 +136,14 @@
          </item>
         </widget>
        </item>
-       <item row="8" column="0">
+       <item row="9" column="0">
         <widget class="QLabel" name="label_type">
          <property name="text">
           <string>Тип озвучки:</string>
          </property>
         </widget>
        </item>
-       <item row="8" column="1">
+       <item row="9" column="1">
         <widget class="QComboBox" name="voiceoverTypeComboBox">
          <item>
           <property name="text">
@@ -147,17 +157,17 @@
          </item>
         </widget>
        </item>
-       <item row="9" column="0">
+       <item row="10" column="0">
         <widget class="QLabel" name="label_18">
          <property name="text">
           <string>Пресет рендера MP4:</string>
          </property>
         </widget>
        </item>
-       <item row="9" column="1">
+       <item row="10" column="1">
         <widget class="QComboBox" name="renderPresetComboBox"/>
        </item>
-       <item row="10" column="0" colspan="2">
+       <item row="11" column="0" colspan="2">
         <widget class="QCheckBox" name="createSrtMasterCheckBox">
          <property name="toolTip">
           <string>После основной сборки создать дополнительный MKV с несжатым звуком и SRT-субтитрами (без надписей)</string>
@@ -167,7 +177,7 @@
          </property>
         </widget>
        </item>
-       <item row="11" column="0" colspan="2">
+       <item row="12" column="0" colspan="2">
         <widget class="QCheckBox" name="isCustomTranslationCheckBox">
          <property name="toolTip">
           <string>Если перевод выполнен силами команды, поставьте эту галочку. Название дорожки субтитров изменится на '[Дубляжная]'</string>
@@ -177,7 +187,7 @@
          </property>
         </widget>
        </item>
-       <item row="12" column="0" colspan="2">
+       <item row="13" column="0" colspan="2">
         <widget class="QCheckBox" name="useConcatRenderCheckBox">
          <property name="toolTip">
           <string>Перекодировать только сегмент с ТБ (титульным блоком), остальное видео копировать без перекодирования. Сохраняет оригинальное качество и значительно ускоряет рендер.</string>
@@ -594,7 +604,7 @@
             </widget>
            </item>
            <item>
-            <widget class="QPlainTextEdit" name="postTgMp4Edit"/>
+            <widget class="TelegramPasteEdit" name="postTgMp4Edit"/>
            </item>
           </layout>
          </item>
@@ -608,7 +618,7 @@
             </widget>
            </item>
            <item>
-            <widget class="QPlainTextEdit" name="postTgMkvEdit"/>
+            <widget class="TelegramPasteEdit" name="postTgMkvEdit"/>
            </item>
           </layout>
          </item>
@@ -732,4 +742,11 @@ https://anime-365.ru/upload...</string>
  </widget>
  <resources/>
  <connections/>
+ <customwidgets>
+  <customwidget>
+   <class>TelegramPasteEdit</class>
+   <extends>QPlainTextEdit</extends>
+   <header>telegrampasteedit.h</header>
+  </customwidget>
+ </customwidgets>
 </ui>

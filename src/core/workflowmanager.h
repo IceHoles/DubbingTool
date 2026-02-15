@@ -71,7 +71,6 @@ struct PathManager
      * @brief Replaces characters that are forbidden in Windows file/directory names.
      *
      * Forbidden characters: : " < > | ? *
-     * Apostrophe (') is also replaced as it causes issues with ffmpeg filter paths.
      */
     static QString sanitizeForPath(const QString& name)
     {
@@ -83,7 +82,6 @@ struct PathManager
         result.replace('|', ' ');
         result.replace('?', ' ');
         result.replace('*', ' ');
-        result.replace('\'', ' ');
         // Collapse multiple spaces into one
         result = result.simplified();
         return result;
@@ -97,9 +95,8 @@ struct PathManager
      *        directly in basePath without creating subdirectories. Used when working
      *        next to source files.
      */
-    PathManager(const QString& baseSavePath, bool useOriginalPath = false)
+    PathManager(const QString& baseSavePath, bool useOriginalPath = false) : basePath(baseSavePath)
     {
-        basePath = baseSavePath;
         sourcesPath = useOriginalPath ? basePath : QDir(basePath).filePath("Sources");
         resultPath = useOriginalPath ? basePath : QDir(basePath).filePath("Result");
 
