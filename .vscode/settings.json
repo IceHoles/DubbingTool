@@ -55,5 +55,14 @@
     "errorLens.enabledDiagnosticLevels": [
         "error",
         "warning"
-    ]
+    ],
+    
+    // You can specify the path toward the "qmlformat" executable,
+    // if it's not available by default in your PATH.
+    "qmlFormat.command": "C:/Qt/6.10.2/msvc2022_64/bin/qmlformat.exe",
+
+    // You can specify additional arguments that will be passed
+    // to the "qmlformat" command while formatting a file.
+    "qmlFormat.extraArguments": ["--normalize"]
+    
 }

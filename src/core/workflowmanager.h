@@ -23,8 +23,18 @@
 #include <QXmlStreamReader>
 
 class AssProcessor;
-class MainWindow;
 class ProcessManager;
+struct WorkflowParams
+{
+    ReleaseTemplate tmpl;
+    QString episodeNumberForPost;
+    QString episodeNumberForSearch;
+    QString initialAudioPath;
+    QString overrideSubsPath;
+    QString overrideSignsPath;
+    bool isNormalizationEnabled = false;
+    bool isSrtMasterDecoupled = false;
+};
 
 enum class SourceFormat
 {
@@ -166,8 +176,7 @@ class WorkflowManager : public QObject
     Q_OBJECT
 
 public:
-    explicit WorkflowManager(ReleaseTemplate t, const QString& episodeNumberForPost,
-                             const QString& episodeNumberForSearch, const QSettings& settings, MainWindow* mainWindow);
+    explicit WorkflowManager(const WorkflowParams& params, const QSettings& settings);
     ~WorkflowManager();
     void start();
     void startWithManualFile(const QString& filePath);
@@ -191,6 +200,10 @@ signals:
     void workflowAborted();
     void userInputRequired(const UserInputRequest& request);
     void progressUpdated(int percentage, const QString& stageName = "");
+    void mkvPathUpdated(const QString& newPath);
+    void audioPathUpdated(const QString& newPath);
+    void overrideSubsPathUpdated(const QString& newPath);
+    void overrideSignsPathUpdated(const QString& newPath);
     void signStylesRequest(const QString& subFilePath);
     void multipleTorrentsFound(const QList<TorrentInfo>& candidates);
     void multipleAudioTracksFound(const QList<AudioTrackInfo>& candidates);
@@ -302,7 +315,6 @@ private:
     QString handleUserFile(const QString& sourcePath, const QString& destDir, const QString& newName = "");
     QString getInfohashFromMagnet(const QString& magnetLink) const;
 
-    MainWindow* m_mainWindow; // Указатель на главный класс UI
     ReleaseTemplate m_template;
     QString m_episodeNumberForPost;
     QString m_episodeNumberForSearch;

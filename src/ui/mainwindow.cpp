@@ -400,13 +400,38 @@ void MainWindow::on_startButton_clicked()
     QSettings settings("MyCompany", "DubbingTool");
 
     setUiEnabled(false);
+    WorkflowParams params;
+    params.tmpl = currentTemplate;
+    params.episodeNumberForPost = episodeForPost;
+    params.episodeNumberForSearch = episodeForSearch;
+    params.initialAudioPath = getAudioPath();
+    params.overrideSubsPath = getOverrideSubsPath();
+    params.overrideSignsPath = getOverrideSignsPath();
+    params.isNormalizationEnabled = isNormalizationEnabled();
+    params.isSrtMasterDecoupled = isSrtSubsDecoupled();
 
     QThread* thread = new QThread(this);
-    WorkflowManager* workflowManager =
-        new WorkflowManager(currentTemplate, episodeForPost, episodeForSearch, settings, this);
+    WorkflowManager* workflowManager = new WorkflowManager(params, settings);
 
-    m_currentWorker = workflowManager; // Сохраняем указатель на текущего воркера
+    m_currentWorker = workflowManager;
     m_activeProcessManagers.append(workflowManager->getProcessManager());
+
+    connect(
+        workflowManager, &WorkflowManager::mkvPathUpdated, this,
+        [this](const QString& path) { ui->mkvPathLineEdit->setText(path); }, Qt::QueuedConnection);
+
+    connect(
+        workflowManager, &WorkflowManager::audioPathUpdated, this,
+        [this](const QString& path) { ui->audioPathLineEdit->setText(path); }, Qt::QueuedConnection);
+
+    connect(
+        workflowManager, &WorkflowManager::overrideSubsPathUpdated, this,
+        [this](const QString& path) { ui->overrideSubsPathEdit->setText(path); }, Qt::QueuedConnection);
+
+    connect(
+        workflowManager, &WorkflowManager::overrideSignsPathUpdated, this,
+        [this](const QString& path) { ui->overrideSignsPathEdit->setText(path); }, Qt::QueuedConnection);
+
     connect(workflowManager, &WorkflowManager::multipleTorrentsFound, this, &MainWindow::onMultipleTorrentsFound,
             Qt::QueuedConnection);
     connect(this, &MainWindow::torrentSelected, workflowManager, &WorkflowManager::resumeWithSelectedTorrent);

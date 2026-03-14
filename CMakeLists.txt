@@ -18,118 +18,26 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Tell AUTOUIC where to find .ui files
 set(CMAKE_AUTOUIC_SEARCH_PATHS ${CMAKE_SOURCE_DIR}/ui)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network Xml Multimedia MultimediaWidgets)
+# ДОБАВЛЕНЫ Qml, Quick и QuickControls2
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network Xml Multimedia MultimediaWidgets Qml Quick QuickControls2)
 
 # Source files organized by module
-set(SOURCES_CORE
-    src/core/appsettings.cpp
-    src/core/processmanager.cpp
-    src/core/workflowmanager.cpp
-)
+set(SOURCES_CORE src/core/appsettings.cpp src/core/processmanager.cpp src/core/workflowmanager.cpp src/core/appcontroller.cpp src/core/manualextractionbridge.cpp)
+set(SOURCES_PROCESSING src/processing/assprocessor.cpp src/processing/fontfinder.cpp src/processing/manualassembler.cpp src/processing/manualrenderer.cpp src/processing/postgenerator.cpp src/processing/renderhelper.cpp src/processing/telegramformatter.cpp)
+set(SOURCES_UI src/ui/main.cpp src/ui/mainwindow.cpp src/ui/manualassemblywidget.cpp src/ui/manualrenderwidget.cpp src/ui/missingfilesdialog.cpp src/ui/publicationwidget.cpp src/ui/rerenderdialog.cpp src/ui/settingsdialog.cpp src/ui/setupwizarddialog.cpp src/ui/styleselectordialog.cpp src/ui/templateeditor.cpp src/ui/torrentselectordialog.cpp src/ui/trackselectordialog.cpp src/ui/telegrampasteedit.cpp src/ui/manualextractionwidget.cpp src/ui/missingfilescontroller.cpp)
+set(SOURCES_MODELS src/models/releasetemplate.cpp)
 
-set(SOURCES_PROCESSING
-    src/processing/assprocessor.cpp
-    src/processing/fontfinder.cpp
-    src/processing/manualassembler.cpp
-    src/processing/manualrenderer.cpp
-    src/processing/postgenerator.cpp
-    src/processing/renderhelper.cpp
-    src/processing/telegramformatter.cpp
-)
+set(HEADERS_CORE src/core/appsettings.h src/core/processmanager.h src/core/workflowmanager.h src/core/appcontroller.h src/core/manualextractionbridge.h)
+set(HEADERS_PROCESSING src/processing/assprocessor.h src/processing/fontfinder.h src/processing/manualassembler.h src/processing/manualrenderer.h src/processing/postgenerator.h src/processing/renderhelper.h src/processing/telegramformatter.h)
+set(HEADERS_UI src/ui/mainwindow.h src/ui/manualassemblywidget.h src/ui/manualrenderwidget.h src/ui/missingfilesdialog.h src/ui/placeholderwidget.h src/ui/publicationwidget.h src/ui/rerenderdialog.h src/ui/settingsdialog.h src/ui/setupwizarddialog.h src/ui/styleselectordialog.h src/ui/templateeditor.h src/ui/telegrampasteedit.h src/ui/torrentselectordialog.h src/ui/trackselectordialog.h src/ui/manualextractionwidget.h src/ui/missingfilescontroller.h)
+set(HEADERS_MODELS src/models/releasetemplate.h)
 
-set(SOURCES_UI
-    src/ui/main.cpp
-    src/ui/mainwindow.cpp
-    src/ui/manualassemblywidget.cpp
-    src/ui/manualrenderwidget.cpp
-    src/ui/missingfilesdialog.cpp
-    src/ui/publicationwidget.cpp
-    src/ui/rerenderdialog.cpp
-    src/ui/settingsdialog.cpp
-    src/ui/setupwizarddialog.cpp
-    src/ui/styleselectordialog.cpp
-    src/ui/templateeditor.cpp
-    src/ui/torrentselectordialog.cpp        
-    src/ui/trackselectordialog.cpp
-    src/ui/telegrampasteedit.cpp
-    src/ui/manualextractionwidget.cpp
-)
-
-set(SOURCES_MODELS
-    src/models/releasetemplate.cpp
-)
-
-set(HEADERS_CORE
-    src/core/appsettings.h
-    src/core/processmanager.h
-    src/core/workflowmanager.h
-)
-
-set(HEADERS_PROCESSING
-    src/processing/assprocessor.h
-    src/processing/fontfinder.h
-    src/processing/manualassembler.h
-    src/processing/manualrenderer.h
-    src/processing/postgenerator.h
-    src/processing/renderhelper.h
-    src/processing/telegramformatter.h
-)
-
-set(HEADERS_UI
-    src/ui/mainwindow.h
-    src/ui/manualassemblywidget.h
-    src/ui/manualrenderwidget.h
-    src/ui/missingfilesdialog.h
-    src/ui/placeholderwidget.h
-    src/ui/publicationwidget.h
-    src/ui/rerenderdialog.h
-    src/ui/settingsdialog.h
-    src/ui/setupwizarddialog.h
-    src/ui/styleselectordialog.h
-    src/ui/templateeditor.h
-    src/ui/telegrampasteedit.h
-    src/ui/torrentselectordialog.h
-    src/ui/trackselectordialog.h
-    src/ui/manualextractionwidget.h
-)
-
-set(HEADERS_MODELS
-    src/models/releasetemplate.h
-)
-
-set(FORMS
-    ui/mainwindow.ui
-    ui/manualassemblywidget.ui
-    ui/manualrenderwidget.ui
-    ui/missingfilesdialog.ui
-    ui/publicationwidget.ui
-    ui/rerenderdialog.ui
-    ui/settingsdialog.ui
-    ui/styleselectordialog.ui
-    ui/templateeditor.ui
-    ui/torrentselectordialog.ui
-    ui/trackselectordialog.ui
-    ui/manualextractionwidget.ui
-)
-
-set(RESOURCES
-    resources/resources.qrc
-)
+set(FORMS ui/mainwindow.ui ui/manualassemblywidget.ui ui/manualrenderwidget.ui ui/missingfilesdialog.ui ui/publicationwidget.ui ui/rerenderdialog.ui ui/settingsdialog.ui ui/styleselectordialog.ui ui/templateeditor.ui ui/torrentselectordialog.ui ui/trackselectordialog.ui ui/manualextractionwidget.ui)
+set(RESOURCES resources/resources.qrc)
 
 # Combine all sources
-set(ALL_SOURCES
-    ${SOURCES_CORE}
-    ${SOURCES_PROCESSING}
-    ${SOURCES_UI}
-    ${SOURCES_MODELS}
-)
-
-set(ALL_HEADERS
-    ${HEADERS_CORE}
-    ${HEADERS_PROCESSING}
-    ${HEADERS_UI}
-    ${HEADERS_MODELS}
-)
+set(ALL_SOURCES ${SOURCES_CORE} ${SOURCES_PROCESSING} ${SOURCES_UI} ${SOURCES_MODELS})
+set(ALL_HEADERS ${HEADERS_CORE} ${HEADERS_PROCESSING} ${HEADERS_UI} ${HEADERS_MODELS})
 
 qt_add_executable(${PROJECT_NAME}
     ${ALL_SOURCES}
@@ -138,7 +46,19 @@ qt_add_executable(${PROJECT_NAME}
     ${RESOURCES}
 )
 
-# Include directories for finding headers
+qt_add_qml_module(${PROJECT_NAME}
+    URI "DubbingTool"
+    VERSION 1.0
+    RESOURCE_PREFIX "/"
+    QML_FILES
+        ui/qml/Main.qml
+        ui/qml/pages/PlaceholderPage.qml
+        ui/qml/pages/AutoModePage.qml
+        ui/qml/pages/ManualExtractionPage.qml
+        ui/qml/pages/TemplateEditorDialog.qml
+        ui/qml/pages/MissingFilesDialog.qml
+)
+
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/src/core
     ${CMAKE_SOURCE_DIR}/src/processing
@@ -149,30 +69,14 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 
 # Windows-specific settings
 if(WIN32)
-    target_link_libraries(${PROJECT_NAME} PRIVATE
-        dwrite
-        gdi32
-        user32
-        ole32
-    )
-    
-    # Add Windows resource file for icon
+    target_link_libraries(${PROJECT_NAME} PRIVATE dwrite gdi32 user32 ole32 dwmapi)
     target_sources(${PROJECT_NAME} PRIVATE resources/resources.rc)
-    
-    # Set Windows subsystem (GUI application, no console)
-    set_target_properties(${PROJECT_NAME} PROPERTIES
-        WIN32_EXECUTABLE TRUE
-    )
+    # set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
 endif()
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
-    Qt6::Core
-    Qt6::Gui
-    Qt6::Widgets
-    Qt6::Network
-    Qt6::Xml
-    Qt6::Multimedia
-    Qt6::MultimediaWidgets
+    Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network Qt6::Xml 
+    Qt6::Multimedia Qt6::MultimediaWidgets Qt6::Qml Qt6::Quick Qt6::QuickControls2
 )
 
 # Enable warnings
@@ -244,18 +148,11 @@ if(BUILD_TESTING)
     )
 
     target_link_libraries(FontFinderLib PUBLIC
-        Qt6::Core
-        Qt6::Gui
-        Qt6::Widgets
+        Qt6::Core Qt6::Gui Qt6::Widgets
     )
 
     if(WIN32)
-        target_link_libraries(FontFinderLib PUBLIC
-            dwrite
-            gdi32
-            user32
-            ole32
-        )
+        target_link_libraries(FontFinderLib PUBLIC dwrite gdi32 user32 ole32)
     endif()
 
     if(MSVC)
@@ -267,10 +164,7 @@ if(BUILD_TESTING)
     # FontFinder tests
     add_executable(fontfinder_test tests/fontfinder_test.cpp)
     set_target_properties(fontfinder_test PROPERTIES AUTOMOC ON)
-    target_link_libraries(fontfinder_test PRIVATE
-        FontFinderLib
-        Qt6::Test
-    )
+    target_link_libraries(fontfinder_test PRIVATE FontFinderLib Qt6::Test)
 
     # Copy test data files to build directory
     set(TEST_DATA_DIR ${CMAKE_SOURCE_DIR}/tests/test_data)

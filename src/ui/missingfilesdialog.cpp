@@ -14,6 +14,7 @@
 #include <QUrl>
 #include <QVBoxLayout>
 #include <QVideoWidget>
+#include <algorithm>
 
 MissingFilesDialog::MissingFilesDialog(QWidget* parent) : QDialog(parent), ui(new Ui::MissingFilesDialog)
 {
@@ -114,10 +115,7 @@ void MissingFilesDialog::setVideoFile(const QString& videoPath, double durationS
 
         // Set initial position to ~last 3 minutes (most likely TB location)
         double initialTimeS = m_videoDurationS - 180.0;
-        if (initialTimeS < 0.0)
-        {
-            initialTimeS = 0.0;
-        }
+        initialTimeS = std::max(initialTimeS, 0.0);
         m_syncInProgress = true;
         int initialSlider = secondsToSliderValue(initialTimeS);
         ui->timeSlider->setValue(initialSlider);
@@ -250,7 +248,7 @@ void MissingFilesDialog::slotTimeEditChanged()
     if (m_mediaPlayer != nullptr)
     {
         QTime t = ui->timeEdit->time();
-        double timeS = t.hour() * 3600.0 + t.minute() * 60.0 + t.second() + t.msec() / 1000.0;
+        double timeS = (t.hour() * 3600.0) + (t.minute() * 60.0) + t.second() + (t.msec() / 1000.0);
         qint64 positionMs = static_cast<qint64>(timeS * 1000.0);
         m_mediaPlayer->setPosition(positionMs);
     }
@@ -275,10 +273,7 @@ void MissingFilesDialog::slotPrevFrame()
     qint64 currentMs = m_mediaPlayer->position();
     qint64 frameDurationMs = static_cast<qint64>(m_frameStepS * 1000.0);
     qint64 newMs = currentMs - frameDurationMs;
-    if (newMs < 0)
-    {
-        newMs = 0;
-    }
+    newMs = std::max<qint64>(newMs, 0);
 
     m_mediaPlayer->setPosition(newMs);
 }
@@ -299,10 +294,7 @@ void MissingFilesDialog::slotNextFrame()
     qint64 frameDurationMs = static_cast<qint64>(m_frameStepS * 1000.0);
     qint64 newMs = currentMs + frameDurationMs;
     qint64 durationMs = static_cast<qint64>(m_videoDurationS * 1000.0);
-    if (newMs > durationMs)
-    {
-        newMs = durationMs;
-    }
+    newMs = std::min(newMs, durationMs);
 
     m_mediaPlayer->setPosition(newMs);
 }
@@ -444,14 +436,14 @@ QString MissingFilesDialog::formatTime(double timeS) const
 {
     int hours = static_cast<int>(timeS) / 3600;
     int minutes = (static_cast<int>(timeS) % 3600) / 60;
-    double seconds = timeS - hours * 3600 - minutes * 60;
+    double seconds = timeS - (hours * 3600) - (minutes * 60);
     return QString("%1:%2:%3").arg(hours).arg(minutes, 2, 10, QChar('0')).arg(seconds, 6, 'f', 3, QChar('0'));
 }
 
 void MissingFilesDialog::syncSliderFromTimeEdit()
 {
     QTime t = ui->timeEdit->time();
-    double timeS = t.hour() * 3600.0 + t.minute() * 60.0 + t.second() + t.msec() / 1000.0;
+    double timeS = (t.hour() * 3600.0) + (t.minute() * 60.0) + t.second() + (t.msec() / 1000.0);
     int sliderVal = secondsToSliderValue(timeS);
     ui->timeSlider->setValue(sliderVal);
 }

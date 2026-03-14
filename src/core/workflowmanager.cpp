@@ -28,11 +28,10 @@
 
 #include <windows.h> // Для API шрифтов
 
-WorkflowManager::WorkflowManager(ReleaseTemplate t, const QString& episodeNumberForPost,
-                                 const QString& episodeNumberForSearch, const QSettings& settings,
-                                 MainWindow* mainWindow)
-    : QObject(nullptr), m_mainWindow(mainWindow), m_template(t), m_episodeNumberForPost(episodeNumberForPost),
-      m_episodeNumberForSearch(episodeNumberForSearch), m_wasUserInputRequested(false)
+WorkflowManager::WorkflowManager(const WorkflowParams& params, const QSettings& settings)
+    : QObject(nullptr), m_template(params.tmpl), m_episodeNumberForPost(params.episodeNumberForPost),
+      m_episodeNumberForSearch(params.episodeNumberForSearch), m_wasUserInputRequested(false),
+      m_originalAudioPathBeforeNormalization(params.initialAudioPath)
 {
     m_webUiHost = settings.value("webUi/host", "http://127.0.0.1").toString();
     m_webUiPort = settings.value("webUi/port", 8080).toInt();
@@ -43,10 +42,11 @@ WorkflowManager::WorkflowManager(ReleaseTemplate t, const QString& episodeNumber
     m_ffmpegPath = settings.value("paths/ffmpeg", "ffmpeg").toString();
     m_renderPreset = AppSettings::instance().findRenderPreset(m_template.renderPresetName);
     m_customRenderArgs = settings.value("render/custom_args", "").toString();
-    m_overrideSubsPath = m_mainWindow->getOverrideSubsPath();
-    m_overrideSignsPath = m_mainWindow->getOverrideSignsPath();
-    m_isNormalizationEnabled = m_mainWindow->isNormalizationEnabled();
-    m_isSrtMasterDecoupled = m_mainWindow->isSrtSubsDecoupled();
+
+    m_overrideSubsPath = params.overrideSubsPath;
+    m_overrideSignsPath = params.overrideSignsPath;
+    m_isNormalizationEnabled = params.isNormalizationEnabled;
+    m_isSrtMasterDecoupled = params.isSrtMasterDecoupled;
 
     m_netManager = new QNetworkAccessManager(this);
     m_hashFindTimer = new QTimer(this);
@@ -124,7 +124,6 @@ void WorkflowManager::startWithManualFile(const QString& filePath)
 
     m_mkvFilePath = newPath;
     m_sourceFormat = detectSourceFormat(m_mkvFilePath);
-    m_mainWindow->findChild<QLineEdit*>("mkvPathLineEdit")->setText(m_mkvFilePath);
 
     if (m_sourceFormat == SourceFormat::MP4)
     {
@@ -1156,7 +1155,7 @@ void WorkflowManager::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
                 else
                 {
                     m_mainRuAudioPath = finalPath;
-                    m_mainWindow->findChild<QLineEdit*>("audioPathLineEdit")->setText(m_mainRuAudioPath);
+                    emit audioPathUpdated(m_mainRuAudioPath);
                 }
                 m_wasNormalizationPerformed = true;
             }
@@ -2821,7 +2820,7 @@ void WorkflowManager::resumeWithUserInput(const UserInputResponse& response)
             if (m_mainRuAudioPath.isEmpty())
             {
                 m_mainRuAudioPath = newAudioPath;
-                m_mainWindow->findChild<QLineEdit*>("audioPathLineEdit")->setText(m_mainRuAudioPath);
+                emit audioPathUpdated(m_mainRuAudioPath);
             }
             else
             {
@@ -3178,14 +3177,14 @@ void WorkflowManager::prepareUserFiles()
 {
     emit logMessage("Перемещение пользовательских файлов в структуру проекта...", LogCategory::APP);
 
-    // 1. Русская аудиодорожка
-    QString oldAudioPath = m_mainWindow->getAudioPath();
+    // 1. Русская аудиодорожка (Берем сохраненный при старте путь)
+    QString oldAudioPath = m_originalAudioPathBeforeNormalization;
     QString newAudioPath = handleUserFile(oldAudioPath, m_paths->sourcesPath);
 
     if (newAudioPath != oldAudioPath && !newAudioPath.isEmpty())
     {
         m_mainRuAudioPath = newAudioPath;
-        m_mainWindow->findChild<QLineEdit*>("audioPathLineEdit")->setText(m_mainRuAudioPath);
+        emit audioPathUpdated(m_mainRuAudioPath); // Обновляем UI сигналом
         emit logMessage("Путь к аудиодорожке обновлен: " + m_mainRuAudioPath, LogCategory::APP);
     }
     else if (!newAudioPath.isEmpty())
@@ -3194,13 +3193,12 @@ void WorkflowManager::prepareUserFiles()
         m_mainRuAudioPath = newAudioPath;
     }
 
-    // 2. Свои субтитры
-    QString newSubsPath =
-        handleUserFile(m_mainWindow->getOverrideSubsPath(), m_paths->sourcesPath, "override_subs.ass");
+    // 2. Свои субтитры (Берем из внутренних переменных)
+    QString newSubsPath = handleUserFile(m_overrideSubsPath, m_paths->sourcesPath, "override_subs.ass");
     if (!newSubsPath.isEmpty() && newSubsPath != m_overrideSubsPath)
     {
         m_overrideSubsPath = newSubsPath;
-        m_mainWindow->findChild<QLineEdit*>("overrideSubsPathEdit")->setText(m_overrideSubsPath);
+        emit overrideSubsPathUpdated(m_overrideSubsPath); // Обновляем UI сигналом
         emit logMessage("Путь к файлу субтитров обновлен: " + m_overrideSubsPath, LogCategory::APP);
     }
     else if (!newSubsPath.isEmpty())
@@ -3208,13 +3206,12 @@ void WorkflowManager::prepareUserFiles()
         m_overrideSubsPath = newSubsPath;
     }
 
-    // 3. Свои надписи
-    QString newSignsPath =
-        handleUserFile(m_mainWindow->getOverrideSignsPath(), m_paths->sourcesPath, "override_signs.ass");
+    // 3. Свои надписи (Берем из внутренних переменных)
+    QString newSignsPath = handleUserFile(m_overrideSignsPath, m_paths->sourcesPath, "override_signs.ass");
     if (!newSignsPath.isEmpty() && newSignsPath != m_overrideSignsPath)
     {
         m_overrideSignsPath = newSignsPath;
-        m_mainWindow->findChild<QLineEdit*>("overrideSignsPathEdit")->setText(m_overrideSignsPath);
+        emit overrideSignsPathUpdated(m_overrideSignsPath); // Обновляем UI сигналом
         emit logMessage("Путь к файлу надписей обновлен: " + m_overrideSignsPath, LogCategory::APP);
     }
     else if (!newSignsPath.isEmpty())
