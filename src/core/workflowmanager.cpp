@@ -8,6 +8,7 @@
 #include "trackselectordialog.h"
 
 #include <QDir>
+#include <QDateTime>
 #include <QEventLoop>
 #include <QFile>
 #include <QFileInfo>
@@ -27,6 +28,31 @@
 #include <QXmlStreamReader>
 
 #include <windows.h> // Для API шрифтов
+
+namespace
+{
+void writeAgentDebugLog(const QString& hypothesisId, const QString& location, const QString& message,
+                        const QJsonObject& data = QJsonObject())
+{
+    // #region agent log
+    QFile f("c:/Users/icehole/git/DubbingTool/debug-dd39f3.log");
+    if (f.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
+    {
+        QJsonObject payload;
+        payload["sessionId"] = "dd39f3";
+        payload["runId"] = "run-manual-vs-workflow-2";
+        payload["hypothesisId"] = hypothesisId;
+        payload["location"] = location;
+        payload["message"] = message;
+        payload["data"] = data;
+        payload["timestamp"] = QDateTime::currentMSecsSinceEpoch();
+        f.write(QJsonDocument(payload).toJson(QJsonDocument::Compact));
+        f.write("\n");
+        f.close();
+    }
+    // #endregion
+}
+} // namespace
 
 WorkflowManager::WorkflowManager(ReleaseTemplate t, const QString& episodeNumberForPost,
                                  const QString& episodeNumberForSearch, const QSettings& settings,
@@ -2024,8 +2050,10 @@ void WorkflowManager::concatCutSegment1()
     // Video-only segment: audio will be taken from the continuous MKV track
     // in the final join step, eliminating AAC splicing artefacts entirely.
     bool sourceIsMp4 = (m_sourceFormat == SourceFormat::MP4);
+    QString seg1InputPath;
     if (sourceIsMp4)
     {
+        seg1InputPath = m_mkvFilePath;
         args << "-i" << m_mkvFilePath // original MP4 — video with correct DTS
              << "-to" << seg1EndStr << "-map" << "0:v:0"
              << "-c:v" << "copy"
@@ -2034,6 +2062,7 @@ void WorkflowManager::concatCutSegment1()
     }
     else
     {
+        seg1InputPath = m_finalMkvPath;
         args << "-i" << m_finalMkvPath << "-to" << seg1EndStr << "-map" << "0:v:0"
              << "-c:v" << "copy"
              << "-an"
@@ -2043,6 +2072,12 @@ void WorkflowManager::concatCutSegment1()
     // Prevent TS muxer from adding initial buffering delays
     args << "-muxdelay" << "0" << "-muxpreload" << "0";
     args << seg1Path;
+    writeAgentDebugLog("H10", "workflowmanager.cpp:concatCutSegment1", "workflow_seg1_settings",
+                       QJsonObject{
+                           {"sourceIsMp4", sourceIsMp4},
+                           {"inputPath", seg1InputPath},
+                           {"seg1End", seg1EndStr},
+                       });
 
     m_processManager->startProcess(m_ffmpegPath, args);
 }
@@ -2184,6 +2219,15 @@ void WorkflowManager::concatRenderSegment2()
     // Prevent TS muxer from adding initial buffering delays
     args << "-muxdelay" << "0" << "-muxpreload" << "0";
     args << seg2Path;
+    writeAgentDebugLog("H10", "workflowmanager.cpp:concatRenderSegment2", "workflow_seg2_settings",
+                       QJsonObject{
+                           {"segmentCount", m_concatSegmentCount},
+                           {"seg2Start", m_concatKfBeforeTbStart},
+                           {"seg2EndKeyframe", m_concatKeyframeTime},
+                           {"bframeOverlap", bframeOverlap},
+                           {"videoBitrateKbps", m_videoTrack.bitrateKbps},
+                           {"sourceFormat", static_cast<int>(m_sourceFormat)},
+                       });
 
     m_processManager->startProcess(m_ffmpegPath, args);
 }
@@ -2197,6 +2241,7 @@ void WorkflowManager::concatCutSegment3()
     bool sourceIsMp4 = (m_sourceFormat == SourceFormat::MP4);
     QString seg3Path = QDir(m_paths->resultPath).filePath("concat_seg3.ts");
     QString kfTimeStr = QString::number(m_concatKeyframeTime, 'f', 3);
+    QString seg3InputPath;
 
     QStringList args;
     args << "-y";
@@ -2205,6 +2250,7 @@ void WorkflowManager::concatCutSegment3()
     // in the final join step, eliminating AAC splicing artefacts entirely.
     if (sourceIsMp4)
     {
+        seg3InputPath = m_mkvFilePath;
         args << "-ss" << kfTimeStr << "-i" << m_mkvFilePath // original MP4 — video only
              << "-map" << "0:v:0"
              << "-c:v" << "copy"
@@ -2213,6 +2259,7 @@ void WorkflowManager::concatCutSegment3()
     }
     else
     {
+        seg3InputPath = m_finalMkvPath;
         args << "-ss" << kfTimeStr << "-i" << m_finalMkvPath << "-map" << "0:v:0"
              << "-c:v" << "copy"
              << "-an"
@@ -2222,6 +2269,12 @@ void WorkflowManager::concatCutSegment3()
     // Prevent TS muxer from adding initial buffering delays
     args << "-muxdelay" << "0" << "-muxpreload" << "0";
     args << seg3Path;
+    writeAgentDebugLog("H10", "workflowmanager.cpp:concatCutSegment3", "workflow_seg3_settings",
+                       QJsonObject{
+                           {"sourceIsMp4", sourceIsMp4},
+                           {"inputPath", seg3InputPath},
+                           {"seg3Start", kfTimeStr},
+                       });
 
     m_processManager->startProcess(m_ffmpegPath, args);
 }
@@ -2267,6 +2320,12 @@ void WorkflowManager::concatJoinSegments()
          << "-c:a" << "copy"
          << "-movflags" << "+faststart"
          << "-shortest" << m_outputMp4Path;
+    writeAgentDebugLog("H10", "workflowmanager.cpp:concatJoinSegments", "workflow_join_settings",
+                       QJsonObject{
+                           {"videoConcatList", QFileInfo(listPath).absoluteFilePath()},
+                           {"audioInputPath", m_finalMkvPath},
+                           {"outputPath", m_outputMp4Path},
+                       });
 
     m_processManager->startProcess(m_ffmpegPath, args);
 }

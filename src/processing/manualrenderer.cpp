@@ -1,20 +1,50 @@
 #include "manualrenderer.h"
 
 #include "appsettings.h"
+#include "assprocessor.h"
 #include "processmanager.h"
 
 #include <QDir>
+#include <QDateTime>
+#include <QFile>
 #include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonArray>
 #include <QProcess>
 #include <QRegularExpression>
+
+namespace
+{
+void writeAgentDebugLog(const QString& hypothesisId, const QString& location, const QString& message,
+                        const QJsonObject& data = QJsonObject())
+{
+    // #region agent log
+    QFile f("c:/Users/icehole/git/DubbingTool/debug-dd39f3.log");
+    if (f.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
+    {
+        QJsonObject payload;
+        payload["sessionId"] = "dd39f3";
+        payload["runId"] = "run-manual-vs-workflow-1";
+        payload["hypothesisId"] = hypothesisId;
+        payload["location"] = location;
+        payload["message"] = message;
+        payload["data"] = data;
+        payload["timestamp"] = QDateTime::currentMSecsSinceEpoch();
+        f.write(QJsonDocument(payload).toJson(QJsonDocument::Compact));
+        f.write("\n");
+        f.close();
+    }
+    // #endregion
+}
+} // namespace
 
 ManualRenderer::ManualRenderer(const QVariantMap& params, QObject* parent)
     : QObject(parent), m_params(params), m_processManager(new ProcessManager(this))
 {
     connect(m_processManager, &ProcessManager::processOutput, this, &ManualRenderer::onProcessText);
     connect(m_processManager, &ProcessManager::processStdErr, this, &ManualRenderer::onProcessText);
+    connect(m_processManager, &ProcessManager::processError, this, &ManualRenderer::onProcessText);
     connect(m_processManager, &ProcessManager::processFinished, this, &ManualRenderer::onProcessFinished);
 }
 
@@ -48,6 +78,8 @@ void ManualRenderer::start()
     }
 
     QByteArray jsonData;
+    QString videoCodecExtension = "h264";
+    int detectedVideoBitrateKbps = -1;
     if (m_processManager->executeAndWait(AppSettings::instance().mkvmergePath(), {"-J", inputMkv}, jsonData))
     {
         QJsonObject root = QJsonDocument::fromJson(jsonData).object();
@@ -56,11 +88,158 @@ void ManualRenderer::start()
             m_sourceDurationS = static_cast<qint64>(
                 root["container"].toObject()["properties"].toObject()["duration"].toDouble() / 1000000000.0);
         }
+
+        QJsonArray tracks = root["tracks"].toArray();
+        for (const QJsonValue& val : tracks)
+        {
+            QJsonObject track = val.toObject();
+            if (track["type"].toString() != "video")
+            {
+                continue;
+            }
+            QString codec = track["codec"].toString().toLower();
+            if (codec.contains("hevc") || codec.contains("h265"))
+            {
+                videoCodecExtension = "h265";
+            }
+            else
+            {
+                videoCodecExtension = "h264";
+            }
+            break;
+        }
     }
+
+    // Match WorkflowManager behavior for bitrate-limited CRF: read bitrate from ffprobe stream metadata.
+    const QString ffprobePath = AppSettings::instance().ffprobePath();
+    QString bitrateSource = "none";
+    if (!ffprobePath.isEmpty() && QFileInfo::exists(ffprobePath))
+    {
+        QByteArray probeData;
+        QStringList probeArgs = {"-v", "quiet", "-print_format", "json", "-show_streams", inputMkv};
+        if (m_processManager->executeAndWait(ffprobePath, probeArgs, probeData) && !probeData.isEmpty())
+        {
+            const QJsonObject probeRoot = QJsonDocument::fromJson(probeData).object();
+            const QJsonArray streams = probeRoot.value("streams").toArray();
+            for (const auto& streamVal : streams)
+            {
+                const QJsonObject stream = streamVal.toObject();
+                if (stream.value("codec_type").toString() != "video")
+                {
+                    continue;
+                }
+                const QString bitRateStr = stream.value("bit_rate").toString();
+                if (!bitRateStr.isEmpty())
+                {
+                    detectedVideoBitrateKbps = static_cast<int>(bitRateStr.toLongLong() / 1000);
+                    bitrateSource = "stream.bit_rate";
+                }
+                break;
+            }
+        }
+    }
+
+    writeAgentDebugLog("H8", "manualrenderer.cpp:start", "input_track_characteristics",
+                       QJsonObject{
+                           {"inputMkv", inputMkv},
+                           {"sourceDurationS", m_sourceDurationS},
+                           {"videoCodecExtension", videoCodecExtension},
+                           {"detectedVideoBitrateKbps", detectedVideoBitrateKbps},
+                           {"bitrateSource", bitrateSource},
+                       });
     if (m_sourceDurationS == 0)
     {
         emit logMessage("Предупреждение: не удалось определить длительность файла. Прогресс не будет отображаться.",
                         LogCategory::APP);
+    }
+
+    const bool useConcatTb = m_params.value("useConcatTb").toBool();
+    const bool useHardsub = m_params.value("useHardsub").toBool();
+    if (useConcatTb && useHardsub)
+    {
+        emit logMessage("Включен режим умного рендера ТБ (concat).", LogCategory::APP);
+        TbSegment segment;
+
+        const QString hardsubMode = m_params.value("hardsubMode").toString();
+        if (hardsubMode == "external")
+        {
+            const QString subsPath = m_params.value("externalSubsPath").toString();
+            segment = AssProcessor::detectTbSegmentFromFile(subsPath);
+        }
+        else if (hardsubMode == "internal")
+        {
+            const int subtitleTrackIndex = m_params.value("subtitleTrackIndex").toInt();
+            const QString tempAssPath =
+                QDir(QFileInfo(inputMkv).absolutePath()).filePath(QString("temp_internal_subs_%1.ass").arg(subtitleTrackIndex));
+            QFile::remove(tempAssPath);
+
+            QByteArray extractOutput;
+            const QString ffmpegPath = AppSettings::instance().ffmpegPath();
+            QStringList extractArgs;
+            extractArgs << "-y" << "-i" << inputMkv << "-map" << QString("0:s:%1").arg(subtitleTrackIndex)
+                        << "-c:s" << "ass" << tempAssPath;
+            if (m_processManager->executeAndWait(ffmpegPath, extractArgs, extractOutput) && QFileInfo::exists(tempAssPath))
+            {
+                segment = AssProcessor::detectTbSegmentFromFile(tempAssPath);
+            }
+            else
+            {
+                emit logMessage("Concat рендер: не удалось извлечь внутреннюю дорожку субтитров в .ass.",
+                                LogCategory::APP);
+            }
+            if (segment.isValid())
+            {
+                m_tempConcatSubsPath = tempAssPath;
+            }
+            else
+            {
+                QFile::remove(tempAssPath);
+            }
+        }
+
+        if (segment.isValid())
+        {
+            emit logMessage(QString("Concat рендер: найден сегмент ТБ: %1s - %2s")
+                                .arg(segment.startSeconds, 0, 'f', 3)
+                                .arg(segment.endSeconds, 0, 'f', 3),
+                            LogCategory::APP);
+            const QString outputMp4 = QFileInfo(m_params.value("outputMp4").toString()).absoluteFilePath();
+            QString hardsubModeForConcat = m_params.value("hardsubMode").toString();
+            const int subtitleTrackIndex = m_params.value("subtitleTrackIndex").toInt();
+            QString externalSubsPath = m_params.value("externalSubsPath").toString();
+            if (!m_tempConcatSubsPath.isEmpty())
+            {
+                hardsubModeForConcat = "external";
+                externalSubsPath = m_tempConcatSubsPath;
+            }
+
+            m_concatRenderer = new ConcatTbRenderer(inputMkv, outputMp4, segment, m_sourceDurationS, videoCodecExtension,
+                                                    hardsubModeForConcat, subtitleTrackIndex, externalSubsPath,
+                                                    detectedVideoBitrateKbps,
+                                                    m_processManager, this);
+            connect(m_concatRenderer, &ConcatTbRenderer::logMessage, this, &ManualRenderer::logMessage);
+            connect(m_concatRenderer, &ConcatTbRenderer::progressUpdated, this, &ManualRenderer::progressUpdated);
+            connect(m_concatRenderer, &ConcatTbRenderer::finished, this,
+                    [this]()
+                    {
+                        if (!m_tempConcatSubsPath.isEmpty())
+                        {
+                            QFile::remove(m_tempConcatSubsPath);
+                            m_tempConcatSubsPath.clear();
+                        }
+                        m_concatRenderer = nullptr;
+                        emit finished();
+                    });
+            m_concatRenderer->start();
+            return;
+        }
+
+        if (!m_tempConcatSubsPath.isEmpty())
+        {
+            QFile::remove(m_tempConcatSubsPath);
+            m_tempConcatSubsPath.clear();
+        }
+        emit logMessage("Concat рендер: границы ТБ не найдены, используется обычный полный рендер.", LogCategory::APP);
     }
 
     m_currentStep = Step::Pass1;
@@ -166,6 +345,11 @@ void ManualRenderer::cancelOperation()
 
 void ManualRenderer::onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
+    if (m_concatRenderer != nullptr)
+    {
+        return;
+    }
+
     QFileInfo fileInfo = QFileInfo(m_params.value("inputMkv").toString());
     QFile::rename(fileInfo.absolutePath() + QDir::separator() + "temp_name_to_extract_subtitle.mkv",
                   fileInfo.absoluteFilePath());

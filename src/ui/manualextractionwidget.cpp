@@ -20,6 +20,13 @@ ManualExtractionWidget::ManualExtractionWidget(QWidget* parent)
     // Настройка колонок дерева
     ui->tracksTree->header()->setDefaultSectionSize(120);
     ui->tracksTree->setColumnWidth(0, 250);
+
+    QSettings settings("MyCompany", "DubbingTool");
+    const QByteArray headerState = settings.value("ui/manualExtractionTracksHeader").toByteArray();
+    if (!headerState.isEmpty())
+    {
+        ui->tracksTree->header()->restoreState(headerState);
+    }
     connect(ui->extractFontsCheckBox, &QCheckBox::toggled, this,
             [this](bool checked)
             {
@@ -43,6 +50,9 @@ ManualExtractionWidget::ManualExtractionWidget(QWidget* parent)
 
 ManualExtractionWidget::~ManualExtractionWidget()
 {
+    QSettings settings("MyCompany", "DubbingTool");
+    settings.setValue("ui/manualExtractionTracksHeader", ui->tracksTree->header()->saveState());
+
     delete ui;
 }
 
@@ -74,9 +84,17 @@ void ManualExtractionWidget::dropEvent(QDropEvent* event)
 
 void ManualExtractionWidget::onBrowseClicked()
 {
-    QString path = QFileDialog::getOpenFileName(this, "Выбор файла", "", "Video (*.mkv *.mp4)");
+    QSettings settings("MyCompany", "DubbingTool");
+    QString lastDir = settings.value("ui/lastBrowseDir").toString();
+    if (lastDir.isEmpty() && !ui->inputPathEdit->text().isEmpty())
+    {
+        lastDir = QFileInfo(ui->inputPathEdit->text()).absolutePath();
+    }
+
+    QString path = QFileDialog::getOpenFileName(this, "Выбор файла", lastDir, "Video (*.mkv *.mp4)");
     if (!path.isEmpty())
     {
+        settings.setValue("ui/lastBrowseDir", QFileInfo(path).absolutePath());
         scanFile(path);
     }
 }

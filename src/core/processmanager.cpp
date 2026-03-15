@@ -48,16 +48,22 @@ void ProcessManager::startProcess(const QString& program, const QStringList& arg
     m_workingDir.clear();
 }
 
-bool ProcessManager::executeAndWait(const QString& program, const QStringList& arguments, QByteArray& output)
+bool ProcessManager::executeAndWait(const QString& program, const QStringList& arguments, QByteArray& output, int timeoutMs)
 {
     emit processOutput(QString("Запуск (синхронный): %1 %2").arg(program, arguments.join(" ")));
 
     QProcess syncProcess;
+    if (!m_workingDir.isEmpty())
+    {
+        syncProcess.setWorkingDirectory(m_workingDir);
+    }
     syncProcess.start(program, arguments);
 
-    if (!syncProcess.waitForFinished(30000))
+    if (!syncProcess.waitForFinished(timeoutMs))
     {
-        emit processError("Процесс '" + program + "' не завершился за 30 секунд (timeout).");
+        emit processError("Процесс '" + program + "' не завершился за " + QString::number(timeoutMs) +
+                          " мс (timeout).");
+        m_workingDir.clear();
         return false;
     }
 
@@ -73,11 +79,13 @@ bool ProcessManager::executeAndWait(const QString& program, const QStringList& a
         {
             emit processError("STDERR: " + QString::fromUtf8(stderrData));
         }
+        m_workingDir.clear();
         return false;
     }
 
     output = syncProcess.readAllStandardOutput();
     emit processOutput("Процесс успешно завершен. Получено " + QString::number(output.size()) + " байт данных.");
+    m_workingDir.clear();
     return true;
 }
 

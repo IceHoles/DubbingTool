@@ -21,6 +21,9 @@ ManualAssemblyWidget::ManualAssemblyWidget(QWidget* parent)
     m_templateModeIcon = this->style()->standardIcon(QStyle::SP_FileDialogListView);
     m_manualModeIcon = this->style()->standardIcon(QStyle::SP_FileDialogDetailedView);
 
+    const bool hasNugenAmb = AppSettings::instance().isNugenAmbAvailable();
+    ui->normalizeAudioCheckBox->setEnabled(hasNugenAmb);
+
     connect(ui->modeSwitchButton, &QToolButton::toggled, this, &ManualAssemblyWidget::onModeSwitched);
     connect(ui->convertAudioCheckBox, &QCheckBox::toggled, ui->convertAudioFormatComboBox, &QComboBox::setVisible);
     ui->modeSwitchButton->setChecked(false);
@@ -114,10 +117,18 @@ void ManualAssemblyWidget::onTemplateDataReceived(const ReleaseTemplate& t)
 
 void ManualAssemblyWidget::browseForFile(QLineEdit* lineEdit, const QString& caption, const QString& filter)
 {
-    QString path = QFileDialog::getOpenFileName(this, caption, "", filter);
+    QSettings settings("MyCompany", "DubbingTool");
+    QString lastDir = settings.value("ui/lastBrowseDir").toString();
+    if (lastDir.isEmpty() && !lineEdit->text().isEmpty())
+    {
+        lastDir = QFileInfo(lineEdit->text()).absolutePath();
+    }
+
+    QString path = QFileDialog::getOpenFileName(this, caption, lastDir, filter);
     if (!path.isEmpty())
     {
         lineEdit->setText(path);
+        settings.setValue("ui/lastBrowseDir", QFileInfo(path).absolutePath());
     }
 }
 

@@ -3,6 +3,7 @@
 
 #include "appsettings.h"
 #include "renderhelper.h"
+#include "concattbrenderer.h"
 
 #include <QDir>
 #include <QObject>
@@ -61,6 +62,8 @@ private:
     ProcessManager* m_processManager;
     qint64 m_sourceDurationS = 0;
     RenderPreset m_preset;
+    ConcatTbRenderer* m_concatRenderer = nullptr;
+    QString m_tempConcatSubsPath;
 };
 
 #endif // MANUALRENDERER_H

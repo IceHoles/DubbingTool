@@ -50,6 +50,10 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWi
     ui->setupUi(this);
     setWindowIcon(QIcon(":/icon.png"));
 
+    QSettings settings("MyCompany", "DubbingTool");
+    restoreGeometry(settings.value("ui/mainWindowGeometry").toByteArray());
+    restoreState(settings.value("ui/mainWindowState").toByteArray());
+
     m_manualExtractionWidget = ui->extractTab;
 
     m_manualAssemblyWidget = new ManualAssemblyWidget(this);
@@ -88,6 +92,9 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWi
 
     ui->downloadProgressBar->setVisible(false);
     ui->progressLabel->setVisible(false);
+
+    const bool hasNugenAmb = AppSettings::instance().isNugenAmbAvailable();
+    ui->normalizeAudioCheckBox->setEnabled(hasNugenAmb);
 
     // Open log file for writing (append mode, overwritten each launch)
     m_logFile.setFileName("dubbing_tool.log");
@@ -453,11 +460,20 @@ void MainWindow::on_startButton_clicked()
 
 void MainWindow::on_selectMkvButton_clicked()
 {
-    QString filePath = QFileDialog::getOpenFileName(this, "Выберите видеофайл", "", "Видеофайлы (*.mkv *.mp4)");
+    QSettings settings("MyCompany", "DubbingTool");
+    QString lastDir = settings.value("ui/lastBrowseDir").toString();
+    if (lastDir.isEmpty() && !ui->mkvPathLineEdit->text().isEmpty())
+    {
+        lastDir = QFileInfo(ui->mkvPathLineEdit->text()).absolutePath();
+    }
+
+    QString filePath =
+        QFileDialog::getOpenFileName(this, "Выберите видеофайл", lastDir, "Видеофайлы (*.mkv *.mp4)");
     if (filePath.isEmpty())
     {
         return;
     }
+    settings.setValue("ui/lastBrowseDir", QFileInfo(filePath).absolutePath());
     ui->mkvPathLineEdit->setText(filePath);
 
     if (ui->episodeNumberLineEdit->text().isEmpty())
@@ -525,9 +541,17 @@ void MainWindow::on_actionSettings_triggered()
         AppSettings::instance().load();
 
         // 2. Обновляем все виджеты, которые зависят от настроек.
-        // Сейчас это только список пресетов в ручном рендере.
-        // В будущем здесь могут быть и другие виджеты.
         m_manualRenderWidget->updateRenderPresets();
+
+        const bool hasNugenAmb = AppSettings::instance().isNugenAmbAvailable();
+        ui->normalizeAudioCheckBox->setEnabled(hasNugenAmb);
+        if (m_manualAssemblyWidget)
+        {
+            if (auto checkBox = m_manualAssemblyWidget->findChild<QCheckBox*>("normalizeAudioCheckBox"))
+            {
+                checkBox->setEnabled(hasNugenAmb);
+            }
+        }
 
         // Также нужно обновить список пресетов в редакторе шаблонов,
         // но он и так обновляется каждый раз при открытии, так что это не обязательно.
@@ -565,10 +589,19 @@ void MainWindow::updateProgress(int percentage, const QString& stageName)
 
 void MainWindow::on_selectAudioButton_clicked()
 {
-    QString filePath = QFileDialog::getOpenFileName(this, "Выберите аудиофайл", "", "Аудиофайлы (*.wav *.flac *.aac)");
+    QSettings settings("MyCompany", "DubbingTool");
+    QString lastDir = settings.value("ui/lastBrowseDir").toString();
+    if (lastDir.isEmpty() && !ui->audioPathLineEdit->text().isEmpty())
+    {
+        lastDir = QFileInfo(ui->audioPathLineEdit->text()).absolutePath();
+    }
+
+    QString filePath = QFileDialog::getOpenFileName(this, "Выберите аудиофайл", lastDir,
+                                                    "Аудиофайлы (*.wav *.flac *.aac)");
     if (!filePath.isEmpty())
     {
         ui->audioPathLineEdit->setText(filePath);
+        settings.setValue("ui/lastBrowseDir", QFileInfo(filePath).absolutePath());
     }
 }
 
@@ -691,8 +724,11 @@ void MainWindow::onFilesReady(const QString& mkvPath, const QString& mp4Path)
 
 void MainWindow::closeEvent(QCloseEvent* event)
 {
-    AppSettings::instance().save();
     QSettings settings("MyCompany", "DubbingTool");
+    settings.setValue("ui/mainWindowGeometry", saveGeometry());
+    settings.setValue("ui/mainWindowState", saveState());
+
+    AppSettings::instance().save();
     settings.setValue("manualRender/lastUsedPreset", m_manualRenderWidget->getCurrentPresetName());
     if (m_currentWorker)
     {
@@ -715,19 +751,35 @@ void MainWindow::closeEvent(QCloseEvent* event)
 
 void MainWindow::on_browseOverrideSubsButton_clicked()
 {
-    QString filePath = QFileDialog::getOpenFileName(this, "Выберите ASS файл", "", "ASS Subtitles (*.ass)");
+    QSettings settings("MyCompany", "DubbingTool");
+    QString lastDir = settings.value("ui/lastBrowseDir").toString();
+    if (lastDir.isEmpty() && !ui->overrideSubsPathEdit->text().isEmpty())
+    {
+        lastDir = QFileInfo(ui->overrideSubsPathEdit->text()).absolutePath();
+    }
+
+    QString filePath = QFileDialog::getOpenFileName(this, "Выберите ASS файл", lastDir, "ASS Subtitles (*.ass)");
     if (!filePath.isEmpty())
     {
         ui->overrideSubsPathEdit->setText(filePath);
+        settings.setValue("ui/lastBrowseDir", QFileInfo(filePath).absolutePath());
     }
 }
 
 void MainWindow::on_browseOverrideSignsButton_clicked()
 {
-    QString filePath = QFileDialog::getOpenFileName(this, "Выберите ASS файл", "", "ASS Subtitles (*.ass)");
+    QSettings settings("MyCompany", "DubbingTool");
+    QString lastDir = settings.value("ui/lastBrowseDir").toString();
+    if (lastDir.isEmpty() && !ui->overrideSignsPathEdit->text().isEmpty())
+    {
+        lastDir = QFileInfo(ui->overrideSignsPathEdit->text()).absolutePath();
+    }
+
+    QString filePath = QFileDialog::getOpenFileName(this, "Выберите ASS файл", lastDir, "ASS Subtitles (*.ass)");
     if (!filePath.isEmpty())
     {
         ui->overrideSignsPathEdit->setText(filePath);
+        settings.setValue("ui/lastBrowseDir", QFileInfo(filePath).absolutePath());
     }
 }
 

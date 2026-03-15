@@ -29,6 +29,7 @@ set(SOURCES_CORE
 
 set(SOURCES_PROCESSING
     src/processing/assprocessor.cpp
+    src/processing/concattbrenderer.cpp
     src/processing/fontfinder.cpp
     src/processing/manualassembler.cpp
     src/processing/manualrenderer.cpp
@@ -67,6 +68,7 @@ set(HEADERS_CORE
 
 set(HEADERS_PROCESSING
     src/processing/assprocessor.h
+    src/processing/concattbrenderer.h
     src/processing/fontfinder.h
     src/processing/manualassembler.h
     src/processing/manualrenderer.h

@@ -83,6 +83,13 @@
       </layout>
      </item>
      <item>
+      <widget class="QCheckBox" name="concatTbCheckBox">
+       <property name="text">
+        <string>Умный рендер (concat) — перекодировать только ТБ</string>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="QCheckBox" name="hardsubCheckBox">
        <property name="text">
         <string>Встроить субтитры в видео (Hardsub)</string>
