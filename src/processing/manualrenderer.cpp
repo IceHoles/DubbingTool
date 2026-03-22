@@ -5,7 +5,6 @@
 #include "processmanager.h"
 
 #include <QDir>
-#include <QDateTime>
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonDocument>
@@ -16,26 +15,39 @@
 
 namespace
 {
-void writeAgentDebugLog(const QString& hypothesisId, const QString& location, const QString& message,
-                        const QJsonObject& data = QJsonObject())
+bool parseFpsRational(const QString& fps, qint64& num, qint64& den)
 {
-    // #region agent log
-    QFile f("c:/Users/icehole/git/DubbingTool/debug-dd39f3.log");
-    if (f.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
+    const QStringList parts = fps.split('/');
+    if (parts.size() != 2)
     {
-        QJsonObject payload;
-        payload["sessionId"] = "dd39f3";
-        payload["runId"] = "run-manual-vs-workflow-1";
-        payload["hypothesisId"] = hypothesisId;
-        payload["location"] = location;
-        payload["message"] = message;
-        payload["data"] = data;
-        payload["timestamp"] = QDateTime::currentMSecsSinceEpoch();
-        f.write(QJsonDocument(payload).toJson(QJsonDocument::Compact));
-        f.write("\n");
-        f.close();
+        return false;
     }
-    // #endregion
+    bool numOk = false;
+    bool denOk = false;
+    const qint64 parsedNum = parts[0].toLongLong(&numOk);
+    const qint64 parsedDen = parts[1].toLongLong(&denOk);
+    if (!numOk || !denOk || parsedNum <= 0 || parsedDen <= 0)
+    {
+        return false;
+    }
+    num = parsedNum;
+    den = parsedDen;
+    return true;
+}
+
+bool isLikelyCfr(const QString& rFrameRate, const QString& avgFrameRate)
+{
+    qint64 rNum = 0;
+    qint64 rDen = 0;
+    qint64 avgNum = 0;
+    qint64 avgDen = 0;
+    if (!parseFpsRational(rFrameRate, rNum, rDen) || !parseFpsRational(avgFrameRate, avgNum, avgDen))
+    {
+        return false;
+    }
+    const double r = static_cast<double>(rNum) / static_cast<double>(rDen);
+    const double avg = static_cast<double>(avgNum) / static_cast<double>(avgDen);
+    return qAbs(r - avg) < 0.001;
 }
 } // namespace
 
@@ -80,6 +92,9 @@ void ManualRenderer::start()
     QByteArray jsonData;
     QString videoCodecExtension = "h264";
     int detectedVideoBitrateKbps = -1;
+    QString detectedVideoFrameRate;
+    QString detectedVideoAvgFrameRate;
+    bool detectedVideoIsCfr = false;
     if (m_processManager->executeAndWait(AppSettings::instance().mkvmergePath(), {"-J", inputMkv}, jsonData))
     {
         QJsonObject root = QJsonDocument::fromJson(jsonData).object();
@@ -134,19 +149,14 @@ void ManualRenderer::start()
                     detectedVideoBitrateKbps = static_cast<int>(bitRateStr.toLongLong() / 1000);
                     bitrateSource = "stream.bit_rate";
                 }
+                detectedVideoFrameRate = stream.value("r_frame_rate").toString();
+                detectedVideoAvgFrameRate = stream.value("avg_frame_rate").toString();
+                detectedVideoIsCfr = isLikelyCfr(detectedVideoFrameRate, detectedVideoAvgFrameRate);
                 break;
             }
         }
     }
 
-    writeAgentDebugLog("H8", "manualrenderer.cpp:start", "input_track_characteristics",
-                       QJsonObject{
-                           {"inputMkv", inputMkv},
-                           {"sourceDurationS", m_sourceDurationS},
-                           {"videoCodecExtension", videoCodecExtension},
-                           {"detectedVideoBitrateKbps", detectedVideoBitrateKbps},
-                           {"bitrateSource", bitrateSource},
-                       });
     if (m_sourceDurationS == 0)
     {
         emit logMessage("Предупреждение: не удалось определить длительность файла. Прогресс не будет отображаться.",
@@ -215,7 +225,8 @@ void ManualRenderer::start()
 
             m_concatRenderer = new ConcatTbRenderer(inputMkv, outputMp4, segment, m_sourceDurationS, videoCodecExtension,
                                                     hardsubModeForConcat, subtitleTrackIndex, externalSubsPath,
-                                                    detectedVideoBitrateKbps,
+                                                    detectedVideoBitrateKbps, detectedVideoFrameRate,
+                                                    detectedVideoAvgFrameRate, detectedVideoIsCfr,
                                                     m_processManager, this);
             connect(m_concatRenderer, &ConcatTbRenderer::logMessage, this, &ManualRenderer::logMessage);
             connect(m_concatRenderer, &ConcatTbRenderer::progressUpdated, this, &ManualRenderer::progressUpdated);

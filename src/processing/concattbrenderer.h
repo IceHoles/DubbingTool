@@ -22,6 +22,7 @@ public:
     ConcatTbRenderer(const QString& inputMkvPath, const QString& outputMp4Path, const TbSegment& segment,
                      qint64 sourceDurationS, const QString& videoCodecExtension, const QString& hardsubMode,
                      int subtitleTrackIndex, const QString& externalSubsPath, int videoBitrateKbps,
+                     const QString& videoFrameRate, const QString& videoAvgFrameRate, bool videoIsCfr,
                      ProcessManager* processManager,
                      QObject* parent = nullptr);
 
@@ -62,6 +63,9 @@ private:
     int m_subtitleTrackIndex = -1;
     QString m_externalSubsPath;
     int m_videoBitrateKbps = -1;
+    QString m_videoFrameRate;
+    QString m_videoAvgFrameRate;
+    bool m_videoIsCfr = false;
     QString m_tempFilterSubsPath;
     QString m_pendingStepErrorMessage;
     bool m_isRunningAsyncStep = false;
@@ -82,6 +86,8 @@ private:
     int m_concatSegmentCount = 0;
     double m_concatKfBeforeTbStart = 0.0;
     double m_concatKeyframeTime = 0.0;
+    double m_lastSeg3StartBase = 0.0;
+    double m_lastSeg3StartChosen = 0.0;
 };
 
 #endif // CONCATTBRENDERER_H

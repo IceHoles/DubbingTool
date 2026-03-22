@@ -347,6 +347,8 @@ private:
         QString extension;
         int bitrateKbps = 0;
         QString frameRate; // e.g. "25/1", "24000/1001"
+        QString avgFrameRate;
+        bool isCfr = false;
     };
 
     FontFinder* m_fontFinder;

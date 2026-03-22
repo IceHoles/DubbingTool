@@ -1,6 +1,5 @@
 #include "concattbrenderer.h"
 
-#include <QDateTime>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -11,38 +10,164 @@
 
 namespace
 {
-void writeAgentDebugLog(const QString& hypothesisId, const QString& location, const QString& message,
-                        const QJsonObject& data = QJsonObject())
+bool parseFpsRational(const QString& fps, qint64& num, qint64& den)
 {
-    // #region agent log
-    QFile f("c:/Users/icehole/git/DubbingTool/debug-dd39f3.log");
-    if (f.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
+    const QStringList parts = fps.split('/');
+    if (parts.size() != 2)
     {
-        QJsonObject payload;
-        payload["sessionId"] = "dd39f3";
-        payload["runId"] = "run-manual-vs-workflow-1";
-        payload["hypothesisId"] = hypothesisId;
-        payload["location"] = location;
-        payload["message"] = message;
-        payload["data"] = data;
-        payload["timestamp"] = QDateTime::currentMSecsSinceEpoch();
-        f.write(QJsonDocument(payload).toJson(QJsonDocument::Compact));
-        f.write("\n");
-        f.close();
+        return false;
     }
-    // #endregion
+    bool numOk = false;
+    bool denOk = false;
+    const qint64 parsedNum = parts[0].toLongLong(&numOk);
+    const qint64 parsedDen = parts[1].toLongLong(&denOk);
+    if (!numOk || !denOk || parsedNum <= 0 || parsedDen <= 0)
+    {
+        return false;
+    }
+    num = parsedNum;
+    den = parsedDen;
+    return true;
+}
+
+QString buildSettsExprForFps(const QString& fps)
+{
+    qint64 num = 0;
+    qint64 den = 0;
+    if (!parseFpsRational(fps, num, den))
+    {
+        return "";
+    }
+    return QString("pts=N*%1/(%2*TB):dts=N*%1/(%2*TB)").arg(den).arg(num);
+}
+
+QJsonObject probeTsVideoStats(ProcessManager* processManager, const QString& ffprobePath, const QString& tsPath)
+{
+    QJsonObject stats{
+        {"path", tsPath},
+        {"packetsOk", false},
+        {"firstPts", -1.0},
+        {"lastPts", -1.0},
+        {"lastDur", 0.0},
+        {"endPtsPlusDur", -1.0},
+        {"formatDuration", -1.0},
+    };
+
+    QByteArray packetOutput;
+    const bool packetsOk = processManager->executeAndWait(
+        ffprobePath,
+        {"-v", "quiet", "-select_streams", "v:0", "-show_entries", "packet=pts_time,duration_time", "-of", "csv=p=0",
+         tsPath},
+        packetOutput);
+    stats["packetsOk"] = packetsOk;
+    if (packetsOk && !packetOutput.isEmpty())
+    {
+        bool firstSet = false;
+        double firstPts = -1.0;
+        double lastPts = -1.0;
+        double lastDur = 0.0;
+        int packetCount = 0;
+        const QStringList lines = QString::fromUtf8(packetOutput).split('\n', Qt::SkipEmptyParts);
+        for (const QString& rawLine : lines)
+        {
+            const QString line = rawLine.trimmed();
+            if (line.isEmpty())
+            {
+                continue;
+            }
+            const QStringList cols = line.split(',', Qt::KeepEmptyParts);
+            if (cols.isEmpty())
+            {
+                continue;
+            }
+            bool ptsOk = false;
+            const double pts = cols[0].trimmed().toDouble(&ptsOk);
+            if (!ptsOk)
+            {
+                continue;
+            }
+            double dur = 0.0;
+            if (cols.size() > 1)
+            {
+                bool durOk = false;
+                const double parsedDur = cols[1].trimmed().toDouble(&durOk);
+                if (durOk && parsedDur > 0.0)
+                {
+                    dur = parsedDur;
+                }
+            }
+            if (!firstSet)
+            {
+                firstPts = pts;
+                firstSet = true;
+            }
+            lastPts = pts;
+            lastDur = dur;
+            packetCount++;
+        }
+        stats["packetCount"] = packetCount;
+        stats["firstPts"] = firstPts;
+        stats["lastPts"] = lastPts;
+        stats["lastDur"] = lastDur;
+        if (lastPts >= 0.0)
+        {
+            stats["endPtsPlusDur"] = lastPts + lastDur;
+        }
+    }
+
+    QByteArray formatOutput;
+    const bool formatOk = processManager->executeAndWait(
+        ffprobePath, {"-v", "quiet", "-show_entries", "format=duration", "-of", "csv=p=0", tsPath}, formatOutput);
+    if (formatOk && !formatOutput.isEmpty())
+    {
+        bool durOk = false;
+        const double duration = QString::fromUtf8(formatOutput).trimmed().toDouble(&durOk);
+        if (durOk)
+        {
+            stats["formatDuration"] = duration;
+        }
+    }
+
+    return stats;
+}
+
+double effectiveTsDuration(const QJsonObject& stats)
+{
+    const double firstPts = stats.value("firstPts").toDouble(-1.0);
+    const double endPtsPlusDur = stats.value("endPtsPlusDur").toDouble(-1.0);
+    if (firstPts >= 0.0 && endPtsPlusDur >= 0.0 && endPtsPlusDur >= firstPts)
+    {
+        return endPtsPlusDur - firstPts;
+    }
+    return stats.value("formatDuration").toDouble(-1.0);
+}
+
+double probeFormatDuration(ProcessManager* processManager, const QString& ffprobePath, const QString& inputPath)
+{
+    QByteArray out;
+    const bool ok = processManager->executeAndWait(
+        ffprobePath, {"-v", "quiet", "-show_entries", "format=duration", "-of", "csv=p=0", inputPath}, out);
+    if (!ok || out.isEmpty())
+    {
+        return -1.0;
+    }
+    bool numOk = false;
+    const double d = QString::fromUtf8(out).trimmed().toDouble(&numOk);
+    return numOk ? d : -1.0;
 }
 } // namespace
 
 ConcatTbRenderer::ConcatTbRenderer(const QString& inputMkvPath, const QString& outputMp4Path, const TbSegment& segment,
                                    qint64 sourceDurationS, const QString& videoCodecExtension, const QString& hardsubMode,
                                    int subtitleTrackIndex, const QString& externalSubsPath, int videoBitrateKbps,
+                                   const QString& videoFrameRate, const QString& videoAvgFrameRate, bool videoIsCfr,
                                    ProcessManager* processManager,
                                    QObject* parent)
     : QObject(parent), m_inputMkvPath(inputMkvPath), m_outputMp4Path(outputMp4Path), m_segment(segment),
       m_sourceDurationS(sourceDurationS), m_processManager(processManager), m_videoCodecExtension(videoCodecExtension),
       m_hardsubMode(hardsubMode), m_subtitleTrackIndex(subtitleTrackIndex), m_externalSubsPath(externalSubsPath),
-      m_videoBitrateKbps(videoBitrateKbps)
+      m_videoBitrateKbps(videoBitrateKbps), m_videoFrameRate(videoFrameRate), m_videoAvgFrameRate(videoAvgFrameRate),
+      m_videoIsCfr(videoIsCfr)
 {
     m_ffmpegPath = AppSettings::instance().ffmpegPath();
     m_ffprobePath = AppSettings::instance().ffprobePath();
@@ -282,7 +407,6 @@ void ConcatTbRenderer::concatCutSegment1()
 
     QString seg1Path = QDir(m_resultPath).filePath("concat_seg1.ts");
     QString seg1EndStr = QString::number(m_concatKfBeforeTbStart, 'f', 3);
-    const QString seg1InputPath = m_inputMkvPath;
 
     QStringList args;
     args << "-y"
@@ -297,11 +421,6 @@ void ConcatTbRenderer::concatCutSegment1()
          << "0"
          << "-muxpreload"
          << "0" << seg1Path;
-    writeAgentDebugLog("H11", "concattbrenderer.cpp:concatCutSegment1", "manual_seg1_settings",
-                       QJsonObject{
-                           {"inputPath", seg1InputPath},
-                           {"seg1End", seg1EndStr},
-                       });
 
     m_currentStep = Step::CutSegment1;
     runFfmpegAsync(args, "Concat рендер: не удалось вырезать сегмент 1.");
@@ -320,41 +439,32 @@ void ConcatTbRenderer::concatRenderSegment2()
         return;
     }
 
-    // Match WorkflowManager behavior: detect seg1 real duration and trim overlap tail.
+    // Match WorkflowManager behavior: detect seg1 real end-time and trim overlap tail.
     double bframeOverlap = 0.0;
     {
         const QString seg1Path = QDir(m_resultPath).filePath("concat_seg1.ts");
-        QStringList probeArgs;
-        probeArgs << "-v" << "quiet" << "-show_entries" << "format=duration" << "-of" << "csv=p=0" << seg1Path;
-
-        QByteArray probeOutput;
-        if (m_processManager->executeAndWait(m_ffprobePath, probeArgs, probeOutput))
+        const QJsonObject seg1Stats = probeTsVideoStats(m_processManager, m_ffprobePath, seg1Path);
+        const double seg1Duration = effectiveTsDuration(seg1Stats);
+        const double seg1EndTime = seg1Duration;
+        if (seg1EndTime > m_concatKfBeforeTbStart)
         {
-            bool ok = false;
-            double seg1Duration = QString::fromUtf8(probeOutput).trimmed().toDouble(&ok);
-            if (ok && seg1Duration > m_concatKfBeforeTbStart)
-            {
-                bframeOverlap = seg1Duration - m_concatKfBeforeTbStart;
-            }
+            bframeOverlap = seg1EndTime - m_concatKfBeforeTbStart;
         }
     }
 
     QString seg2StartStr = QString::number(m_concatKfBeforeTbStart, 'f', 3);
     QStringList args;
-    bool usesExplicitInputDuration = false;
     args << "-y" << "-ss" << seg2StartStr;
 
     if (m_concatSegmentCount == 3)
     {
         double segInputDuration = m_concatKeyframeTime - m_concatKfBeforeTbStart;
         args << "-t" << QString::number(segInputDuration, 'f', 3);
-        usesExplicitInputDuration = true;
     }
     else
     {
         double segInputDuration = static_cast<double>(m_sourceDurationS) - m_concatKfBeforeTbStart;
         args << "-t" << QString::number(segInputDuration, 'f', 3);
-        usesExplicitInputDuration = true;
     }
 
     args << "-i" << m_inputMkvPath;
@@ -382,15 +492,16 @@ void ConcatTbRenderer::concatRenderSegment2()
     }
 
     QStringList vfParts;
-    if (!subtitleFilter.isEmpty())
-    {
-        vfParts << QString("setpts=PTS+%1/TB").arg(seg2StartStr);
-        vfParts << QString("subtitles=%1").arg(subtitleFilter);
-        vfParts << "setpts=PTS-STARTPTS";
-    }
     if (bframeOverlap > 0.001)
     {
         vfParts << QString("trim=start=%1").arg(bframeOverlap, 0, 'f', 3);
+        vfParts << "setpts=PTS-STARTPTS";
+    }
+    if (!subtitleFilter.isEmpty())
+    {
+        const double subtitleTimelineStart = qMin(m_concatKfBeforeTbStart + bframeOverlap, m_concatTbStartSeconds);
+        vfParts << QString("setpts=PTS+%1/TB").arg(QString::number(subtitleTimelineStart, 'f', 3));
+        vfParts << QString("subtitles=%1").arg(subtitleFilter);
         vfParts << "setpts=PTS-STARTPTS";
     }
     if (!vfParts.isEmpty())
@@ -401,12 +512,10 @@ void ConcatTbRenderer::concatRenderSegment2()
     args << "-an";
     args << "-c:v" << encoder;
 
-    bool usesMaxrateBufsize = false;
     if (m_videoBitrateKbps > 0)
     {
         const QString maxrateStr = QString::number(m_videoBitrateKbps) + "k";
         const QString bufsizeStr = QString::number(m_videoBitrateKbps * 2) + "k";
-        usesMaxrateBufsize = true;
         if (encoder == "libx264")
         {
             args << "-crf" << "18" << "-maxrate" << maxrateStr << "-bufsize" << bufsizeStr << "-preset" << "medium"
@@ -433,20 +542,6 @@ void ConcatTbRenderer::concatRenderSegment2()
     args << "-map" << "0:v:0";
     args << "-muxdelay" << "0" << "-muxpreload" << "0";
     args << seg2Path;
-    writeAgentDebugLog("H7", "concattbrenderer.cpp:concatRenderSegment2", "segment2_settings",
-                       QJsonObject{
-                           {"segmentCount", m_concatSegmentCount},
-                           {"seg2Start", m_concatKfBeforeTbStart},
-                           {"seg2EndKeyframe", m_concatKeyframeTime},
-                           {"usesExplicitInputDuration", usesExplicitInputDuration},
-                           {"encoder", encoder},
-                           {"usesCrfOnly", !usesMaxrateBufsize},
-                           {"usesMaxrateBufsize", usesMaxrateBufsize},
-                           {"usesBframeTrim", bframeOverlap > 0.001},
-                           {"bframeOverlap", bframeOverlap},
-                           {"videoBitrateKbps", m_videoBitrateKbps},
-                           {"subtitleFilterApplied", !subtitleFilter.isEmpty()},
-                       });
 
     m_currentStep = Step::RenderSegment2;
     runFfmpegAsync(args, "Concat рендер: не удалось перекодировать сегмент 2.");
@@ -458,26 +553,69 @@ void ConcatTbRenderer::concatCutSegment3()
     emit progressUpdated(-1, "Concat: сегмент 3/3");
 
     QString seg3Path = QDir(m_resultPath).filePath("concat_seg3.ts");
-    QString kfTimeStr = QString::number(m_concatKeyframeTime, 'f', 3);
-    const QString seg3InputPath = m_inputMkvPath;
+    double seg3Start = m_concatKeyframeTime;
+    m_lastSeg3StartBase = m_concatKeyframeTime;
 
-    QStringList args;
-    args << "-y" << "-ss" << kfTimeStr << "-i" << m_inputMkvPath << "-map"
-         << "0:v:0"
-         << "-c:v"
-         << "copy"
-         << "-an"
-         << "-avoid_negative_ts"
-         << "make_non_negative"
-         << "-muxdelay"
-         << "0"
-         << "-muxpreload"
-         << "0" << seg3Path;
-    writeAgentDebugLog("H11", "concattbrenderer.cpp:concatCutSegment3", "manual_seg3_settings",
-                       QJsonObject{
-                           {"inputPath", seg3InputPath},
-                           {"seg3Start", kfTimeStr},
-                       });
+    QString kfTimeStr = QString::number(seg3Start, 'f', 3);
+    m_lastSeg3StartChosen = seg3Start;
+    const QString inputSuffix = QFileInfo(m_inputMkvPath).suffix().toLower();
+
+    auto buildSeg3Args = [this](double startSeconds, const QString& outPath, bool quietProbe) -> QStringList
+    {
+        const QString startStr = QString::number(startSeconds, 'f', 3);
+        QStringList localArgs;
+        localArgs << "-y";
+        if (quietProbe)
+        {
+            localArgs << "-v" << "error" << "-nostats";
+        }
+        localArgs << "-ss" << startStr << "-i" << m_inputMkvPath << "-map"
+                  << "0:v:0"
+                  << "-c:v"
+                  << "copy"
+                  << "-an"
+                  << "-avoid_negative_ts"
+                  << "make_non_negative"
+                  << "-muxdelay"
+                  << "0"
+                  << "-muxpreload"
+                  << "0" << outPath;
+        return localArgs;
+    };
+
+    // MKV/WebM manual path can snap copy-seek to an earlier decode point.
+    // Probe once and compensate only when measured tail is significantly longer than expected.
+    if ((inputSuffix == "mkv" || inputSuffix == "webm") && !m_ffprobePath.isEmpty() && !m_ffmpegPath.isEmpty())
+    {
+        const QString probePath = QDir(m_resultPath).filePath("concat_seg3_probe.ts");
+        QFile::remove(probePath);
+        QByteArray probeCutOut;
+        const bool probeCutOk =
+            m_processManager->executeAndWait(m_ffmpegPath, buildSeg3Args(seg3Start, probePath, true), probeCutOut);
+        if (probeCutOk && QFileInfo::exists(probePath))
+        {
+            const QJsonObject probeStats = probeTsVideoStats(m_processManager, m_ffprobePath, probePath);
+            const double probeDuration = effectiveTsDuration(probeStats);
+            const double inputDuration = probeFormatDuration(m_processManager, m_ffprobePath, m_inputMkvPath);
+            const double expectedTailDuration = (inputDuration > 0.0) ? (inputDuration - seg3Start) : -1.0;
+            const double extraDuration =
+                (probeDuration > 0.0 && expectedTailDuration > 0.0) ? (probeDuration - expectedTailDuration) : 0.0;
+
+            if (extraDuration > 0.20 && extraDuration < 2.50)
+            {
+                seg3Start += extraDuration;
+                kfTimeStr = QString::number(seg3Start, 'f', 3);
+                m_lastSeg3StartChosen = seg3Start;
+                emit logMessage(QString("Concat рендер: MKV-компенсация seg.3 старта на %1с -> %2с")
+                                    .arg(extraDuration, 0, 'f', 3)
+                                    .arg(seg3Start, 0, 'f', 3),
+                                LogCategory::APP);
+            }
+        }
+        QFile::remove(probePath);
+    }
+
+    const QStringList args = buildSeg3Args(seg3Start, seg3Path, false);
 
     m_currentStep = Step::CutSegment3;
     runFfmpegAsync(args, "Concat рендер: не удалось вырезать сегмент 3.");
@@ -523,16 +661,29 @@ void ConcatTbRenderer::concatJoinSegments()
          << "-c:v"
          << "copy"
          << "-c:a"
-         << "copy"
-         << "-movflags"
+         << "copy";
+
+    const QString settsExpr = m_videoIsCfr ? buildSettsExprForFps(m_videoFrameRate) : "";
+    const bool applySetts = !settsExpr.isEmpty();
+    if (applySetts)
+    {
+        args << "-bsf:v" << QString("setts=%1").arg(settsExpr);
+        emit logMessage(QString("Concat рендер: включен setts для CFR (%1, avg %2).")
+                            .arg(m_videoFrameRate, m_videoAvgFrameRate),
+                        LogCategory::APP);
+    }
+    else
+    {
+        emit logMessage(QString("Concat рендер: setts отключен (fps=%1, avg=%2, CFR=%3).")
+                            .arg(m_videoFrameRate.isEmpty() ? "n/a" : m_videoFrameRate)
+                            .arg(m_videoAvgFrameRate.isEmpty() ? "n/a" : m_videoAvgFrameRate)
+                            .arg(m_videoIsCfr ? "yes" : "no"),
+                        LogCategory::APP);
+    }
+
+    args << "-movflags"
          << "+faststart"
          << "-shortest" << m_outputMp4Path;
-    writeAgentDebugLog("H11", "concattbrenderer.cpp:concatJoinSegments", "manual_join_settings",
-                       QJsonObject{
-                           {"videoConcatList", QFileInfo(listPath).absoluteFilePath()},
-                           {"audioInputPath", m_inputMkvPath},
-                           {"outputPath", m_outputMp4Path},
-                       });
 
     m_currentStep = Step::JoinSegments;
     runFfmpegAsync(args, "Concat рендер: не удалось склеить сегменты.");
@@ -554,12 +705,6 @@ void ConcatTbRenderer::runFfmpegAsync(const QStringList& args, const QString& er
     m_pendingStepErrorMessage = errorMessageForStep;
     m_isRunningAsyncStep = true;
     m_processManager->setWorkingDirectory(m_resultPath);
-    writeAgentDebugLog("H9", "concattbrenderer.cpp:runFfmpegAsync", "start_async_ffmpeg_step",
-                       QJsonObject{
-                           {"step", static_cast<int>(m_currentStep)},
-                           {"workingDir", m_resultPath},
-                           {"argCount", static_cast<int>(args.size())},
-                       });
     m_processManager->startProcess(m_ffmpegPath, args);
 }
 
@@ -571,12 +716,6 @@ void ConcatTbRenderer::onProcessFinished(int exitCode, QProcess::ExitStatus exit
     }
 
     m_isRunningAsyncStep = false;
-    writeAgentDebugLog("H9", "concattbrenderer.cpp:onProcessFinished", "finish_async_ffmpeg_step",
-                       QJsonObject{
-                           {"step", static_cast<int>(m_currentStep)},
-                           {"exitCode", exitCode},
-                           {"exitStatus", static_cast<int>(exitStatus)},
-                       });
     if (exitCode != 0 || exitStatus != QProcess::NormalExit)
     {
         failAndFinish(m_pendingStepErrorMessage);
