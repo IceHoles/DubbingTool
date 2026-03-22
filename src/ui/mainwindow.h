@@ -42,6 +42,7 @@ public:
     QString getManualMkvPath() const;
     QString getOverrideSubsPath() const;
     QString getOverrideSignsPath() const;
+    QString getChaptersXmlPath() const;
     bool isSrtSubsDecoupled() const;
     bool isNormalizationEnabled() const;
 
@@ -82,11 +83,13 @@ private slots:
     void updateProgress(int percentage, const QString& stageName = "");
     void on_browseOverrideSubsButton_clicked();
     void on_browseOverrideSignsButton_clicked();
+    void on_browseChaptersXmlButton_clicked();
 
     void startManualAssembly();
     void startManualRender();
     void finishWorkerProcess();
     void updateDecoupleCheckBoxState();
+    void updateChaptersAutoVisibility();
 
 private:
     Ui::MainWindow* ui;

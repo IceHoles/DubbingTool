@@ -56,6 +56,7 @@ private:
     };
     void runPass(Step pass);
     QStringList prepareCommandArguments(const QString& commandTemplate);
+    void applyChaptersIfNeeded();
 
     Step m_currentStep = Step::Idle;
     QVariantMap m_params;

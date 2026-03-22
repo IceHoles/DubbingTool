@@ -149,6 +149,7 @@ void TemplateEditor::setTemplate(const ReleaseTemplate& t)
 
     // Вкладка "Создание ТБ"
     ui->generateTbCheckBox->setChecked(t.generateTb);
+    ui->chaptersEnabledCheckBox->setChecked(t.chaptersEnabled);
     ui->endingChapterNameEdit->setText(t.endingChapterName);
     ui->endingStartTimeEdit->setTime(QTime::fromString(t.endingStartTime, "H:mm:ss.zzz"));
     ui->useManualTimeCheckBox->setChecked(t.useManualTime);
@@ -231,6 +232,7 @@ ReleaseTemplate TemplateEditor::getTemplate() const
 
     // Вкладка "Создание ТБ"
     t.generateTb = ui->generateTbCheckBox->isChecked();
+    t.chaptersEnabled = ui->chaptersEnabledCheckBox->isChecked();
     t.endingChapterName = ui->endingChapterNameEdit->text().trimmed();
     t.endingStartTime = ui->endingStartTimeEdit->time().toString("H:mm:ss.zzz");
     t.useManualTime = ui->useManualTimeCheckBox->isChecked();

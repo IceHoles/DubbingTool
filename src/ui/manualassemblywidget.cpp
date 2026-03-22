@@ -26,9 +26,19 @@ ManualAssemblyWidget::ManualAssemblyWidget(QWidget* parent)
 
     connect(ui->modeSwitchButton, &QToolButton::toggled, this, &ManualAssemblyWidget::onModeSwitched);
     connect(ui->convertAudioCheckBox, &QCheckBox::toggled, ui->convertAudioFormatComboBox, &QComboBox::setVisible);
+    connect(ui->manualChaptersCustomCheckBox, &QCheckBox::toggled, this,
+            [this](bool on)
+            {
+                if (!ui->manualChaptersCustomCheckBox->isVisible())
+                {
+                    return;
+                }
+                ui->manualChaptersXmlPathRowWidget->setVisible(on);
+            });
     ui->modeSwitchButton->setChecked(false);
     onModeSwitched(false);
     ui->convertAudioFormatComboBox->setVisible(ui->convertAudioCheckBox->isChecked());
+    ui->manualChaptersXmlPathRowWidget->setVisible(false);
 }
 
 ManualAssemblyWidget::~ManualAssemblyWidget()
@@ -103,6 +113,18 @@ void ManualAssemblyWidget::on_templateComboBox_currentIndexChanged(int index)
 
 void ManualAssemblyWidget::onTemplateDataReceived(const ReleaseTemplate& t)
 {
+    m_templateChaptersEnabled = t.chaptersEnabled;
+    ui->manualChaptersCustomCheckBox->setVisible(t.chaptersEnabled);
+    if (!t.chaptersEnabled)
+    {
+        ui->manualChaptersCustomCheckBox->setChecked(false);
+        ui->manualChaptersXmlPathRowWidget->setVisible(false);
+    }
+    else
+    {
+        ui->manualChaptersXmlPathRowWidget->setVisible(ui->manualChaptersCustomCheckBox->isChecked());
+    }
+
     ui->tbStartTimeEdit->setTime(QTime::fromString(t.endingStartTime, "H:mm:ss.zzz"));
 
     ui->tbStyleComboBox->clear();
@@ -188,7 +210,6 @@ void ManualAssemblyWidget::on_addFontsButton_clicked()
 {
     QStringList paths = QFileDialog::getOpenFileNames(this, "Выберите файлы шрифтов", "",
                                                       "Файлы шрифтов (*.ttf *.otf *.ttc);;Все файлы (*)");
-
     for (const QString& path : paths)
     {
         QListWidgetItem* item = new QListWidgetItem(QFileInfo(path).fileName());
@@ -197,6 +218,16 @@ void ManualAssemblyWidget::on_addFontsButton_clicked()
         item->setData(Qt::UserRole, path);
         ui->fontsListWidget->addItem(item);
     }
+}
+
+void ManualAssemblyWidget::on_clearFontsButton_clicked()
+{
+    clearFontsList();
+}
+
+void ManualAssemblyWidget::clearFontsList()
+{
+    ui->fontsListWidget->clear();
 }
 
 QVariantMap ManualAssemblyWidget::getParameters() const
@@ -228,6 +259,11 @@ QVariantMap ManualAssemblyWidget::getParameters() const
 
     params["normalizeAudio"] = ui->normalizeAudioCheckBox->isChecked();
     params["convertAudio"] = ui->convertAudioCheckBox->isChecked();
+
+    params["templateChaptersEnabled"] = m_templateChaptersEnabled;
+    params["useCustomChaptersXml"] =
+        ui->manualChaptersCustomCheckBox->isVisible() && ui->manualChaptersCustomCheckBox->isChecked();
+    params["chaptersXmlPath"] = ui->chaptersXmlPathManualAssemblyEdit->text().trimmed();
 
     if (params["convertAudio"].toBool())
     {
@@ -318,6 +354,12 @@ void ManualAssemblyWidget::on_browseWorkDirButton_clicked()
     {
         ui->workDirEdit->setText(dir);
     }
+}
+
+void ManualAssemblyWidget::on_browseChaptersXmlManualAssemblyButton_clicked()
+{
+    browseForFile(ui->chaptersXmlPathManualAssemblyEdit, "Выберите XML глав",
+                  "Matroska chapters (*.xml);;Все файлы (*)");
 }
 
 void ManualAssemblyWidget::onFontFinderFinished(const FontFinderResult& result)

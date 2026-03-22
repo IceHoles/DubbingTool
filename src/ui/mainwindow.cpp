@@ -89,6 +89,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWi
 
     connect(ui->overrideSubsPathEdit, &QLineEdit::textChanged, this, &MainWindow::updateDecoupleCheckBoxState);
     connect(ui->templateComboBox, &QComboBox::currentIndexChanged, this, &MainWindow::updateDecoupleCheckBoxState);
+    connect(ui->templateComboBox, &QComboBox::currentIndexChanged, this, &MainWindow::updateChaptersAutoVisibility);
 
     ui->downloadProgressBar->setVisible(false);
     ui->progressLabel->setVisible(false);
@@ -115,6 +116,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWi
     }
 
     updateDecoupleCheckBoxState();
+    updateChaptersAutoVisibility();
 }
 
 MainWindow::~MainWindow()
@@ -189,7 +191,13 @@ void MainWindow::loadTemplates()
     if (m_manualAssemblyWidget)
     {
         m_manualAssemblyWidget->updateTemplateList(m_templates.keys());
+        const QString sel = ui->templateComboBox->currentText();
+        if (!sel.isEmpty() && m_templates.contains(sel))
+        {
+            m_manualAssemblyWidget->onTemplateDataReceived(m_templates.value(sel));
+        }
     }
+    updateChaptersAutoVisibility();
 }
 
 void MainWindow::saveTemplate(const ReleaseTemplate& t)
@@ -644,7 +652,15 @@ void MainWindow::startManualAssembly()
     worker->moveToThread(thread);
 
     connect(thread, &QThread::started, worker, &ManualAssembler::start);
-    connect(worker, &ManualAssembler::finished, this, &MainWindow::finishWorkerProcess);
+    connect(worker, &ManualAssembler::finished, this,
+            [this](bool success)
+            {
+                finishWorkerProcess();
+                if (success)
+                {
+                    m_manualAssemblyWidget->clearFontsList();
+                }
+            });
     connect(worker, &ManualAssembler::logMessage, this, &MainWindow::logMessage);
     connect(worker, &ManualAssembler::progressUpdated, this, &MainWindow::updateProgress);
     connect(thread, &QThread::finished, worker, &QObject::deleteLater);
@@ -783,6 +799,24 @@ void MainWindow::on_browseOverrideSignsButton_clicked()
     }
 }
 
+void MainWindow::on_browseChaptersXmlButton_clicked()
+{
+    QSettings settings("MyCompany", "DubbingTool");
+    QString lastDir = settings.value("ui/lastBrowseDir").toString();
+    if (lastDir.isEmpty() && !ui->chaptersXmlPathLineEdit->text().isEmpty())
+    {
+        lastDir = QFileInfo(ui->chaptersXmlPathLineEdit->text()).absolutePath();
+    }
+
+    QString filePath = QFileDialog::getOpenFileName(this, "Файл глав Matroska (XML)", lastDir,
+                                                    "XML (*.xml);;Все файлы (*)");
+    if (!filePath.isEmpty())
+    {
+        ui->chaptersXmlPathLineEdit->setText(filePath);
+        settings.setValue("ui/lastBrowseDir", QFileInfo(filePath).absolutePath());
+    }
+}
+
 QString MainWindow::getOverrideSubsPath() const
 {
     return ui->overrideSubsPathEdit->text();
@@ -791,6 +825,11 @@ QString MainWindow::getOverrideSubsPath() const
 QString MainWindow::getOverrideSignsPath() const
 {
     return ui->overrideSignsPathEdit->text();
+}
+
+QString MainWindow::getChaptersXmlPath() const
+{
+    return ui->chaptersXmlPathLineEdit->text().trimmed();
 }
 
 bool MainWindow::isNormalizationEnabled() const
@@ -813,33 +852,56 @@ void MainWindow::onPostsUpdateRequest(const QMap<QString, QString>& viewLinks)
 void MainWindow::onUserInputRequired(const UserInputRequest& request)
 {
     logMessage("Процесс приостановлен: требуются данные от пользователя.", LogCategory::APP);
-    MissingFilesDialog dialog(this);
 
-    dialog.setAudioPathVisible(request.audioFileRequired);
-    if (ui->audioPathLineEdit->text().isEmpty())
+    for (;;)
     {
-        dialog.setAudioPrompt("Не удалось найти русскую аудиодорожку. Укажите путь к ней:");
-    }
-    else if (request.isWavRequired)
-    {
-        dialog.setAudioPrompt("Для SRT-мастера требуется несжатый WAV-файл:");
-    }
+        MissingFilesDialog dialog(this);
 
-    dialog.setMissingFonts(request.missingFonts);
+        dialog.setAudioPathVisible(request.audioFileRequired);
+        if (ui->audioPathLineEdit->text().isEmpty())
+        {
+            dialog.setAudioPrompt("Не удалось найти русскую аудиодорожку. Укажите путь к ней:");
+        }
+        else if (request.isWavRequired)
+        {
+            dialog.setAudioPrompt("Для SRT-мастера требуется несжатый WAV-файл:");
+        }
 
-    dialog.setTimeInputVisible(request.tbTimeRequired);
-    if (request.tbTimeRequired)
-    {
-        dialog.setTimePrompt(request.tbTimeReason);
-        dialog.setVideoFile(request.videoFilePath, request.videoDurationS);
-    }
+        dialog.setMissingFonts(request.missingFonts);
 
-    if (dialog.exec() == QDialog::Accepted)
-    {
+        dialog.setTimeInputVisible(request.tbTimeRequired);
+        if (request.tbTimeRequired)
+        {
+            dialog.setTimePrompt(request.tbTimeReason);
+            dialog.setVideoFile(request.videoFilePath, request.videoDurationS);
+        }
+
+        dialog.setChaptersInputVisible(request.chaptersRequired);
+        if (request.chaptersRequired && !request.chaptersReason.isEmpty())
+        {
+            dialog.setChaptersPrompt(request.chaptersReason);
+        }
+
+        if (dialog.exec() != QDialog::Accepted)
+        {
+            logMessage("Пользователь отменил ввод данных. Процесс прерван.", LogCategory::APP);
+            emit userInputProvided({});
+            return;
+        }
+
         UserInputResponse response;
         response.audioPath = dialog.getAudioPath();
         response.resolvedFonts = dialog.getResolvedFonts();
         response.time = dialog.getTime();
+        response.chaptersXmlPath = dialog.getChaptersXmlPath();
+        response.buildWithoutChapters = dialog.getBuildWithoutChapters();
+
+        if (request.chaptersRequired && !response.buildWithoutChapters && response.chaptersXmlPath.isEmpty())
+        {
+            QMessageBox::warning(this, "Нужны данные по главам",
+                                 "Укажите путь к XML глав или отметьте сборку без глав.");
+            continue;
+        }
 
         if (request.audioFileRequired && response.audioPath.isEmpty())
         {
@@ -856,11 +918,7 @@ void MainWindow::onUserInputRequired(const UserInputRequest& request)
 
         logMessage("Данные от пользователя получены, возобновление процесса...", LogCategory::APP);
         emit userInputProvided(response);
-    }
-    else
-    {
-        logMessage("Пользователь отменил ввод данных. Процесс прерван.", LogCategory::APP);
-        emit userInputProvided({});
+        return;
     }
 }
 
@@ -1013,4 +1071,15 @@ void MainWindow::updateDecoupleCheckBoxState()
     {
         ui->decoupleSrtSubsCheckBox->setChecked(false);
     }
+}
+
+void MainWindow::updateChaptersAutoVisibility()
+{
+    const QString name = ui->templateComboBox->currentText();
+    if (name.isEmpty() || !m_templates.contains(name))
+    {
+        ui->chaptersAutoContainerWidget->setVisible(false);
+        return;
+    }
+    ui->chaptersAutoContainerWidget->setVisible(m_templates.value(name).chaptersEnabled);
 }

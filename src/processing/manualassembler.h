@@ -28,7 +28,8 @@ public slots:
 signals:
     void logMessage(const QString&, LogCategory);
     void progressUpdated(int percentage, const QString& stageName = "");
-    void finished();
+    /// Emitted when the worker stops. \a success is true only after MKV was built successfully.
+    void finished(bool success);
 
 private slots:
     void onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
@@ -39,6 +40,7 @@ private:
     void normalizeAudio();
     void convertAudio();
     void processSubtitlesAndAssemble();
+    QString resolveChaptersPathForMkvMerge();
     void assemble();
 
     QVariantMap m_params;

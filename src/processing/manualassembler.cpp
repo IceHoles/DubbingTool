@@ -2,9 +2,11 @@
 
 #include "appsettings.h"
 #include "assprocessor.h"
+#include "chapterhelper.h"
 #include "processmanager.h"
 #include "releasetemplate.h"
 
+#include <QByteArray>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -230,6 +232,91 @@ void ManualAssembler::processSubtitlesAndAssemble()
     assemble();
 }
 
+QString ManualAssembler::resolveChaptersPathForMkvMerge()
+{
+    const bool tplEnabled = m_params.value(QStringLiteral("templateChaptersEnabled"), true).toBool();
+    if (!tplEnabled)
+    {
+        return {};
+    }
+
+    const bool useCustom = m_params.value(QStringLiteral("useCustomChaptersXml")).toBool();
+    const QString customPath = m_params.value(QStringLiteral("chaptersXmlPath")).toString().trimmed();
+
+    if (useCustom && !customPath.isEmpty())
+    {
+        if (QFileInfo::exists(customPath))
+        {
+            const QString abs = QFileInfo(customPath).absoluteFilePath();
+            emit logMessage(QStringLiteral("Главы: используется указанный XML: %1").arg(abs), LogCategory::APP);
+            return abs;
+        }
+        emit logMessage(QStringLiteral("ПРЕДУПРЕЖДЕНИЕ: файл глав не найден: %1").arg(customPath), LogCategory::APP);
+    }
+
+    const QString videoPath = m_params.value(QStringLiteral("videoPath")).toString();
+    if (videoPath.isEmpty())
+    {
+        emit logMessage(QStringLiteral("ВНИМАНИЕ: в шаблоне включены главы, но не указан видеофайл и нет валидного "
+                                       "внешнего XML."),
+                        LogCategory::APP);
+        return {};
+    }
+
+    QString baseDir = m_params.value(QStringLiteral("workDir")).toString().trimmed();
+    if (baseDir.isEmpty())
+    {
+        baseDir = QFileInfo(videoPath).absolutePath();
+    }
+
+    const QString embPath = QDir(baseDir).filePath(QStringLiteral("chapters_embedded_ma.xml"));
+    const QString muxPath = QDir(baseDir).filePath(QStringLiteral("chapters_mux_ma.xml"));
+
+    if (videoPath.endsWith(QStringLiteral(".mkv"), Qt::CaseInsensitive))
+    {
+        const QString mkvextract = AppSettings::instance().mkvextractPath();
+        if (ChapterHelper::extractEmbeddedChaptersToFile(mkvextract, videoPath, embPath, m_processManager))
+        {
+            const QList<ChapterMarker> markers = ChapterHelper::loadChaptersFromFile(embPath);
+            if (!markers.isEmpty())
+            {
+                if (ChapterHelper::writeMatroskaChapterXml(markers, muxPath))
+                {
+                    emit logMessage(QStringLiteral("Главы: взяты из встроенных глав MKV."), LogCategory::APP);
+                    return muxPath;
+                }
+                emit logMessage(QStringLiteral("Главы: взяты из встроенных глав MKV."), LogCategory::APP);
+                return QFileInfo(embPath).absoluteFilePath();
+            }
+        }
+    }
+    else if (videoPath.endsWith(QStringLiteral(".mp4"), Qt::CaseInsensitive))
+    {
+        const QString ffprobePath = AppSettings::instance().ffprobePath();
+        if (!ffprobePath.isEmpty() && QFileInfo::exists(ffprobePath))
+        {
+            QByteArray json;
+            const QStringList args = {QStringLiteral("-v"), QStringLiteral("quiet"), QStringLiteral("-show_chapters"),
+                                      QStringLiteral("-print_format"), QStringLiteral("json"),
+                                      QStringLiteral("-i"), videoPath};
+            if (m_processManager->executeAndWait(ffprobePath, args, json))
+            {
+                const QList<ChapterMarker> markers = ChapterHelper::parseFfprobeChaptersJson(json);
+                if (!markers.isEmpty() && ChapterHelper::writeMatroskaChapterXml(markers, muxPath))
+                {
+                    emit logMessage(QStringLiteral("Главы: взяты из встроенных метаданных MP4."), LogCategory::APP);
+                    return muxPath;
+                }
+            }
+        }
+    }
+
+    emit logMessage(QStringLiteral("ВНИМАНИЕ: для релиза ожидались главы, но ни встроенных в контейнере, ни "
+                                   "валидного внешнего XML не найдено."),
+                    LogCategory::APP);
+    return {};
+}
+
 void ManualAssembler::assemble()
 {
     m_currentStep = Step::AssemblingMkv;
@@ -243,7 +330,7 @@ void ManualAssembler::assemble()
     if (outputName.isEmpty())
     {
         emit logMessage("Критическая ошибка: не указан выходной файл.", LogCategory::APP);
-        emit finished();
+        emit finished(false);
         return;
     }
 
@@ -268,7 +355,7 @@ void ManualAssembler::assemble()
     if (fullOutputPath.isEmpty())
     {
         emit logMessage("Критическая ошибка: не удалось определить путь для сохранения файла.", LogCategory::APP);
-        emit finished();
+        emit finished(false);
         return;
     }
 
@@ -298,6 +385,13 @@ void ManualAssembler::assemble()
         args << "--attach-file" << path;
     }
 
+    const QString chaptersMux = resolveChaptersPathForMkvMerge();
+    if (!chaptersMux.isEmpty() && QFileInfo::exists(chaptersMux))
+    {
+        args << "--chapters" << chaptersMux;
+        emit logMessage(QStringLiteral("mkvmerge: добавлены главы (%1).").arg(chaptersMux), LogCategory::APP);
+    }
+
     // Дорожки
     if (m_params["isManualMode"].toBool())
     {
@@ -323,6 +417,7 @@ void ManualAssembler::assemble()
         }
         if (m_params.contains("originalAudioPath"))
         {
+            args << "--default-track-flag" << "0:no";
             if (!lang.isEmpty())
             {
                 args << "--language" << "0:" + lang;
@@ -340,8 +435,8 @@ void ManualAssembler::assemble()
         }
         if (m_params.contains("subtitlesPath"))
         {
-            args << "--language" << "0:rus" << "--track-name" << QString("0:Субтитры [%1]").arg(subAuthor)
-                 << m_params["subtitlesPath"].toString();
+            args << "--default-track-flag" << "0:no" << "--forced-display-flag" << "0:no" << "--language" << "0:rus"
+                 << "--track-name" << QString("0:Субтитры [%1]").arg(subAuthor) << m_params["subtitlesPath"].toString();
         }
     }
     else
@@ -365,7 +460,7 @@ void ManualAssembler::assemble()
         }
         if (m_params.contains("originalAudioPath"))
         {
-            args << "--language" << "0:" + t.originalLanguage << "--track-name"
+            args << "--default-track-flag" << "0:no" << "--language" << "0:" + t.originalLanguage << "--track-name"
                  << QString("0:Оригинал [%1]").arg(t.animationStudio) << m_params["originalAudioPath"].toString();
         }
         if (m_params.contains("signsPath"))
@@ -376,7 +471,8 @@ void ManualAssembler::assemble()
         }
         if (m_params.contains("subtitlesPath"))
         {
-            args << "--language" << "0:rus" << "--track-name" << QString("0:Субтитры [%1]").arg(subTrackAuthorName)
+            args << "--default-track-flag" << "0:no" << "--forced-display-flag" << "0:no" << "--language" << "0:rus"
+                 << "--track-name" << QString("0:Субтитры [%1]").arg(subTrackAuthorName)
                  << m_params["subtitlesPath"].toString();
         }
     }
@@ -389,14 +485,14 @@ void ManualAssembler::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
     if ((m_processManager != nullptr) && m_processManager->wasKilled())
     {
         emit logMessage("Ручная сборка отменена пользователем.", LogCategory::APP);
-        emit finished();
+        emit finished(false);
         return;
     }
 
     if (exitCode != 0 || exitStatus != QProcess::NormalExit)
     {
         emit logMessage("Ошибка выполнения дочернего процесса. Рабочий процесс остановлен.", LogCategory::APP);
-        emit finished();
+        emit finished(false);
         return;
     }
 
@@ -464,7 +560,7 @@ void ManualAssembler::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
     else if (m_currentStep == Step::AssemblingMkv)
     {
         emit logMessage("Ручная сборка MKV успешно завершена.", LogCategory::APP);
-        emit finished();
+        emit finished(true);
     }
 }
 

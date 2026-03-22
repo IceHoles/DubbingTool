@@ -159,7 +159,46 @@
             </item>
            </layout>
           </item>
-          <item row="4" column="0">
+          <item row="4" column="0" colspan="2">
+           <widget class="QWidget" name="chaptersAutoContainerWidget" native="true">
+            <layout class="QHBoxLayout" name="horizontalLayout_chapters_auto">
+             <property name="leftMargin">
+              <number>0</number>
+             </property>
+             <property name="topMargin">
+              <number>0</number>
+             </property>
+             <property name="rightMargin">
+              <number>0</number>
+             </property>
+             <property name="bottomMargin">
+              <number>0</number>
+             </property>
+             <item>
+              <widget class="QLabel" name="label_chapters_auto">
+               <property name="text">
+                <string>Файл глав (XML):</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLineEdit" name="chaptersXmlPathLineEdit">
+               <property name="placeholderText">
+                <string>Matroska chapters XML для этой серии (необязательно, если главы уже в контейнере)</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="browseChaptersXmlButton">
+               <property name="text">
+                <string>Обзор...</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item row="5" column="0">
            <layout class="QHBoxLayout" name="horizontalLayout_5">
             <item>
              <widget class="QLabel" name="label_41">
@@ -184,7 +223,7 @@
             </item>
            </layout>
           </item>
-          <item row="4" column="1">
+          <item row="5" column="1">
            <layout class="QHBoxLayout" name="horizontalLayout_51">
             <item>
              <widget class="QLabel" name="label_44">

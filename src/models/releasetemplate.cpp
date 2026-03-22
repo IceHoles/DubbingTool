@@ -44,6 +44,17 @@ void ReleaseTemplate::read(const QJsonObject& json)
     originalLanguage = json["originalLanguage"].toString("jpn");
     endingChapterName = json["endingChapterName"].toString();
     endingStartTime = json["endingStartTime"].toString();
+    if (json.contains(QStringLiteral("chaptersEnabled")))
+    {
+        chaptersEnabled = json[QStringLiteral("chaptersEnabled")].toBool(true);
+    }
+    else
+    {
+        // Миграция: старое поле expectsChapters или по умолчанию true
+        chaptersEnabled = json.contains(QStringLiteral("expectsChapters"))
+                                ? json[QStringLiteral("expectsChapters")].toBool()
+                                : true;
+    }
     useManualTime = json["useManualTime"].toBool(false);
     useOriginalAudio = json["useOriginalAudio"].toBool(true);
     generateTb = json["generateTb"].toBool(true);
@@ -120,6 +131,7 @@ void ReleaseTemplate::write(QJsonObject& json) const
     json["originalLanguage"] = originalLanguage;
     json["endingChapterName"] = endingChapterName;
     json["endingStartTime"] = endingStartTime;
+    json[QStringLiteral("chaptersEnabled")] = chaptersEnabled;
     json["useManualTime"] = useManualTime;
     json["useOriginalAudio"] = useOriginalAudio;
     json["generateTb"] = generateTb;

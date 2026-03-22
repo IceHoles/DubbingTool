@@ -8,9 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Главы (MKV / MP4):** модуль `ChapterHelper` — разбор Matroska XML и JSON ffprobe, запись XML для mkvmerge, ffmetadata и пост-обработка MP4 (`applyChaptersToMp4`) без дублирования chapter-track в контейнере (`-map 0:v -map 0:a`).
+- Шаблон: флаг ожидания глав (`chaptersEnabled`), предупреждение в `MissingFilesDialog`, если глав нет ни во входе, ни во внешнем XML; ручная сборка/рендер: свой XML глав, строка пути в UI.
+- **Ручная сборка — шрифты:** кнопка «Очистить список»; список очищается после **успешной** сборки MKV (следующая серия без «хвоста» прошлых шрифтов); `ManualAssembler::finished(bool success)`.
 - `docs/concat-cfr-debug-report.md` — отчёт по отладке concat (CFR/setts, швы, `\fad`, проверки ffprobe/framemd5).
 
 ### Changed
+- **Ручная сборка MKV (`ManualAssembler`):** явные флаги дорожек как в авто-сборке — русское аудио default, оригинал `default no`; надписи `default + forced`; полные субтитры `default no` и `forced no`.
+- **Авто-сборка MKV:** для полных субтитров добавлен явный `--forced-display-flag 0:no` (согласовано с ручным режимом).
 - **Concat TB (авто `WorkflowManager` + ручной `ConcatTbRenderer`):**
   - учёт B-frame overlap по длительности TS и `trim` в сегменте 2;
   - для MP4: поправка «щели» в ~1 кадр между хвостом seg1 и головой seg2 (framemd5 + шаг кадра);

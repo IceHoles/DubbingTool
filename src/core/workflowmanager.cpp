@@ -1,6 +1,7 @@
 #include "workflowmanager.h"
 
 #include "assprocessor.h"
+#include "chapterhelper.h"
 #include "fontfinder.h"
 #include "mainwindow.h"
 #include "manualrenderer.h"
@@ -392,6 +393,7 @@ WorkflowManager::WorkflowManager(ReleaseTemplate t, const QString& episodeNumber
     m_customRenderArgs = settings.value("render/custom_args", "").toString();
     m_overrideSubsPath = m_mainWindow->getOverrideSubsPath();
     m_overrideSignsPath = m_mainWindow->getOverrideSignsPath();
+    m_userChaptersXmlPath = m_mainWindow->getChaptersXmlPath();
     m_isNormalizationEnabled = m_mainWindow->isNormalizationEnabled();
     m_isSrtMasterDecoupled = m_mainWindow->isSrtSubsDecoupled();
 
@@ -418,6 +420,10 @@ WorkflowManager::~WorkflowManager()
 
 void WorkflowManager::start()
 {
+    m_skipChaptersForWorkflow = false;
+    m_chapterContinueKind = ChapterContinueKind::None;
+    m_pendingMkvInfoRoot = QJsonObject();
+
     QString baseDir = AppSettings::instance().effectiveProjectDirectory();
     QString sanitizedTitle = PathManager::sanitizeForPath(m_template.seriesTitle);
     QString baseDownloadPath = QString("%1/%2/Episode %3").arg(baseDir, sanitizedTitle, m_episodeNumberForSearch);
@@ -440,6 +446,10 @@ void WorkflowManager::downloadRss()
 
 void WorkflowManager::startWithManualFile(const QString& filePath)
 {
+    m_skipChaptersForWorkflow = false;
+    m_chapterContinueKind = ChapterContinueKind::None;
+    m_pendingMkvInfoRoot = QJsonObject();
+
     delete m_paths;
 
     UserFileAction fileAction = AppSettings::instance().userFileAction();
@@ -1211,6 +1221,23 @@ void WorkflowManager::getMkvInfo()
             return;
         }
 
+        loadChaptersForWorkflow();
+
+        if (m_template.chaptersEnabled && m_chapterMarkers.isEmpty() && !m_skipChaptersForWorkflow)
+        {
+            m_chapterContinueKind = ChapterContinueKind::AfterMkvProbe;
+            m_pendingMkvInfoRoot = root;
+            m_wasUserInputRequested = true;
+            m_lastStepBeforeRequest = Step::GettingMkvInfo;
+            UserInputRequest req;
+            req.chaptersRequired = true;
+            req.chaptersReason =
+                QStringLiteral("Для релиза ожидаются главы, но в контейнере не найдено и на главной странице не "
+                               "указан файл XML. Укажите путь к файлу глав или выберите сборку без глав.");
+            emit userInputRequired(req);
+            return;
+        }
+
         if (root.contains("attachments"))
         {
             extractAttachments(root["attachments"].toArray());
@@ -1652,6 +1679,7 @@ void WorkflowManager::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
 
 void WorkflowManager::finishWorkflow()
 {
+    maybeApplyChaptersToFinalMp4();
     emit logMessage("Все шаги автоматического процесса выполнены.", LogCategory::APP);
     emit filesReady(m_finalMkvPath, m_outputMp4Path);
     // Сигнал workflowAborted теперь используется только для ошибок или принудительной отмены.
@@ -2011,7 +2039,12 @@ void WorkflowManager::assembleMkv(const QString& russianAudioPath)
         args << "--attach-file" << path;
     }
 
-    // args << "--chapters" << m_mkvFilePath;
+    if (!m_chaptersMuxPathForMkv.isEmpty() && QFileInfo::exists(m_chaptersMuxPathForMkv))
+    {
+        args << "--chapters" << m_chaptersMuxPathForMkv;
+        emit logMessage(QStringLiteral("mkvmerge: добавлены главы (%1).").arg(m_chaptersMuxPathForMkv),
+                        LogCategory::APP);
+    }
 
     // Названия из шаблона
     QString animStudio = m_template.animationStudio;
@@ -2050,8 +2083,8 @@ void WorkflowManager::assembleMkv(const QString& russianAudioPath)
     }
     if (QFileInfo::exists(fullSubsPath))
     {
-        args << "--default-track-flag" << "0:no" << "--language" << "0:rus" << "--track-name"
-             << QString("0:Субтитры [%1]").arg(subTrackAuthorName) << fullSubsPath;
+        args << "--default-track-flag" << "0:no" << "--forced-display-flag" << "0:no" << "--language" << "0:rus"
+             << "--track-name" << QString("0:Субтитры [%1]").arg(subTrackAuthorName) << fullSubsPath;
     }
 
     emit progressUpdated(-1, "Сборка MKV");
@@ -3195,6 +3228,22 @@ void WorkflowManager::getMp4Info()
         return;
     }
 
+    loadChaptersForWorkflow();
+
+    if (m_template.chaptersEnabled && m_chapterMarkers.isEmpty() && !m_skipChaptersForWorkflow)
+    {
+        m_chapterContinueKind = ChapterContinueKind::AfterMp4Probe;
+        m_wasUserInputRequested = true;
+        m_lastStepBeforeRequest = Step::GettingMkvInfo;
+        UserInputRequest req;
+        req.chaptersRequired = true;
+        req.chaptersReason =
+            QStringLiteral("Для релиза ожидаются главы, но в контейнере не найдено и на главной странице не "
+                           "указан файл XML. Укажите путь к файлу глав или выберите сборку без глав.");
+        emit userInputRequired(req);
+        return;
+    }
+
     // MP4 не содержит attachments (шрифтов) - пропускаем этот шаг
     emit logMessage("MP4 файл не содержит вложенных шрифтов. Пропускаем извлечение вложений.", LogCategory::APP);
     m_currentStep = Step::ExtractingAttachments;
@@ -3251,7 +3300,32 @@ void WorkflowManager::resumeWithUserInput(const UserInputResponse& response)
     if (!response.isValid())
     {
         emit logMessage("Процесс прерван пользователем в диалоге выбора файлов.", LogCategory::APP);
+        m_chapterContinueKind = ChapterContinueKind::None;
+        m_pendingMkvInfoRoot = QJsonObject();
         emit workflowAborted();
+        return;
+    }
+
+    const bool chapterResume = (m_chapterContinueKind != ChapterContinueKind::None);
+    if (chapterResume)
+    {
+        if (response.buildWithoutChapters)
+        {
+            m_skipChaptersForWorkflow = true;
+            emit logMessage(QStringLiteral("Главы: сборка без глав в контейнере (по выбору пользователя)."),
+                            LogCategory::APP);
+        }
+        else if (!response.chaptersXmlPath.isEmpty())
+        {
+            m_userChaptersXmlPath = response.chaptersXmlPath.trimmed();
+            loadChaptersForWorkflow();
+            if (m_template.chaptersEnabled && m_chapterMarkers.isEmpty() && !m_skipChaptersForWorkflow)
+            {
+                warnIfExpectedChaptersMissing();
+            }
+        }
+        m_wasUserInputRequested = false;
+        continueWorkflowAfterChaptersResolved();
         return;
     }
 
@@ -3356,6 +3430,22 @@ void WorkflowManager::resumeWithSelectedAudioTrack(int trackId)
 
     emit logMessage("Пользователь выбрал аудиодорожку с ID: " + QString::number(trackId) + ". Продолжаем...",
                     LogCategory::APP);
+
+    loadChaptersForWorkflow();
+
+    if (m_template.chaptersEnabled && m_chapterMarkers.isEmpty() && !m_skipChaptersForWorkflow)
+    {
+        m_chapterContinueKind = ChapterContinueKind::AfterAudioTrack;
+        m_wasUserInputRequested = true;
+        m_lastStepBeforeRequest = Step::GettingMkvInfo;
+        UserInputRequest req;
+        req.chaptersRequired = true;
+        req.chaptersReason =
+            QStringLiteral("Для релиза ожидаются главы, но в контейнере не найдено и на главной странице не "
+                           "указан файл XML. Укажите путь к файлу глав или выберите сборку без глав.");
+        emit userInputRequired(req);
+        return;
+    }
 
     if (m_sourceFormat == SourceFormat::MP4)
     {
@@ -3618,6 +3708,183 @@ QString WorkflowManager::handleUserFile(const QString& sourcePath, const QString
                         sourcePath,
                     LogCategory::APP);
     return sourceInfo.absoluteFilePath();
+}
+
+void WorkflowManager::warnIfExpectedChaptersMissing()
+{
+    if (m_template.chaptersEnabled && m_chapterMarkers.isEmpty())
+    {
+        emit logMessage(QStringLiteral("ВНИМАНИЕ: для релиза ожидались главы, но ни встроенных, ни валидного "
+                                       "внешнего файла не найдено. Возможно, не приложен XML глав."),
+                        LogCategory::APP);
+    }
+}
+
+void WorkflowManager::loadChaptersForWorkflow()
+{
+    m_chaptersMuxPathForMkv.clear();
+    m_chapterMarkers.clear();
+
+    if (!m_template.chaptersEnabled || m_skipChaptersForWorkflow)
+    {
+        return;
+    }
+
+    const QString extPath = m_userChaptersXmlPath.trimmed();
+    if (!extPath.isEmpty() && QFileInfo::exists(extPath))
+    {
+        m_chapterMarkers = ChapterHelper::loadChaptersFromFile(extPath);
+        if (!m_chapterMarkers.isEmpty())
+        {
+            m_chaptersMuxPathForMkv = QFileInfo(extPath).absoluteFilePath();
+            emit logMessage(QStringLiteral("Главы: используется внешний файл: %1").arg(m_chaptersMuxPathForMkv),
+                            LogCategory::APP);
+        }
+        else
+        {
+            emit logMessage(
+                QStringLiteral("ПРЕДУПРЕЖДЕНИЕ: не удалось разобрать файл глав: %1").arg(extPath),
+                LogCategory::APP);
+        }
+        warnIfExpectedChaptersMissing();
+        return;
+    }
+    if (!extPath.isEmpty() && !QFileInfo::exists(extPath))
+    {
+        emit logMessage(QStringLiteral("ПРЕДУПРЕЖДЕНИЕ: файл глав не найден: %1").arg(extPath), LogCategory::APP);
+    }
+
+    if (m_sourceFormat == SourceFormat::MKV && QFileInfo::exists(m_mkvFilePath))
+    {
+        const QString embPath = QDir(m_paths->sourcesPath).filePath(QStringLiteral("chapters_embedded.xml"));
+        if (ChapterHelper::extractEmbeddedChaptersToFile(m_mkvextractPath, m_mkvFilePath, embPath, m_processManager))
+        {
+            m_chapterMarkers = ChapterHelper::loadChaptersFromFile(embPath);
+            if (!m_chapterMarkers.isEmpty())
+            {
+                const QString muxCopy = QDir(m_paths->sourcesPath).filePath(QStringLiteral("chapters_mux.xml"));
+                if (ChapterHelper::writeMatroskaChapterXml(m_chapterMarkers, muxCopy))
+                {
+                    m_chaptersMuxPathForMkv = muxCopy;
+                }
+                else
+                {
+                    m_chaptersMuxPathForMkv = QFileInfo(embPath).absoluteFilePath();
+                }
+                emit logMessage(QStringLiteral("Главы: взяты из встроенных глав MKV."), LogCategory::APP);
+            }
+        }
+    }
+    else if (m_sourceFormat == SourceFormat::MP4 && QFileInfo::exists(m_mkvFilePath))
+    {
+        const QString ffprobePath = AppSettings::instance().ffprobePath();
+        if (!ffprobePath.isEmpty() && QFileInfo::exists(ffprobePath))
+        {
+            QByteArray json;
+            const QStringList args = {QStringLiteral("-v"), QStringLiteral("quiet"), QStringLiteral("-show_chapters"),
+                                      QStringLiteral("-print_format"), QStringLiteral("json"),
+                                      QStringLiteral("-i"), m_mkvFilePath};
+            if (m_processManager->executeAndWait(ffprobePath, args, json))
+            {
+                m_chapterMarkers = ChapterHelper::parseFfprobeChaptersJson(json);
+                if (!m_chapterMarkers.isEmpty())
+                {
+                    const QString muxCopy = QDir(m_paths->sourcesPath).filePath(QStringLiteral("chapters_mux.xml"));
+                    if (ChapterHelper::writeMatroskaChapterXml(m_chapterMarkers, muxCopy))
+                    {
+                        m_chaptersMuxPathForMkv = muxCopy;
+                    }
+                    emit logMessage(QStringLiteral("Главы: взяты из встроенных метаданных MP4."), LogCategory::APP);
+                }
+            }
+        }
+    }
+}
+
+void WorkflowManager::continueWorkflowAfterChaptersResolved()
+{
+    switch (m_chapterContinueKind)
+    {
+    case ChapterContinueKind::None:
+        return;
+    case ChapterContinueKind::AfterMkvProbe:
+    {
+        QJsonObject root = m_pendingMkvInfoRoot;
+        m_pendingMkvInfoRoot = QJsonObject();
+        m_chapterContinueKind = ChapterContinueKind::None;
+        if (root.contains(QStringLiteral("attachments")))
+        {
+            extractAttachments(root[QStringLiteral("attachments")].toArray());
+        }
+        else
+        {
+            emit logMessage(QStringLiteral("Вложений в файле не найдено."), LogCategory::APP);
+            m_currentStep = Step::ExtractingAttachments;
+            QMetaObject::invokeMethod(this, "onProcessFinished", Qt::QueuedConnection, Q_ARG(int, 0),
+                                      Q_ARG(QProcess::ExitStatus, QProcess::NormalExit));
+        }
+        break;
+    }
+    case ChapterContinueKind::AfterMp4Probe:
+        m_chapterContinueKind = ChapterContinueKind::None;
+        emit logMessage(QStringLiteral("MP4 файл не содержит вложенных шрифтов. Пропускаем извлечение вложений."),
+                        LogCategory::APP);
+        m_currentStep = Step::ExtractingAttachments;
+        QMetaObject::invokeMethod(this, "onProcessFinished", Qt::QueuedConnection, Q_ARG(int, 0),
+                                  Q_ARG(QProcess::ExitStatus, QProcess::NormalExit));
+        break;
+    case ChapterContinueKind::AfterAudioTrack:
+        m_chapterContinueKind = ChapterContinueKind::None;
+        if (m_sourceFormat == SourceFormat::MP4)
+        {
+            emit logMessage(QStringLiteral("MP4 файл не содержит вложенных шрифтов. Пропускаем извлечение вложений."),
+                            LogCategory::APP);
+            m_currentStep = Step::ExtractingAttachments;
+            QMetaObject::invokeMethod(this, "onProcessFinished", Qt::QueuedConnection, Q_ARG(int, 0),
+                                      Q_ARG(QProcess::ExitStatus, QProcess::NormalExit));
+        }
+        else
+        {
+            QByteArray jsonData;
+            m_processManager->executeAndWait(m_mkvmergePath, {QStringLiteral("-J"), m_mkvFilePath}, jsonData);
+            QJsonDocument doc = QJsonDocument::fromJson(jsonData);
+            const QJsonObject obj = doc.object();
+            if (obj.contains(QStringLiteral("attachments")))
+            {
+                extractAttachments(obj[QStringLiteral("attachments")].toArray());
+            }
+            else
+            {
+                emit logMessage(QStringLiteral("Вложений в файле не найдено."), LogCategory::APP);
+                m_currentStep = Step::ExtractingAttachments;
+                QMetaObject::invokeMethod(this, "onProcessFinished", Qt::QueuedConnection, Q_ARG(int, 0),
+                                          Q_ARG(QProcess::ExitStatus, QProcess::NormalExit));
+            }
+        }
+        break;
+    }
+}
+
+void WorkflowManager::maybeApplyChaptersToFinalMp4()
+{
+    if (m_chapterMarkers.isEmpty() || m_outputMp4Path.isEmpty() || !QFileInfo::exists(m_outputMp4Path))
+    {
+        return;
+    }
+    const qint64 durNs =
+        m_sourceDurationS > 0 ? static_cast<qint64>(static_cast<double>(m_sourceDurationS) * 1e9) : 0;
+    QString err;
+    emit logMessage(QStringLiteral("Запись глав в финальный MP4..."), LogCategory::APP);
+    if (ChapterHelper::applyChaptersToMp4(m_outputMp4Path, m_chapterMarkers, durNs, m_ffmpegPath, m_processManager,
+                                          &err))
+    {
+        emit logMessage(QStringLiteral("Главы записаны в MP4."), LogCategory::APP);
+    }
+    else
+    {
+        emit logMessage(QStringLiteral("ПРЕДУПРЕЖДЕНИЕ: не удалось записать главы в MP4: %1").arg(err),
+                        LogCategory::APP);
+    }
 }
 
 void WorkflowManager::prepareUserFiles()

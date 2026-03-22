@@ -2,6 +2,7 @@
 
 #include "appsettings.h"
 #include "assprocessor.h"
+#include "chapterhelper.h"
 #include "processmanager.h"
 
 #include <QDir>
@@ -239,6 +240,7 @@ void ManualRenderer::start()
                             m_tempConcatSubsPath.clear();
                         }
                         m_concatRenderer = nullptr;
+                        applyChaptersIfNeeded();
                         emit finished();
                     });
             m_concatRenderer->start();
@@ -453,7 +455,56 @@ void ManualRenderer::onBitrateCheckFinished(RerenderDecision decision, const Ren
     }
     else
     {
+        applyChaptersIfNeeded();
         emit progressUpdated(100, "Рендер MP4");
         emit finished();
+    }
+}
+
+void ManualRenderer::applyChaptersIfNeeded()
+{
+    const QString ext = m_params.value(QStringLiteral("chaptersExternalPath")).toString().trimmed();
+    const QString inputMkv = m_params.value(QStringLiteral("inputMkv")).toString();
+    const bool transferEmbedded = m_params.value(QStringLiteral("transferEmbeddedChapters"), true).toBool();
+    const QString outMp4 = m_params.value(QStringLiteral("outputMp4")).toString();
+    if (outMp4.isEmpty())
+    {
+        return;
+    }
+
+    QList<ChapterMarker> markers;
+    if (!ext.isEmpty() && QFileInfo::exists(ext))
+    {
+        markers = ChapterHelper::loadChaptersFromFile(ext);
+    }
+    else if (transferEmbedded && !inputMkv.isEmpty())
+    {
+        const QString embPath =
+            QDir(QFileInfo(inputMkv).absolutePath()).filePath(QStringLiteral("manual_chapters_extract.xml"));
+        if (ChapterHelper::extractEmbeddedChaptersToFile(AppSettings::instance().mkvextractPath(), inputMkv, embPath,
+                                                         m_processManager))
+        {
+            markers = ChapterHelper::loadChaptersFromFile(embPath);
+        }
+    }
+
+    if (markers.isEmpty() || !QFileInfo::exists(outMp4))
+    {
+        return;
+    }
+
+    const qint64 durNs =
+        m_sourceDurationS > 0 ? static_cast<qint64>(static_cast<double>(m_sourceDurationS) * 1e9) : 0;
+    QString err;
+    emit logMessage(QStringLiteral("Запись глав в MP4..."), LogCategory::APP);
+    if (ChapterHelper::applyChaptersToMp4(outMp4, markers, durNs, AppSettings::instance().ffmpegPath(), m_processManager,
+                                          &err))
+    {
+        emit logMessage(QStringLiteral("Главы записаны в MP4."), LogCategory::APP);
+    }
+    else
+    {
+        emit logMessage(QStringLiteral("ПРЕДУПРЕЖДЕНИЕ: не удалось записать главы в MP4: %1").arg(err),
+                        LogCategory::APP);
     }
 }
