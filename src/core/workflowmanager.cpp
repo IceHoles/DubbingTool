@@ -2158,7 +2158,19 @@ QStringList WorkflowManager::prepareCommandArguments(const QString& commandTempl
         emit logMessage("Hardsub отключен. Фильтр субтитров удален из команды.", LogCategory::APP);
     }
 
-    return QProcess::splitCommand(processedTemplate);
+    QStringList args = QProcess::splitCommand(processedTemplate);
+    // Do not copy chapters from source MKV into the intermediate MP4; chapters are written later via ffmetadata
+    // (otherwise MediaInfo shows two chapter sets with conflicting times).
+    if (!m_chapterMarkers.isEmpty() && !m_skipChaptersForWorkflow)
+    {
+        const int outIdx = args.size() - 1;
+        if (outIdx >= 0)
+        {
+            args.insert(outIdx, QStringLiteral("-1"));
+            args.insert(outIdx, QStringLiteral("-map_chapters"));
+        }
+    }
+    return args;
 }
 
 // ==================== Smart Concat Render ====================

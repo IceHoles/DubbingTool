@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `docs/concat-cfr-debug-report.md` — отчёт по отладке concat (CFR/setts, швы, `\fad`, проверки ffprobe/framemd5).
 
 ### Changed
+- **Ручная сборка — главы:** путь к XML глав (`chaptersXmlPath`) учитывается **всегда**, если файл существует (не требуется галочка «Свой XML»). В режиме «Ручной» поле пути к XML показывается всегда. Рендер MP4: в команду ffmpeg добавлен `-map_chapters -1`, чтобы не копировать главы из исходного MKV в промежуточный MP4 перед записью глав из ffmetadata; при первой главе не с `00:00` добавляется техническая пустая глава `00:00`, чтобы FFmpeg не сдвигал `OP` в ноль.
 - **Ручная сборка MKV (`ManualAssembler`):** явные флаги дорожек как в авто-сборке — русское аудио default, оригинал `default no`; надписи `default + forced`; полные субтитры `default no` и `forced no`.
 - **Авто-сборка MKV:** для полных субтитров добавлен явный `--forced-display-flag 0:no` (согласовано с ручным режимом).
 - **Concat TB (авто `WorkflowManager` + ручной `ConcatTbRenderer`):**

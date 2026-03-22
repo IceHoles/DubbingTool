@@ -497,9 +497,18 @@ bool ChapterHelper::applyChaptersToMp4(const QString& mp4Path, const QList<Chapt
         }
         return false;
     }
+    QList<ChapterMarker> chaptersForMp4 = chapters;
+    if (!chaptersForMp4.isEmpty() && chaptersForMp4.first().startNs > 0)
+    {
+        ChapterMarker lead;
+        lead.startNs = 0;
+        lead.title = QStringLiteral(" ");
+        chaptersForMp4.prepend(lead);
+    }
+
     const QString dir = QFileInfo(mp4Path).absolutePath();
     const QString ffmetaPath = QDir(dir).filePath(QStringLiteral("chapters_apply.ffmeta"));
-    if (!writeFfmetadata(chapters, durationNs, ffmetaPath))
+    if (!writeFfmetadata(chaptersForMp4, durationNs, ffmetaPath))
     {
         if (errorMessage)
         {
@@ -510,9 +519,33 @@ bool ChapterHelper::applyChaptersToMp4(const QString& mp4Path, const QList<Chapt
     const QString tmpPath = mp4Path + QStringLiteral(".chapters_tmp.mp4");
     QFile::remove(tmpPath);
 
+    // Remux with -map_chapters -1 so the MP4 has no chapter atoms / menu tracks before we mux ffmetadata.
+    // (Encode pass may still leave chapter metadata in the file despite -map_chapters -1 on that command.)
+    const QString stripPath = mp4Path + QStringLiteral(".strip_chapters.mp4");
+    QFile::remove(stripPath);
+    QByteArray stripErr;
+    QStringList stripArgs;
+    stripArgs << QStringLiteral("-y") << QStringLiteral("-i") << QFileInfo(mp4Path).absoluteFilePath()
+              << QStringLiteral("-map") << QStringLiteral("0:v") << QStringLiteral("-map") << QStringLiteral("0:a")
+              << QStringLiteral("-map_chapters") << QStringLiteral("-1") << QStringLiteral("-codec") << QStringLiteral("copy")
+              << QFileInfo(stripPath).absoluteFilePath();
+    bool stripOk = proc->executeAndWait(ffmpegPath, stripArgs, stripErr);
+    if (!stripOk || !QFileInfo::exists(stripPath))
+    {
+        stripArgs.clear();
+        stripArgs << QStringLiteral("-y") << QStringLiteral("-i") << QFileInfo(mp4Path).absoluteFilePath()
+                  << QStringLiteral("-map") << QStringLiteral("0:v") << QStringLiteral("-map_chapters") << QStringLiteral("-1")
+                  << QStringLiteral("-codec") << QStringLiteral("copy") << QFileInfo(stripPath).absoluteFilePath();
+        stripErr.clear();
+        stripOk = proc->executeAndWait(ffmpegPath, stripArgs, stripErr);
+    }
+    const QString inputForChapterMux =
+        (stripOk && QFileInfo::exists(stripPath)) ? QFileInfo(stripPath).absoluteFilePath()
+                                                  : QFileInfo(mp4Path).absoluteFilePath();
+
     QStringList args;
-    // Only video+audio from the MP4 so an existing chapter/menu text track is not copied; chapters come from ffmetadata.
-    args << QStringLiteral("-y") << QStringLiteral("-i") << QFileInfo(mp4Path).absoluteFilePath() << QStringLiteral("-i")
+    // Only video+audio; chapters from ffmetadata (input 1).
+    args << QStringLiteral("-y") << QStringLiteral("-i") << inputForChapterMux << QStringLiteral("-i")
          << QFileInfo(ffmetaPath).absoluteFilePath() << QStringLiteral("-map") << QStringLiteral("0:v") << QStringLiteral("-map")
          << QStringLiteral("0:a") << QStringLiteral("-map_chapters") << QStringLiteral("1") << QStringLiteral("-codec")
          << QStringLiteral("copy") << QFileInfo(tmpPath).absoluteFilePath();
@@ -521,6 +554,7 @@ bool ChapterHelper::applyChaptersToMp4(const QString& mp4Path, const QList<Chapt
     if (!proc->executeAndWait(ffmpegPath, args, errOut))
     {
         QFile::remove(tmpPath);
+        QFile::remove(stripPath);
         if (errorMessage)
         {
             *errorMessage = QString::fromUtf8(errOut);
@@ -529,15 +563,19 @@ bool ChapterHelper::applyChaptersToMp4(const QString& mp4Path, const QList<Chapt
     }
     if (!QFileInfo::exists(tmpPath))
     {
+        QFile::remove(stripPath);
         if (errorMessage)
         {
             *errorMessage = QStringLiteral("output missing");
         }
         return false;
     }
+
     QFile::remove(mp4Path);
     if (!QFile::rename(tmpPath, mp4Path))
     {
+        QFile::remove(stripPath);
+        QFile::remove(tmpPath);
         QFile::remove(ffmetaPath);
         if (errorMessage)
         {
@@ -546,5 +584,6 @@ bool ChapterHelper::applyChaptersToMp4(const QString& mp4Path, const QList<Chapt
         return false;
     }
     QFile::remove(ffmetaPath);
+    QFile::remove(stripPath);
     return true;
 }

@@ -234,16 +234,8 @@ void ManualAssembler::processSubtitlesAndAssemble()
 
 QString ManualAssembler::resolveChaptersPathForMkvMerge()
 {
-    const bool tplEnabled = m_params.value(QStringLiteral("templateChaptersEnabled"), true).toBool();
-    if (!tplEnabled)
-    {
-        return {};
-    }
-
-    const bool useCustom = m_params.value(QStringLiteral("useCustomChaptersXml")).toBool();
     const QString customPath = m_params.value(QStringLiteral("chaptersXmlPath")).toString().trimmed();
-
-    if (useCustom && !customPath.isEmpty())
+    if (!customPath.isEmpty())
     {
         if (QFileInfo::exists(customPath))
         {
@@ -252,6 +244,12 @@ QString ManualAssembler::resolveChaptersPathForMkvMerge()
             return abs;
         }
         emit logMessage(QStringLiteral("ПРЕДУПРЕЖДЕНИЕ: файл глав не найден: %1").arg(customPath), LogCategory::APP);
+    }
+
+    const bool tplEnabled = m_params.value(QStringLiteral("templateChaptersEnabled"), true).toBool();
+    if (!tplEnabled)
+    {
+        return {};
     }
 
     const QString videoPath = m_params.value(QStringLiteral("videoPath")).toString();

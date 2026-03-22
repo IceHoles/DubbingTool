@@ -343,8 +343,21 @@ QStringList ManualRenderer::prepareCommandArguments(const QString& commandTempla
     }
     processedTemplate.replace("%INPUT%", inputMkv);
 
-    // 3. Используем QProcess для безопасного разбора готовой строки в список аргументов
-    return QProcess::splitCommand(processedTemplate);
+    QStringList args = QProcess::splitCommand(processedTemplate);
+    const QString extCh = m_params.value(QStringLiteral("chaptersExternalPath")).toString().trimmed();
+    const bool xfer = m_params.value(QStringLiteral("transferEmbeddedChapters"), true).toBool();
+    const bool willApplyChaptersLater =
+        (!extCh.isEmpty() && QFileInfo::exists(extCh)) || (xfer && QFileInfo::exists(inputMkv));
+    if (willApplyChaptersLater)
+    {
+        const int outIdx = args.size() - 1;
+        if (outIdx >= 0)
+        {
+            args.insert(outIdx, QStringLiteral("-1"));
+            args.insert(outIdx, QStringLiteral("-map_chapters"));
+        }
+    }
+    return args;
 }
 
 void ManualRenderer::cancelOperation()

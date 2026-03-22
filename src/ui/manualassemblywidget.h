@@ -46,6 +46,7 @@ private slots:
 private:
     void browseForFile(QLineEdit* lineEdit, const QString& caption, const QString& filter);
     void updateUiState(bool isManualMode);
+    void updateChaptersUiVisibility();
     FontFinder* m_fontFinder;
     QIcon m_templateModeIcon;
     QIcon m_manualModeIcon;

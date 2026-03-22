@@ -27,18 +27,14 @@ ManualAssemblyWidget::ManualAssemblyWidget(QWidget* parent)
     connect(ui->modeSwitchButton, &QToolButton::toggled, this, &ManualAssemblyWidget::onModeSwitched);
     connect(ui->convertAudioCheckBox, &QCheckBox::toggled, ui->convertAudioFormatComboBox, &QComboBox::setVisible);
     connect(ui->manualChaptersCustomCheckBox, &QCheckBox::toggled, this,
-            [this](bool on)
+            [this](bool)
             {
-                if (!ui->manualChaptersCustomCheckBox->isVisible())
-                {
-                    return;
-                }
-                ui->manualChaptersXmlPathRowWidget->setVisible(on);
+                updateChaptersUiVisibility();
             });
     ui->modeSwitchButton->setChecked(false);
     onModeSwitched(false);
     ui->convertAudioFormatComboBox->setVisible(ui->convertAudioCheckBox->isChecked());
-    ui->manualChaptersXmlPathRowWidget->setVisible(false);
+    updateChaptersUiVisibility();
 }
 
 ManualAssemblyWidget::~ManualAssemblyWidget()
@@ -72,6 +68,18 @@ void ManualAssemblyWidget::updateUiState(bool isManualMode)
         ui->modeSwitchButton->setText("Режим по шаблону");
         ui->modeSwitchButton->setToolTip("Переключить в ручной режим");
     }
+
+    updateChaptersUiVisibility();
+}
+
+void ManualAssemblyWidget::updateChaptersUiVisibility()
+{
+    const bool manualMode = ui->modeSwitchButton->isChecked();
+    const bool chaptersUi = m_templateChaptersEnabled || manualMode;
+    ui->manualChaptersCustomCheckBox->setVisible(chaptersUi);
+    const bool showPathRow =
+        manualMode || (chaptersUi && ui->manualChaptersCustomCheckBox->isChecked());
+    ui->manualChaptersXmlPathRowWidget->setVisible(showPathRow);
 }
 
 void ManualAssemblyWidget::updateTemplateList(const QStringList& templateNames)
@@ -114,15 +122,9 @@ void ManualAssemblyWidget::on_templateComboBox_currentIndexChanged(int index)
 void ManualAssemblyWidget::onTemplateDataReceived(const ReleaseTemplate& t)
 {
     m_templateChaptersEnabled = t.chaptersEnabled;
-    ui->manualChaptersCustomCheckBox->setVisible(t.chaptersEnabled);
-    if (!t.chaptersEnabled)
+    if (!t.chaptersEnabled && !ui->modeSwitchButton->isChecked())
     {
         ui->manualChaptersCustomCheckBox->setChecked(false);
-        ui->manualChaptersXmlPathRowWidget->setVisible(false);
-    }
-    else
-    {
-        ui->manualChaptersXmlPathRowWidget->setVisible(ui->manualChaptersCustomCheckBox->isChecked());
     }
 
     ui->tbStartTimeEdit->setTime(QTime::fromString(t.endingStartTime, "H:mm:ss.zzz"));
@@ -135,6 +137,8 @@ void ManualAssemblyWidget::onTemplateDataReceived(const ReleaseTemplate& t)
     ui->tbStyleComboBox->setCurrentText(t.defaultTbStyleName);
 
     ui->outputFileNameEdit->setText(QString("[DUB] %1 - 00.mkv").arg(t.seriesTitle));
+
+    updateChaptersUiVisibility();
 }
 
 void ManualAssemblyWidget::browseForFile(QLineEdit* lineEdit, const QString& caption, const QString& filter)
