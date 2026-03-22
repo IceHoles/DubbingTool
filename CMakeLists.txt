@@ -23,12 +23,14 @@ find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network Xml Multimedia Mul
 # Source files organized by module
 set(SOURCES_CORE
     src/core/appsettings.cpp
+    src/core/chapterhelper.cpp
     src/core/processmanager.cpp
     src/core/workflowmanager.cpp
 )
 
 set(SOURCES_PROCESSING
     src/processing/assprocessor.cpp
+    src/processing/concattbrenderer.cpp
     src/processing/fontfinder.cpp
     src/processing/manualassembler.cpp
     src/processing/manualrenderer.cpp
@@ -61,12 +63,14 @@ set(SOURCES_MODELS
 
 set(HEADERS_CORE
     src/core/appsettings.h
+    src/core/chapterhelper.h
     src/core/processmanager.h
     src/core/workflowmanager.h
 )
 
 set(HEADERS_PROCESSING
     src/processing/assprocessor.h
+    src/processing/concattbrenderer.h
     src/processing/fontfinder.h
     src/processing/manualassembler.h
     src/processing/manualrenderer.h

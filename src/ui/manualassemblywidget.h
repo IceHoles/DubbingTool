@@ -24,6 +24,9 @@ public:
 
     void updateTemplateList(const QStringList& templateNames);
 
+    /// Clears the font attachment list (e.g. after a successful MKV build for the next episode).
+    void clearFontsList();
+
 private slots:
     void on_browseVideo_clicked();
     void on_browseOriginalAudio_clicked();
@@ -32,18 +35,22 @@ private slots:
     void on_browseSigns_clicked();
     void on_analyzeSubsButton_clicked();
     void on_addFontsButton_clicked();
+    void on_clearFontsButton_clicked();
     void on_assembleButton_clicked();
     void on_templateComboBox_currentIndexChanged(int index);
     void on_browseWorkDirButton_clicked();
+    void on_browseChaptersXmlManualAssemblyButton_clicked();
     void onFontFinderFinished(const FontFinderResult& result);
     void onModeSwitched(bool isManualMode);
 
 private:
     void browseForFile(QLineEdit* lineEdit, const QString& caption, const QString& filter);
     void updateUiState(bool isManualMode);
+    void updateChaptersUiVisibility();
     FontFinder* m_fontFinder;
     QIcon m_templateModeIcon;
     QIcon m_manualModeIcon;
+    bool m_templateChaptersEnabled = true;
 
     Ui::ManualAssemblyWidget* ui;
 signals:

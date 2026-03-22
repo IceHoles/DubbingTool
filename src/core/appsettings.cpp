@@ -395,6 +395,22 @@ void AppSettings::setTbStyles(const QList<TbStyleInfo>& styles)
 {
     m_tbStyles = styles;
 }
+bool AppSettings::isNugenAmbAvailable() const
+{
+    if (m_nugenAmbPath.isEmpty())
+    {
+        return false;
+    }
+
+    QFileInfo nugenInfo(m_nugenAmbPath);
+    if (!nugenInfo.exists())
+    {
+        return false;
+    }
+
+    const QString ambCmdPath = nugenInfo.dir().filePath("AMBCmd.exe");
+    return QFileInfo::exists(ambCmdPath);
+}
 QList<RenderPreset> AppSettings::renderPresets() const
 {
     return m_renderPresets;

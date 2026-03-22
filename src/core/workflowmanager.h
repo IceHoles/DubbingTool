@@ -3,6 +3,7 @@
 
 #include "appsettings.h"
 #include "assprocessor.h"
+#include "chapterhelper.h"
 #include "fontfinder.h"
 #include "postgenerator.h"
 #include "processmanager.h"
@@ -17,6 +18,7 @@
 #include <QNetworkAccessManager>
 #include <QNetworkCookie>
 #include <QNetworkReply>
+#include <QJsonObject>
 #include <QObject>
 #include <QSettings>
 #include <QTimer>
@@ -42,10 +44,12 @@ struct UserInputRequest
     QString tbTimeReason;
     QString videoFilePath;       // Path to source video for TB viewfinder preview
     double videoDurationS = 0.0; // Source video duration in seconds
+    bool chaptersRequired = false;
+    QString chaptersReason;
 
     bool isValid() const
     {
-        return audioFileRequired || !missingFonts.isEmpty() || tbTimeRequired;
+        return audioFileRequired || !missingFonts.isEmpty() || tbTimeRequired || chaptersRequired;
     }
 };
 
@@ -54,10 +58,13 @@ struct UserInputResponse
     QString audioPath;
     QMap<QString, QString> resolvedFonts;
     QString time;
+    QString chaptersXmlPath;
+    bool buildWithoutChapters = false;
 
     bool isValid() const
     {
-        return !audioPath.isEmpty() || !resolvedFonts.isEmpty() || !time.isEmpty();
+        return !audioPath.isEmpty() || !resolvedFonts.isEmpty() || !time.isEmpty() || !chaptersXmlPath.isEmpty()
+               || buildWithoutChapters;
     }
 };
 
@@ -290,6 +297,21 @@ private:
     void concatCleanup();
     static QString concatEncoderForCodec(const QString& codecExtension);
     void prepareUserFiles();
+    void loadChaptersForWorkflow();
+    void warnIfExpectedChaptersMissing();
+    void continueWorkflowAfterChaptersResolved();
+
+    enum class ChapterContinueKind
+    {
+        None,
+        AfterMkvProbe,
+        AfterMp4Probe,
+        AfterAudioTrack
+    };
+    ChapterContinueKind m_chapterContinueKind = ChapterContinueKind::None;
+    QJsonObject m_pendingMkvInfoRoot;
+    bool m_skipChaptersForWorkflow = false;
+    void maybeApplyChaptersToFinalMp4();
     void finishWorkflow();
     void processSubtitles();
     void runAssProcessing();
@@ -322,7 +344,11 @@ private:
     QString m_parsedEndingTime;
     QString m_overrideSubsPath;
     QString m_overrideSignsPath;
+    QString m_userChaptersXmlPath;
     QString m_originalAudioPathBeforeNormalization;
+
+    QString m_chaptersMuxPathForMkv;
+    QList<ChapterMarker> m_chapterMarkers;
 
     SourceFormat m_sourceFormat = SourceFormat::Unknown;
 
@@ -347,6 +373,8 @@ private:
         QString extension;
         int bitrateKbps = 0;
         QString frameRate; // e.g. "25/1", "24000/1001"
+        QString avgFrameRate;
+        bool isCfr = false;
     };
 
     FontFinder* m_fontFinder;

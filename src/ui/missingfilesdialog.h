@@ -32,6 +32,8 @@ public:
     void setAudioPathVisible(bool visible);
     void setMissingFonts(const QStringList& fontNames);
     void setTimeInputVisible(bool visible);
+    void setChaptersInputVisible(bool visible);
+    void setChaptersPrompt(const QString& text);
     void setAudioPrompt(const QString& text);
     void setTimePrompt(const QString& text);
 
@@ -45,9 +47,12 @@ public:
     [[nodiscard]] QString getAudioPath() const;
     [[nodiscard]] QMap<QString, QString> getResolvedFonts() const;
     [[nodiscard]] QString getTime() const;
+    [[nodiscard]] QString getChaptersXmlPath() const;
+    [[nodiscard]] bool getBuildWithoutChapters() const;
 
 private slots:
     void on_browseAudioButton_clicked();
+    void on_browseChaptersButton_clicked();
     void on_fontsListWidget_itemDoubleClicked(QListWidgetItem* item);
     void slotOpenInPlayer();
     void slotSliderValueChanged(int value);

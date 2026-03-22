@@ -37,6 +37,17 @@ ManualRenderWidget::ManualRenderWidget(QWidget* parent) : QWidget(parent), ui(ne
                 }
             });
 
+    connect(ui->browseChaptersManualButton, &QPushButton::clicked, this,
+            [this]()
+            {
+                QString path = QFileDialog::getOpenFileName(this, "Файл глав Matroska XML", "",
+                                                            "XML (*.xml);;Все файлы (*)");
+                if (!path.isEmpty())
+                {
+                    ui->chaptersExternalPathManualEdit->setText(path);
+                }
+            });
+
     updateHardsubOptions();
 }
 
@@ -178,6 +189,14 @@ void ManualRenderWidget::updateHardsubOptions()
 {
     bool hardsubEnabled = ui->hardsubCheckBox->isChecked();
     ui->hardsubOptionsGroup->setEnabled(hardsubEnabled);
+    if (auto* concatTbCheckBox = findChild<QCheckBox*>("concatTbCheckBox"))
+    {
+        concatTbCheckBox->setEnabled(hardsubEnabled);
+        if (!hardsubEnabled)
+        {
+            concatTbCheckBox->setChecked(false);
+        }
+    }
 
     if (hardsubEnabled)
     {
@@ -196,6 +215,14 @@ QVariantMap ManualRenderWidget::getParameters() const
 
     bool useHardsub = ui->hardsubCheckBox->isChecked();
     params["useHardsub"] = useHardsub;
+    bool useConcatTb = false;
+    if (auto* concatTbCheckBox = findChild<QCheckBox*>("concatTbCheckBox"))
+    {
+        useConcatTb = concatTbCheckBox->isChecked();
+    }
+    params["useConcatTb"] = useConcatTb;
+    params["chaptersExternalPath"] = ui->chaptersExternalPathManualEdit->text().trimmed();
+    params["transferEmbeddedChapters"] = ui->transferEmbeddedChaptersCheckBox->isChecked();
 
     if (useHardsub)
     {

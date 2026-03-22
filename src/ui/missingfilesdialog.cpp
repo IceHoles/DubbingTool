@@ -4,6 +4,7 @@
 #include "ui_missingfilesdialog.h"
 
 #include <QAudioOutput>
+#include <QCheckBox>
 #include <QDesktopServices>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -21,6 +22,18 @@ MissingFilesDialog::MissingFilesDialog(QWidget* parent) : QDialog(parent), ui(ne
     ui->audioGroupBox->setVisible(false);
     ui->fontsGroupBox->setVisible(false);
     ui->timeGroupBox->setVisible(false);
+    ui->chaptersGroupBox->setVisible(false);
+
+    connect(ui->buildWithoutChaptersCheckBox, &QCheckBox::toggled, this,
+            [this](bool without)
+            {
+                ui->chaptersPathEdit->setEnabled(!without);
+                ui->browseChaptersButton->setEnabled(!without);
+                if (without)
+                {
+                    ui->chaptersPathEdit->clear();
+                }
+            });
 
     // Prepare the container layout for the video widget (widget added later in setVideoFile)
     auto* containerLayout = new QVBoxLayout(ui->videoContainer);
@@ -85,9 +98,45 @@ void MissingFilesDialog::setTimeInputVisible(bool visible)
     ui->timeGroupBox->setVisible(visible);
 }
 
+void MissingFilesDialog::setChaptersInputVisible(bool visible)
+{
+    ui->chaptersGroupBox->setVisible(visible);
+    if (!visible)
+    {
+        ui->chaptersPathEdit->clear();
+        ui->buildWithoutChaptersCheckBox->setChecked(false);
+    }
+}
+
+void MissingFilesDialog::setChaptersPrompt(const QString& text)
+{
+    ui->chaptersLabel->setText(text);
+}
+
 QString MissingFilesDialog::getTime() const
 {
     return ui->timeEdit->time().toString("H:mm:ss.zzz");
+}
+
+QString MissingFilesDialog::getChaptersXmlPath() const
+{
+    return ui->chaptersPathEdit->text().trimmed();
+}
+
+bool MissingFilesDialog::getBuildWithoutChapters() const
+{
+    return ui->buildWithoutChaptersCheckBox->isChecked();
+}
+
+void MissingFilesDialog::on_browseChaptersButton_clicked()
+{
+    QString path = QFileDialog::getOpenFileName(this, "Файл глав Matroska (XML)", "",
+                                                "XML (*.xml);;Все файлы (*)");
+    if (!path.isEmpty())
+    {
+        ui->buildWithoutChaptersCheckBox->setChecked(false);
+        ui->chaptersPathEdit->setText(path);
+    }
 }
 
 void MissingFilesDialog::setVideoFile(const QString& videoPath, double durationS)

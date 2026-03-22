@@ -3,6 +3,7 @@
 
 #include "appsettings.h"
 #include "renderhelper.h"
+#include "concattbrenderer.h"
 
 #include <QDir>
 #include <QObject>
@@ -55,12 +56,15 @@ private:
     };
     void runPass(Step pass);
     QStringList prepareCommandArguments(const QString& commandTemplate);
+    void applyChaptersIfNeeded();
 
     Step m_currentStep = Step::Idle;
     QVariantMap m_params;
     ProcessManager* m_processManager;
     qint64 m_sourceDurationS = 0;
     RenderPreset m_preset;
+    ConcatTbRenderer* m_concatRenderer = nullptr;
+    QString m_tempConcatSubsPath;
 };
 
 #endif // MANUALRENDERER_H

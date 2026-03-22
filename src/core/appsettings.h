@@ -83,6 +83,7 @@ public:
     [[nodiscard]] QString effectiveProjectDirectory() const;
     QList<TbStyleInfo> tbStyles() const;
     void setTbStyles(const QList<TbStyleInfo>& styles);
+    [[nodiscard]] bool isNugenAmbAvailable() const;
     TbStyleInfo findTbStyle(const QString& name) const;
     QList<RenderPreset> renderPresets() const;
     void setRenderPresets(const QList<RenderPreset>& presets);

@@ -14,7 +14,8 @@ public:
     ~ProcessManager();
 
     void startProcess(const QString& program, const QStringList& arguments);
-    bool executeAndWait(const QString& program, const QStringList& arguments, QByteArray& output);
+    bool executeAndWait(const QString& program, const QStringList& arguments, QByteArray& output,
+                        int timeoutMs = 30000);
     void killProcess();
     bool wasKilled() const;
     void setWorkingDirectory(const QString& dir)

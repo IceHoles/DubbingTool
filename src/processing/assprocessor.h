@@ -3,6 +3,7 @@
 
 #include "appsettings.h"
 #include "releasetemplate.h"
+#include "concattbrenderer.h"
 
 #include <QObject>
 #include <QStringList>
@@ -25,6 +26,7 @@ public:
     bool convertToSrt(const QString& inputAssPath, const QString& outputSrtPath, const QStringList& signStyles);
     bool applySubstitutions(const QString& filePath, const QMap<QString, QString>& substitutions);
     static int calculateTbLineCount(const ReleaseTemplate& t);
+    static TbSegment detectTbSegmentFromFile(const QString& assPath);
 
 signals:
     void logMessage(const QString&, LogCategory);

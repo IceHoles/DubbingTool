@@ -63,6 +63,50 @@
     </widget>
    </item>
    <item>
+    <widget class="QGroupBox" name="groupBox_chapters_manual">
+     <property name="title">
+      <string>Главы (опционально)</string>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_chapters_manual_outer">
+      <item>
+       <widget class="QCheckBox" name="transferEmbeddedChaptersCheckBox">
+        <property name="text">
+         <string>Переносить встроенные главы из MKV, если файл не указан</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout_chapters_manual">
+        <item>
+         <widget class="QLabel" name="label_chapters_manual">
+          <property name="text">
+           <string>Файл глав (XML):</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLineEdit" name="chaptersExternalPathManualEdit">
+          <property name="placeholderText">
+           <string>Необязательно; при отключённой галочке встроенные главы не переносятся</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="browseChaptersManualButton">
+          <property name="text">
+           <string>Обзор...</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
    <widget class="QGroupBox" name="groupBox_2">
     <property name="title">
      <string>Параметры рендера</string>
@@ -81,6 +125,13 @@
         <widget class="QComboBox" name="renderPresetComboBox"/>
        </item>
       </layout>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="concatTbCheckBox">
+       <property name="text">
+        <string>Умный рендер (concat) — перекодировать только ТБ</string>
+       </property>
+      </widget>
      </item>
      <item>
       <widget class="QCheckBox" name="hardsubCheckBox">

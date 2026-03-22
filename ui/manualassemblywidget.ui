@@ -251,6 +251,13 @@
          </widget>
         </item>
         <item>
+         <widget class="QCheckBox" name="manualChaptersCustomCheckBox">
+          <property name="text">
+           <string>Свой XML глав</string>
+          </property>
+         </widget>
+        </item>
+        <item>
          <spacer name="horizontalSpacer_2">
           <property name="orientation">
            <enum>Qt::Orientation::Horizontal</enum>
@@ -264,6 +271,45 @@
          </spacer>
         </item>
        </layout>
+      </item>
+      <item row="6" column="0" colspan="4">
+       <widget class="QWidget" name="manualChaptersXmlPathRowWidget">
+        <layout class="QHBoxLayout" name="horizontalLayout_chapters_ma">
+         <property name="leftMargin">
+          <number>0</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>0</number>
+         </property>
+         <property name="bottomMargin">
+          <number>0</number>
+         </property>
+         <item>
+          <widget class="QLabel" name="label_chapters_ma">
+           <property name="text">
+            <string>Файл глав (XML):</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="chaptersXmlPathManualAssemblyEdit">
+           <property name="placeholderText">
+            <string>Путь к Matroska chapters XML</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="browseChaptersXmlManualAssemblyButton">
+           <property name="text">
+            <string>Обзор...</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
       </item>
      </layout>
     </widget>
@@ -439,6 +485,16 @@
            <widget class="QPushButton" name="addFontsButton">
             <property name="text">
              <string>Добавить вручную...</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="clearFontsButton">
+            <property name="toolTip">
+             <string>Удалить все шрифты из списка</string>
+            </property>
+            <property name="text">
+             <string>Очистить список</string>
             </property>
            </widget>
           </item>

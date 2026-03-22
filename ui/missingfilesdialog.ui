@@ -215,6 +215,50 @@
     </widget>
    </item>
    <item>
+    <widget class="QGroupBox" name="chaptersGroupBox">
+     <property name="title">
+      <string>Главы</string>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_chapters">
+      <item>
+       <widget class="QLabel" name="chaptersLabel">
+        <property name="text">
+         <string>Для релиза ожидаются главы, но они не найдены. Укажите XML или соберите без глав.</string>
+        </property>
+        <property name="wordWrap">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="buildWithoutChaptersCheckBox">
+        <property name="text">
+         <string>Собрать без глав в контейнере</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout_chapters">
+        <item>
+         <widget class="QLineEdit" name="chaptersPathEdit">
+          <property name="placeholderText">
+           <string>Matroska chapters XML</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="browseChaptersButton">
+          <property name="text">
+           <string>Обзор...</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
     <widget class="QDialogButtonBox" name="buttonBox">
      <property name="orientation">
       <enum>Qt::Orientation::Horizontal</enum>

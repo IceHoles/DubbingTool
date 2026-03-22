@@ -447,6 +447,126 @@ QString AssProcessor::balanceCastLine(const QStringList& actors, bool shouldSort
     return bestLine1.join(", ") + ",\\N" + bestLine2.join(", ");
 }
 
+TbSegment AssProcessor::detectTbSegmentFromFile(const QString& assPath)
+{
+    auto parseAssTimeToSeconds = [](const QString& raw, double& secondsOut) -> bool
+    {
+        // ASS timestamps are usually h:mm:ss.cc (centiseconds), but sometimes come as h:mm:ss.zzz.
+        const QString value = raw.trimmed();
+        const QStringList hms = value.split(':');
+        if (hms.size() != 3)
+        {
+            return false;
+        }
+
+        bool okH = false;
+        bool okM = false;
+        int hours = hms[0].toInt(&okH);
+        int minutes = hms[1].toInt(&okM);
+        if (!okH || !okM)
+        {
+            return false;
+        }
+
+        const QStringList secParts = hms[2].split('.');
+        if (secParts.isEmpty())
+        {
+            return false;
+        }
+
+        bool okS = false;
+        int wholeSeconds = secParts[0].toInt(&okS);
+        if (!okS)
+        {
+            return false;
+        }
+
+        double fractional = 0.0;
+        if (secParts.size() > 1)
+        {
+            QString fraction = secParts[1].left(3);
+            while (fraction.size() < 3)
+            {
+                fraction.append('0');
+            }
+            bool okMs = false;
+            int ms = fraction.toInt(&okMs);
+            if (!okMs)
+            {
+                return false;
+            }
+            fractional = static_cast<double>(ms) / 1000.0;
+        }
+
+        secondsOut = static_cast<double>(hours) * 3600.0 + static_cast<double>(minutes) * 60.0 +
+                     static_cast<double>(wholeSeconds) + fractional;
+        return true;
+    };
+
+    TbSegment segment;
+    QFile file(assPath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        return segment;
+    }
+
+    QTextStream in(&file);
+    in.setEncoding(QStringConverter::Utf8);
+
+    bool inEvents = false;
+    while (!in.atEnd())
+    {
+        const QString line = in.readLine();
+        if (line.trimmed().compare("[Events]", Qt::CaseInsensitive) == 0)
+        {
+            inEvents = true;
+            continue;
+        }
+        if (!inEvents)
+        {
+            continue;
+        }
+        if (!line.startsWith("Dialogue:", Qt::CaseInsensitive))
+        {
+            continue;
+        }
+
+        QString rest = line.mid(QStringLiteral("Dialogue:").length());
+        QStringList parts = rest.split(',');
+        if (parts.size() < 3)
+        {
+            continue;
+        }
+
+        double startS = 0.0;
+        double endS = 0.0;
+        if (!parseAssTimeToSeconds(parts[1], startS) || !parseAssTimeToSeconds(parts[2], endS))
+        {
+            continue;
+        }
+
+        if (!segment.isValid())
+        {
+            segment.startSeconds = startS;
+            segment.endSeconds = endS;
+        }
+        else
+        {
+            if (startS < segment.startSeconds)
+            {
+                segment.startSeconds = startS;
+            }
+            if (endS > segment.endSeconds)
+            {
+                segment.endSeconds = endS;
+            }
+        }
+    }
+
+    return segment;
+}
+
+
 QStringList AssProcessor::generateTb(const ReleaseTemplate& t, const QString& startTime, int detectedResX)
 {
     if (!t.generateTb)

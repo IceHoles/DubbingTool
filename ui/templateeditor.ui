@@ -197,6 +197,16 @@
          </property>
         </widget>
        </item>
+       <item row="14" column="0" colspan="2">
+        <widget class="QCheckBox" name="chaptersEnabledCheckBox">
+         <property name="text">
+          <string>Включить главы в релизе (файл XML для серии — на главной странице автоматического режима)</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
       </layout>
      </widget>
      <widget class="QWidget" name="tabSubtitles">

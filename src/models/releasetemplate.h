@@ -48,6 +48,8 @@ public:
     QStringList signStyles;           // Стили ASS, которые считаются надписями
     QString endingChapterName;        // Название главы MKV, обозначающей эндинг
     QString endingStartTime;          // Тайминг эндинга, если нет главы
+    /// Если true — в авто-режиме показывается поле пути к XML глав на главной странице; при отсутствии глав — предупреждение в лог.
+    bool chaptersEnabled = true;
     bool useManualTime = false;       // Использовать тайминг по парсингу главы
     bool useOriginalAudio = false;    // Использовать оригинальную аудиодорожку
     bool generateTb = true;           // Генерировать ТБ?
