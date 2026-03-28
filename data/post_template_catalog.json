@@ -1,0 +1,226 @@
+{
+    "postTemplateMeta": {
+        "custom_10": {
+            "builtin": false,
+            "category": "tg_post",
+            "platform": "telegram",
+            "sortOrder": 1009,
+            "tags": [
+            ],
+            "title": "Дубляж TVOЁ"
+        },
+        "custom_11": {
+            "builtin": false,
+            "category": "tg_post",
+            "platform": "telegram",
+            "sortOrder": 1010,
+            "tags": [
+            ],
+            "title": "Студийный Дубляж"
+        },
+        "custom_12": {
+            "builtin": false,
+            "category": "tg_post",
+            "platform": "telegram",
+            "sortOrder": 1011,
+            "tags": [
+            ],
+            "title": "По Заказу"
+        },
+        "custom_13": {
+            "builtin": false,
+            "category": "vk_post",
+            "platform": "vk",
+            "sortOrder": 1012,
+            "tags": [
+            ],
+            "title": "Закадр (+лок-ция)"
+        },
+        "custom_14": {
+            "builtin": false,
+            "category": "vk_post",
+            "platform": "vk",
+            "sortOrder": 1013,
+            "tags": [
+            ],
+            "title": "Закадр ТВОЕ"
+        },
+        "custom_15": {
+            "builtin": false,
+            "category": "vk_post",
+            "platform": "vk",
+            "sortOrder": 1014,
+            "tags": [
+            ],
+            "title": "Студийный Дубляж"
+        },
+        "custom_16": {
+            "builtin": false,
+            "category": "vk_post",
+            "platform": "vk",
+            "sortOrder": 1015,
+            "tags": [
+            ],
+            "title": "Дубляж TVOЁ"
+        },
+        "custom_17": {
+            "builtin": false,
+            "category": "vk_post",
+            "platform": "vk",
+            "sortOrder": 1016,
+            "tags": [
+            ],
+            "title": "Дубляж (+лок-ция)"
+        },
+        "custom_18": {
+            "builtin": false,
+            "category": "vk_post",
+            "platform": "vk",
+            "sortOrder": 1017,
+            "tags": [
+            ],
+            "title": "По Заказу"
+        },
+        "custom_19": {
+            "builtin": false,
+            "category": "vk_comment",
+            "platform": "vk",
+            "sortOrder": 1018,
+            "tags": [
+            ],
+            "title": "1 Серия"
+        },
+        "custom_20": {
+            "builtin": false,
+            "category": "vk_comment",
+            "platform": "vk",
+            "sortOrder": 1019,
+            "tags": [
+            ],
+            "title": "> 1 Серии"
+        },
+        "custom_21": {
+            "builtin": false,
+            "category": "vk_comment",
+            "platform": "vk",
+            "sortOrder": 1020,
+            "tags": [
+            ],
+            "title": "1 Серия Янима"
+        },
+        "custom_22": {
+            "builtin": false,
+            "category": "vk_comment",
+            "platform": "vk",
+            "sortOrder": 1021,
+            "tags": [
+            ],
+            "title": "> 1 Серии Янима"
+        },
+        "custom_23": {
+            "builtin": false,
+            "category": "vk_comment",
+            "platform": "vk",
+            "sortOrder": 1022,
+            "tags": [
+            ],
+            "title": "TVOЁ"
+        },
+        "custom_24": {
+            "builtin": false,
+            "category": "vk_comment",
+            "platform": "vk",
+            "sortOrder": 1023,
+            "tags": [
+            ],
+            "title": "LOSSLESS"
+        },
+        "custom_25": {
+            "builtin": false,
+            "category": "vk_comment",
+            "platform": "vk",
+            "sortOrder": 1024,
+            "tags": [
+            ],
+            "title": "Янима LOSSLESS AnimeLib 4К"
+        },
+        "custom_26": {
+            "builtin": false,
+            "category": "tg_archive",
+            "platform": "telegram",
+            "sortOrder": 1025,
+            "tags": [
+            ],
+            "title": "UTM Метки для Янима"
+        },
+        "custom_5": {
+            "builtin": false,
+            "category": "tg_post",
+            "platform": "telegram",
+            "sortOrder": 1004,
+            "tags": [
+            ],
+            "title": "Закадр (>1эп)"
+        },
+        "custom_6": {
+            "builtin": false,
+            "category": "tg_post",
+            "platform": "telegram",
+            "sortOrder": 1005,
+            "tags": [
+            ],
+            "title": "Закадр (+лок-ция)"
+        },
+        "custom_7": {
+            "builtin": false,
+            "category": "tg_post",
+            "platform": "telegram",
+            "sortOrder": 1006,
+            "tags": [
+            ],
+            "title": "Закадр TVOЁ"
+        },
+        "custom_8": {
+            "builtin": false,
+            "category": "tg_post",
+            "platform": "telegram",
+            "sortOrder": 1007,
+            "tags": [
+            ],
+            "title": "Дубляж (+лок-ция)"
+        },
+        "custom_9": {
+            "builtin": false,
+            "category": "tg_post",
+            "platform": "telegram",
+            "sortOrder": 1008,
+            "tags": [
+            ],
+            "title": "Дубляж (>1эп)"
+        }
+    },
+    "postTemplates": {
+        "custom_10": "▶️Серия: %EPISODE_NUMBER%/%TOTAL_EPISODES%\n\n📌«%SERIES_TITLE%» в дубляже от ТО Дубляжная\n\n🎁Сериал озвучен при поддержке [онлайн-кинотеатра TVOЁ](https://tvoe.live/), если вы хотите поддержать Дубляжную, то смотрите нашу озвучку именно там, ведь TVOЁ дарит скидку нашим подписчикам по промокоду - `Dublyazhnaya`, где 1 месяц 99 рублей вместо 299 руб\n\nПомимо ТГ сериал можно посмотреть здесь:\n\n[TVOЁ](https://tvoe.live/p/) (~~299~~ 99 руб. по промокоду: `Dublyazhnaya`)\n\n[Архив MKV](https://t.me/+CVpSSg33UwI4MzYy)\n\n🎙Роли дублировали:\n%CAST_LIST%\n\n📝Режиссёр дубляжа:\n%DIRECTOR%\n\n🪄Звукорежиссёр:\n%SOUND_ENGINEER%\n\n📚Перевод:\n%SUB_AUTHOR%\n\n✏️Разметка:\n%TIMING_AUTHOR%\n\n✨Локализация надписей:\n%SIGNS_AUTHOR%\n\n✨Локализация постера:\nКирилл Хоримиев\n\n📦Сборка релиза:\n%RELEASE_BUILDER%\n\n#Дубрелиз@dublyajnaya #Хештег@dublyajnaya #Дубляж@dublyajnaya",
+        "custom_11": "▶️Серия: %EPISODE_NUMBER%/%TOTAL_EPISODES%\n\n📌«%SERIES_TITLE%» в дубляже студии **Дубляжная**\n\n**СТУДИЙНЫЙ ДУБЛЯЖ**\n\n🎁Сериал озвучен при поддержке [онлайн-кинотеатра TVOЁ](https://tvoe.live/), если вы хотите поддержать Дубляжную, то смотрите нашу озвучку именно там, ведь TVOЁ дарит скидку нашим подписчикам по промокоду - `Dublyazhnaya`, где 1 месяц 99 рублей вместо 299 руб\n\nПомимо ТГ сериал можно посмотреть здесь:\n\n[TVOЁ](https://tvoe.live/p/) (~~299~~ 99 руб. по промокоду: `Dublyazhnaya`)\n\n[Архив MKV](https://t.me/+CVpSSg33UwI4MzYy)\n\n🎙Роли дублировали:\n%CAST_LIST%\n\n📝Режиссёр дубляжа:\n%DIRECTOR%\n\n🪄Звукорежиссёр эпизода:\n%EPISODE_ENGINEER%\n\n🪄Звукорежиссёр записи:\n%RECORDING_ENGINEER%\n\n📚Перевод:\n%SUB_AUTHOR%\n\n✏️Разметка:\n%TIMING_AUTHOR%\n\n✨Локализация постера:\n\n\n📦Сборка релиза:\n%RELEASE_BUILDER%\n\n#Дубрелиз@dublyajnaya #Хештег@dublyajnaya #Дубляж@dublyajnaya\n",
+        "custom_12": "▶️ Серия: 1-2/12\n \n📌«НАЗВАНИЕ» в дубляже от ТО Дубляжная\n \n🎁^^**РЕЛИЗ ДУБЛИРОВАН ПО ЗАКАЗУ [ИМЯ]**^^🎁\n \nПомимо ТГ сериал можно посмотреть здесь:\n\n[Архив MKV](https://t.me/+CVpSSg33UwI4MzYy)[[LOSSLESS](https://t.me/+CVpSSg33UwI4MzYy) ЕСЛИ ЕСТЬ]\n\n4K серия (Yanima) [ЕСЛИ ЕСТЬ]\n\n1 серия\n\nAnime365\n\nAnimeLib\n\n2 серия\n\nAnime365\n\nAnimeLib\n\n🎙Роли дублировали:\n\n \n📝Режиссёр дубляжа: \n\n \n🪄Звукорежиссёр: \n\n\n📚Перевод:\n\n\n✏️Разметка:\n\n\n✨Локализация постера:\n\n\n📦Сборка релиза:\n\n\n#Дубрелиз@dublyajnaya #ТЕГ_ТАЙТЛА@dublyajnaya #Дубляж@dublyajnaya #Заказ@dublyajnaya",
+        "custom_13": "«%SERIES_TITLE%» в закадре от ТО Дубляжная\n\nСерия: %EPISODE_NUMBER%/%TOTAL_EPISODES%\n\nРоли озвучивали:\n%CAST_LIST%\n\nКуратор закадра::\n%DIRECTOR%\n\nЗвукорежиссёр:\n%SOUND_ENGINEER%\n\nПеревод:\n%SUB_AUTHOR%\n\nЛокализация надписей:\n%SIGNS_AUTHOR%\n\nЛокализация постера:\n\n\nСборка релиза:\n%RELEASE_BUILDER%\n\n#Хештег@dublyajnaya",
+        "custom_14": "«%SERIES_TITLE%» в закадре от ТО Дубляжная\n\nСерия: %EPISODE_NUMBER%/%TOTAL_EPISODES%\n\n🎁Сериал озвучен при поддержке онлайн-кинотеатра TVOЁ, если вы хотите поддержать Дубляжную, то смотрите нашу озвучку именно там, ведь TVOЁ дарит скидку нашим подписчикам по промокоду - Dublyazhnaya, где 1 месяц 99 рублей вместо 299 руб tvoe.cc/inby\n\nРоли озвучивали:\n%CAST_LIST%\n\nКуратор закадра:\n%DIRECTOR%\n\nЗвукорежиссёр:\n%SOUND_ENGINEER%\n\nПеревод:\n%SUB_AUTHOR%\t\n\nЛокализация постера:\n\n\nСборка релиза:\n%RELEASE_BUILDER%\n\n#Хештег@dublyajnaya",
+        "custom_15": "«%SERIES_TITLE%» в дубляже от ТО Дубляжная\n\nСерия: %EPISODE_NUMBER%/%TOTAL_EPISODES%\n\nРоли дублировали:\n%CAST_LIST%\n\nРежиссёр дубляжа:\n%DIRECTOR%\n\nЗвукорежиссёр эпизода:\n%EPISODE_ENGINEER%\n\nЗвукорежиссёр записи:\n%RECORDING_ENGINEER%\n\nПеревод:\n%SUB_AUTHOR%\n\n️Разметка:\n%TIMING_AUTHOR%\n\nЛокализация постера:\n\n\nСборка релиза:\n%RELEASE_BUILDER%\n\n#Хештег@dublyajnaya",
+        "custom_16": "«%SERIES_TITLE%» в дубляже от ТО Дубляжная\n\nСерия: %EPISODE_NUMBER%/%TOTAL_EPISODES%\n\n🎁Сериал озвучен при поддержке онлайн-кинотеатра TVOЁ, если вы хотите поддержать Дубляжную, то смотрите нашу озвучку именно там, ведь TVOЁ дарит скидку нашим подписчикам по промокоду - Dublyazhnaya, где 1 месяц 99 рублей вместо 299 руб tvoe.cc/inby\n\nРоли дублировали:\n%CAST_LIST%\n\nРежиссёр дубляжа:\n%DIRECTOR%\n\nЗвукорежиссёр:\n%SOUND_ENGINEER%\n\nПеревод:\n%SUB_AUTHOR%\n\n️Разметка:\n%TIMING_AUTHOR%\n\nЛокализация постера:\n\n\nСборка релиза:\n%RELEASE_BUILDER%\n\n#Хештег@dublyajnaya",
+        "custom_17": "«%SERIES_TITLE%» в дубляже от ТО Дубляжная\n\nСерия: %EPISODE_NUMBER%/%TOTAL_EPISODES%\n\nРоли дублировали:\n%CAST_LIST%\n\nРежиссёр дубляжа:\n%DIRECTOR%\n\nЗвукорежиссёр:\n%SOUND_ENGINEER%\n\nПеревод:\n%SUB_AUTHOR%\n\n️Разметка:\n%TIMING_AUTHOR%\n\nЛокализация постера:\n\n\nСборка релиза:\n%RELEASE_BUILDER%\n\n#Хештег@dublyajnaya",
+        "custom_18": "«%SERIES_TITLE%» в дубляже от ТО Дубляжная\n\nСерия: %EPISODE_NUMBER%/%TOTAL_EPISODES%\n\n🎁РЕЛИЗ ДУБЛИРОВАН ПО ЗАКАЗУ [ИМЯ]🎁\n\nРоли дублировали:\n%CAST_LIST%\n\nРежиссёр дубляжа:\n%DIRECTOR%\n\nЗвукорежиссёр:\n%SOUND_ENGINEER%\n\nПеревод:\n%SUB_AUTHOR%\n\n️Разметка:\n%TIMING_AUTHOR%\n\nЛокализация постера:\n\n\nСборка релиза:\n%RELEASE_BUILDER%\n\n#Хештег@dublyajnaya",
+        "custom_19": "А также вы можете поддержать наш коллектив на бусти: https://boosty.to/dubl/single-payment/donation/634652\n\nТГ: https://t.me/dublyajnaya\n\nAnime365: %LINK_ANIME365%\nAnimeLib: %LINK_ANILIB%",
+        "custom_20": "А также вы можете поддержать наш коллектив на бусти: https://boosty.to/dubl/single-payment/donation/634652\n\nТГ: https://t.me/dublyajnaya\n\n1 серия\n\nAnime365: \nAnimeLib: \n\n2 серия\n\nAnime365: \nAnimeLib:",
+        "custom_21": "А также вы можете поддержать наш коллектив на бусти: https://boosty.to/dubl/single-payment/donation/634652\n\nТГ: https://t.me/dublyajnaya\n\nYanima 4K: ?utm_source=vk&utm_campaign=dublyajnaya\nAnime365: %LINK_ANIME365%\nAnimeLib: %LINK_ANILIB%",
+        "custom_22": "А также вы можете поддержать наш коллектив на бусти: https://boosty.to/dubl/single-payment/donation/634652\n\nТГ: https://t.me/dublyajnaya\n\nYanima 4K: ?utm_source=vk&utm_campaign=dublyajnaya\n\n1 серия:\n\nAnime365: \nAnimeLib: \n\n2 серия:\n\nAnime365: \nAnimeLib:",
+        "custom_23": "А также вы можете поддержать наш коллектив на бусти: https://boosty.to/dubl/single-payment/donation/634652\n\nТГ: https://t.me/dublyajnaya\n\nTVOЁ (99 руб. по промокоду: Dublyazhnaya): https://tvoe.live/p/",
+        "custom_24": "А также вы можете поддержать наш коллектив на бусти: https://boosty.to/dubl/single-payment/donation/634652\n\nТГ: https://t.me/dublyajnaya\n\nLOSSLESS: https://t.me/+CVpSSg33UwI4MzYy\nAnime365: %LINK_ANIME365%\nAnimeLib: %LINK_ANILIB%",
+        "custom_25": "А также вы можете поддержать наш коллектив на бусти: https://boosty.to/dubl/single-payment/donation/634652\n\nТГ: https://t.me/dublyajnaya\nYanima 4K: ?utm_source=vk&utm_campaign=dublyajnaya\n4К LOSSLESS: https://t.me/+CVpSSg33UwI4MzYy\n\n1 серия\n\nAnime365: \nAnimeLib 4К: \n\n2 серия\n\nAnime365: \nAnimeLib 4К:",
+        "custom_26": "Utm-метки для ссылок на Яниму\n\nВК: [ССЫЛКА]?utm_source=vk&utm_campaign=dublyajnaya\n\nТГ: [ССЫЛКА]?utm_source=tg&utm_campaign=dublyajnaya\n",
+        "custom_5": "▶️Серия: 1-2/12\n \n📌«НАЗВАНИЕ» в закадре от ТО Дубляжная\n \n🎁А также вы можете поддержать наш коллектив копеечкой \n[💙](emoji:5278229754099540071?58)**[ВК ](https://vk.com/dublyajnaya?from=groups&ref=group_widget&w=app6471849_-216649949)**\n[💰](emoji:5296401966887345356?59)**[BOOSTY](https://boosty.to/dubl/single-payment/donation/696237/target?share=target_link)**\n \nПомимо ТГ сериал можно посмотреть здесь:\n\n[Архив MKV](https://t.me/+CVpSSg33UwI4MzYy)\n\n1 серия\n\nAnime365\n\nAnimeLib\n\n2 серия\n\nAnime365\n\nAnimeLib\n\n🎙Роли озвучивали:\n\n\n📝Куратор закадра: \n\n \n🪄Звукорежиссёр: \n\n\n📚Перевод: \n\n\n✨Локализация постера:\n\n\n📦Сборка релиза:\n\n\n#Дубрелиз@dublyajnaya #ТЕГ_ТАЙТЛА@dublyajnaya #Закадр@dublyajnaya",
+        "custom_6": "▶️Серия: %EPISODE_NUMBER%/%TOTAL_EPISODES%\n \n📌«%SERIES_TITLE%» в закадре от ТО Дубляжная\n \n🎁А также вы можете поддержать наш коллектив копеечкой \n[💙](emoji:5278229754099540071?56)**[ВК ](https://vk.com/dublyajnaya?from=groups&ref=group_widget&w=app6471849_-216649949)**\n[💰](emoji:5296401966887345356?57)**[BOOSTY](https://boosty.to/dubl/single-payment/donation/696237/target?share=target_link)**\n \nПомимо ТГ сериал можно посмотреть здесь:\n\n[Anime365](%LINK_ANIME365%)\n\n[AnimeLib](%LINK_ANILIB%)\n\n[Архив MKV](https://t.me/+CVpSSg33UwI4MzYy)\n\n🎙Роли озвучивали:\n%CAST_LIST%\n\n📝Куратор закадра: \n%DIRECTOR%\n \n🪄Звукорежиссёр: \n%SOUND_ENGINEER%\n\n📚Перевод: \n%TRANSLATION_EDITOR%\n\n✨Локализация надписей:\n%SIGNS_AUTHOR%\n\n✨Локализация постера:\n\n\n📦Сборка релиза:\n%RELEASE_BUILDER%\n\n#Дубрелиз@dublyajnaya #ТЕГ_ТАЙТЛА@dublyajnaya #Закадр@dublyajnaya",
+        "custom_7": "▶️Серия: %EPISODE_NUMBER%/%TOTAL_EPISODES% \n \n📌«%SERIES_TITLE%» в закадре от ТО Дубляжная\n \n🎁Сериал озвучен при поддержке [онлайн-кинотеатра TVOЁ](https://tvoe.live/), если вы хотите поддержать Дубляжную, то смотрите нашу озвучку именно там, ведь TVOЁ дарит скидку нашим подписчикам по промокоду - `Dublyazhnaya`, где 1 месяц 99 рублей вместо 299 руб\n\nПомимо ТГ сериал можно посмотреть здесь: \n\n[TVOЁ](https://tvoe.live/) (~~299~~ 99 руб. по промокоду: `Dublyazhnaya`)\n\n[Архив MKV](https://t.me/+CVpSSg33UwI4MzYy)\n\n🎙Роли озвучивали:\n%CAST_LIST%\n \n📝Куратор закадра: \n%DIRECTOR%\n \n🪄Звукорежиссёр: \n%SOUND_ENGINEER%\n\n📚Перевод: \n%SUB_AUTHOR%\n\n✨Локализация постера:\n\n\n📦Сборка релиза:\n%RELEASE_BUILDER%\n\n#Дубрелиз@dublyajnaya #ТЕГ_ТАЙТЛА@dublyajnaya #Закадр@dublyajnaya",
+        "custom_8": "▶️Серия: %EPISODE_NUMBER%/%TOTAL_EPISODES%\n \n📌«%SERIES_TITLE%» в дубляже от ТО Дубляжная\n \n🎁 А также вы можете поддержать наш коллектив копеечкой \n[💙](emoji:5278229754099540071?60)**[ВК](https://vk.com/dublyajnaya?from=groups&ref=group_widget&w=app6471849_-216649949)**\n[💰](emoji:5296401966887345356?61)**[BOOSTY](https://boosty.to/dubl/single-payment/donation/696237/target?share=target_link)**\n \nПомимо ТГ сериал можно посмотреть здесь: \n\n4K серия (Yanima) [ЕСЛИ ЕСТЬ]\n\n[Anime365](%LINK_ANIME365%)\n\n[AnimeLib](%LINK_ANILIB%)\n\n[Архив MKV](https://t.me/+CVpSSg33UwI4MzYy)\n\n🎙Роли дублировали:\n%CAST_LIST%\n\n📝Режиссёр дубляжа: \n%DIRECTOR%\n\n🪄Звукорежиссёр: \n%SOUND_ENGINEER%\n \n📚Перевод: \n%TRANSLATION_EDITOR%\n\n✏️Разметка:\n%TIMING_AUTHOR%\n\n✨Локализация надписей:\n%SIGNS_AUTHOR%\n\n✨Локализация постера:\n\n\n📦Сборка релиза:\n%RELEASE_BUILDER%\n\n#Дубрелиз@dublyajnaya #ТЕГ_ТАЙТЛА@dublyajnaya #Дубляж@dublyajnaya",
+        "custom_9": "▶️Серия: 1-2/12\n \n📌«НАЗВАНИЕ» в дубляже от ТО Дубляжная\n \n🎁 А также вы можете поддержать наш коллектив копеечкой \n[💙](emoji:5278229754099540071?62)**[ВК](https://vk.com/dublyajnaya?from=groups&ref=group_widget&w=app6471849_-216649949)**\n[💰](emoji:5296401966887345356?63)**[BOOSTY](https://boosty.to/dubl/single-payment/donation/696237/target?share=target_link)**\n \nПомимо ТГ сериал можно посмотреть здесь: \n\n[Архив MKV](https://t.me/+CVpSSg33UwI4MzYy)\n\n4K серия (Yanima) [ЕСЛИ ЕСТЬ]\n\n1 серия\n\nAnime365\n\nAnimeLib\n\n2 серия\n\nAnime365\n\nAnimeLib\n\n🎙Роли дублировали:\n\n\n📝Режиссёр дубляжа: \n\n\n🪄Звукорежиссёр: \n\n \n📚Перевод: \n\n\n✏️Разметка:\n\n\n✨Локализация постера:\n\n\n📦Сборка релиза:\n\n\n#Дубрелиз@dublyajnaya #ТЕГ_ТАЙТЛА@dublyajnaya #Дубляж@dublyajnaya"
+    }
+}

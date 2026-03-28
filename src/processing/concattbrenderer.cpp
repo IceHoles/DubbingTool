@@ -44,21 +44,20 @@ QString buildSettsExprForFps(const QString& fps)
 QJsonObject probeTsVideoStats(ProcessManager* processManager, const QString& ffprobePath, const QString& tsPath)
 {
     QJsonObject stats{
-        {"path", tsPath},
-        {"packetsOk", false},
-        {"firstPts", -1.0},
-        {"lastPts", -1.0},
-        {"lastDur", 0.0},
-        {"endPtsPlusDur", -1.0},
-        {"formatDuration", -1.0},
+        {          "path", tsPath},
+        {     "packetsOk",  false},
+        {      "firstPts",   -1.0},
+        {       "lastPts",   -1.0},
+        {       "lastDur",    0.0},
+        { "endPtsPlusDur",   -1.0},
+        {"formatDuration",   -1.0},
     };
 
     QByteArray packetOutput;
-    const bool packetsOk = processManager->executeAndWait(
-        ffprobePath,
-        {"-v", "quiet", "-select_streams", "v:0", "-show_entries", "packet=pts_time,duration_time", "-of", "csv=p=0",
-         tsPath},
-        packetOutput);
+    const bool packetsOk = processManager->executeAndWait(ffprobePath,
+                                                          {"-v", "quiet", "-select_streams", "v:0", "-show_entries",
+                                                           "packet=pts_time,duration_time", "-of", "csv=p=0", tsPath},
+                                                          packetOutput);
     stats["packetsOk"] = packetsOk;
     if (packetsOk && !packetOutput.isEmpty())
     {
@@ -158,11 +157,11 @@ double probeFormatDuration(ProcessManager* processManager, const QString& ffprob
 } // namespace
 
 ConcatTbRenderer::ConcatTbRenderer(const QString& inputMkvPath, const QString& outputMp4Path, const TbSegment& segment,
-                                   qint64 sourceDurationS, const QString& videoCodecExtension, const QString& hardsubMode,
-                                   int subtitleTrackIndex, const QString& externalSubsPath, int videoBitrateKbps,
-                                   const QString& videoFrameRate, const QString& videoAvgFrameRate, bool videoIsCfr,
-                                   bool reencodeAudioAac256, ProcessManager* processManager,
-                                   QObject* parent)
+                                   qint64 sourceDurationS, const QString& videoCodecExtension,
+                                   const QString& hardsubMode, int subtitleTrackIndex, const QString& externalSubsPath,
+                                   int videoBitrateKbps, const QString& videoFrameRate,
+                                   const QString& videoAvgFrameRate, bool videoIsCfr, bool reencodeAudioAac256,
+                                   ProcessManager* processManager, QObject* parent)
     : QObject(parent), m_inputMkvPath(inputMkvPath), m_outputMp4Path(outputMp4Path), m_segment(segment),
       m_sourceDurationS(sourceDurationS), m_processManager(processManager), m_videoCodecExtension(videoCodecExtension),
       m_hardsubMode(hardsubMode), m_subtitleTrackIndex(subtitleTrackIndex), m_externalSubsPath(externalSubsPath),
@@ -678,9 +677,9 @@ void ConcatTbRenderer::concatJoinSegments()
     if (applySetts)
     {
         args << "-bsf:v" << QString("setts=%1").arg(settsExpr);
-        emit logMessage(QString("Concat рендер: включен setts для CFR (%1, avg %2).")
-                            .arg(m_videoFrameRate, m_videoAvgFrameRate),
-                        LogCategory::APP);
+        emit logMessage(
+            QString("Concat рендер: включен setts для CFR (%1, avg %2).").arg(m_videoFrameRate, m_videoAvgFrameRate),
+            LogCategory::APP);
     }
     else
     {
@@ -794,4 +793,3 @@ void ConcatTbRenderer::cleanupTempFiles(bool removeSegments)
         m_tempFilterSubsPath.clear();
     }
 }
-

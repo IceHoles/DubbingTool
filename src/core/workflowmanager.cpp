@@ -89,11 +89,10 @@ QString buildSettsExprForFps(const QString& fps)
 double probeTsVideoEndTime(ProcessManager* processManager, const QString& ffprobePath, const QString& tsPath)
 {
     QByteArray packetOutput;
-    const bool packetsOk = processManager->executeAndWait(
-        ffprobePath,
-        {"-v", "quiet", "-select_streams", "v:0", "-show_entries", "packet=pts_time,duration_time", "-of", "csv=p=0",
-         tsPath},
-        packetOutput);
+    const bool packetsOk = processManager->executeAndWait(ffprobePath,
+                                                          {"-v", "quiet", "-select_streams", "v:0", "-show_entries",
+                                                           "packet=pts_time,duration_time", "-of", "csv=p=0", tsPath},
+                                                          packetOutput);
     if (packetsOk && !packetOutput.isEmpty())
     {
         double lastPts = -1.0;
@@ -151,21 +150,20 @@ double probeTsVideoEndTime(ProcessManager* processManager, const QString& ffprob
 QJsonObject probeTsVideoStats(ProcessManager* processManager, const QString& ffprobePath, const QString& tsPath)
 {
     QJsonObject stats{
-        {"path", tsPath},
-        {"packetsOk", false},
-        {"firstPts", -1.0},
-        {"lastPts", -1.0},
-        {"lastDur", 0.0},
-        {"endPtsPlusDur", -1.0},
-        {"formatDuration", -1.0},
+        {          "path", tsPath},
+        {     "packetsOk",  false},
+        {      "firstPts",   -1.0},
+        {       "lastPts",   -1.0},
+        {       "lastDur",    0.0},
+        { "endPtsPlusDur",   -1.0},
+        {"formatDuration",   -1.0},
     };
 
     QByteArray packetOutput;
-    const bool packetsOk = processManager->executeAndWait(
-        ffprobePath,
-        {"-v", "quiet", "-select_streams", "v:0", "-show_entries", "packet=pts_time,duration_time", "-of", "csv=p=0",
-         tsPath},
-        packetOutput);
+    const bool packetsOk = processManager->executeAndWait(ffprobePath,
+                                                          {"-v", "quiet", "-select_streams", "v:0", "-show_entries",
+                                                           "packet=pts_time,duration_time", "-of", "csv=p=0", tsPath},
+                                                          packetOutput);
     stats["packetsOk"] = packetsOk;
     if (packetsOk && !packetOutput.isEmpty())
     {
@@ -280,9 +278,9 @@ QString probeFirstFrameMd5(ProcessManager* processManager, const QString& ffmpeg
 
     const QString text = QString::fromUtf8(out);
     const QStringList lines = text.split('\n', Qt::SkipEmptyParts);
-    for (int i = lines.size() - 1; i >= 0; --i)
+    for (qsizetype idx = lines.size(); idx-- > 0;)
     {
-        const QString line = lines[i].trimmed();
+        const QString line = lines[idx].trimmed();
         if (line.isEmpty() || line.startsWith('#'))
         {
             continue;
@@ -325,9 +323,9 @@ QString probeFilteredFirstFrameMd5(ProcessManager* processManager, const QString
 
     const QString text = QString::fromUtf8(out);
     const QStringList lines = text.split('\n', Qt::SkipEmptyParts);
-    for (int i = lines.size() - 1; i >= 0; --i)
+    for (qsizetype idx = lines.size(); idx-- > 0;)
     {
-        const QString line = lines[i].trimmed();
+        const QString line = lines[idx].trimmed();
         if (line.isEmpty() || line.startsWith('#'))
         {
             continue;
@@ -341,8 +339,8 @@ QString probeFilteredFirstFrameMd5(ProcessManager* processManager, const QString
     return "";
 }
 
-QString probeLastFrameMd5FromTailWindow(ProcessManager* processManager, const QString& ffmpegPath, const QString& inputPath,
-                                        double sseofSeconds)
+QString probeLastFrameMd5FromTailWindow(ProcessManager* processManager, const QString& ffmpegPath,
+                                        const QString& inputPath, double sseofSeconds)
 {
     // Dump framemd5 for a short tail window and return the LAST frame md5.
     // This is more reliable than -frames:v 1 when TS seeking lands after EOF.
@@ -359,9 +357,9 @@ QString probeLastFrameMd5FromTailWindow(ProcessManager* processManager, const QS
 
     const QString text = QString::fromUtf8(out);
     const QStringList lines = text.split('\n', Qt::SkipEmptyParts);
-    for (int i = lines.size() - 1; i >= 0; --i)
+    for (qsizetype idx = lines.size(); idx-- > 0;)
     {
-        const QString line = lines[i].trimmed();
+        const QString line = lines[idx].trimmed();
         if (line.isEmpty() || line.startsWith('#'))
         {
             continue;
@@ -2163,7 +2161,7 @@ QStringList WorkflowManager::prepareCommandArguments(const QString& commandTempl
     // (otherwise MediaInfo shows two chapter sets with conflicting times).
     if (!m_chapterMarkers.isEmpty() && !m_skipChaptersForWorkflow)
     {
-        const int outIdx = args.size() - 1;
+        const qsizetype outIdx = args.size() - 1;
         if (outIdx >= 0)
         {
             args.insert(outIdx, QStringLiteral("-1"));
@@ -2474,10 +2472,9 @@ void WorkflowManager::concatRenderSegment2()
     if (m_sourceFormat == SourceFormat::MP4)
     {
         const QString probeVf = QString("trim=start=%1,setpts=PTS-STARTPTS").arg(bframeOverlap, 0, 'f', 3);
-        const QString seg2HeadBaseMd5 = probeFilteredFirstFrameMd5(
-            m_processManager, m_ffmpegPath, m_finalMkvPath, m_concatKfBeforeTbStart, 1.000, probeVf);
-        const QList<double> seamOffsets = {-0.20, -0.16, -0.12, -0.08, -0.04, 0.00,
-                                           0.04,  0.08,  0.12,  0.16,  0.20};
+        const QString seg2HeadBaseMd5 = probeFilteredFirstFrameMd5(m_processManager, m_ffmpegPath, m_finalMkvPath,
+                                                                   m_concatKfBeforeTbStart, 1.000, probeVf);
+        const QList<double> seamOffsets = {-0.20, -0.16, -0.12, -0.08, -0.04, 0.00, 0.04, 0.08, 0.12, 0.16, 0.20};
         double seg2HeadSourceTs = -1.0;
         for (const double offset : seamOffsets)
         {
@@ -2509,9 +2506,8 @@ void WorkflowManager::concatRenderSegment2()
         }
 
         const double frameStep = frameStepSecondsForFps(m_videoTrack.frameRate);
-        const double tailToHead = (seg1TailSourceTs >= 0.0 && seg2HeadSourceTs >= 0.0)
-                                      ? (seg2HeadSourceTs - seg1TailSourceTs)
-                                      : -1.0;
+        const double tailToHead =
+            (seg1TailSourceTs >= 0.0 && seg2HeadSourceTs >= 0.0) ? (seg2HeadSourceTs - seg1TailSourceTs) : -1.0;
         if (frameStep > 0.0 && tailToHead > 0.0)
         {
             const double oneFrameDelta = tailToHead - frameStep;
@@ -2653,7 +2649,8 @@ void WorkflowManager::concatCutSegment3()
             {
                 seg3Start = cumulativeSeam;
                 emit logMessage(
-                    QString("Concat рендер: корректируем старт сег.3 по длительности seg1+seg2: %1с -> %2с (дельта %3с)")
+                    QString(
+                        "Concat рендер: корректируем старт сег.3 по длительности seg1+seg2: %1с -> %2с (дельта %3с)")
                         .arg(m_concatKeyframeTime, 0, 'f', 3)
                         .arg(seg3Start, 0, 'f', 3)
                         .arg(delta, 0, 'f', 3),
@@ -3182,14 +3179,15 @@ void WorkflowManager::getMp4Info()
             m_videoTrack.avgFrameRate = stream["avg_frame_rate"].toString();
             m_videoTrack.isCfr = isLikelyCfr(m_videoTrack.frameRate, m_videoTrack.avgFrameRate);
 
-            emit logMessage(QString("Видеодорожка найдена: индекс %1, кодек %2, битрейт %3 kbps, fps %4, avg %5, CFR=%6")
-                                .arg(streamIndex)
-                                .arg(codecName)
-                                .arg(m_videoTrack.bitrateKbps)
-                                .arg(m_videoTrack.frameRate)
-                                .arg(m_videoTrack.avgFrameRate)
-                                .arg(m_videoTrack.isCfr ? "yes" : "no"),
-                            LogCategory::APP);
+            emit logMessage(
+                QString("Видеодорожка найдена: индекс %1, кодек %2, битрейт %3 kbps, fps %4, avg %5, CFR=%6")
+                    .arg(streamIndex)
+                    .arg(codecName)
+                    .arg(m_videoTrack.bitrateKbps)
+                    .arg(m_videoTrack.frameRate)
+                    .arg(m_videoTrack.avgFrameRate)
+                    .arg(m_videoTrack.isCfr ? "yes" : "no"),
+                LogCategory::APP);
         }
         else if (codecType == "audio")
         {
@@ -3754,9 +3752,8 @@ void WorkflowManager::loadChaptersForWorkflow()
         }
         else
         {
-            emit logMessage(
-                QStringLiteral("ПРЕДУПРЕЖДЕНИЕ: не удалось разобрать файл глав: %1").arg(extPath),
-                LogCategory::APP);
+            emit logMessage(QStringLiteral("ПРЕДУПРЕЖДЕНИЕ: не удалось разобрать файл глав: %1").arg(extPath),
+                            LogCategory::APP);
         }
         warnIfExpectedChaptersMissing();
         return;
@@ -3793,9 +3790,13 @@ void WorkflowManager::loadChaptersForWorkflow()
         if (!ffprobePath.isEmpty() && QFileInfo::exists(ffprobePath))
         {
             QByteArray json;
-            const QStringList args = {QStringLiteral("-v"), QStringLiteral("quiet"), QStringLiteral("-show_chapters"),
-                                      QStringLiteral("-print_format"), QStringLiteral("json"),
-                                      QStringLiteral("-i"), m_mkvFilePath};
+            const QStringList args = {QStringLiteral("-v"),
+                                      QStringLiteral("quiet"),
+                                      QStringLiteral("-show_chapters"),
+                                      QStringLiteral("-print_format"),
+                                      QStringLiteral("json"),
+                                      QStringLiteral("-i"),
+                                      m_mkvFilePath};
             if (m_processManager->executeAndWait(ffprobePath, args, json))
             {
                 m_chapterMarkers = ChapterHelper::parseFfprobeChaptersJson(json);
@@ -3883,8 +3884,7 @@ void WorkflowManager::maybeApplyChaptersToFinalMp4()
     {
         return;
     }
-    const qint64 durNs =
-        m_sourceDurationS > 0 ? static_cast<qint64>(static_cast<double>(m_sourceDurationS) * 1e9) : 0;
+    const qint64 durNs = m_sourceDurationS > 0 ? static_cast<qint64>(static_cast<double>(m_sourceDurationS) * 1e9) : 0;
     QString err;
     emit logMessage(QStringLiteral("Запись глав в финальный MP4..."), LogCategory::APP);
     if (ChapterHelper::applyChaptersToMp4(m_outputMp4Path, m_chapterMarkers, durNs, m_ffmpegPath, m_processManager,

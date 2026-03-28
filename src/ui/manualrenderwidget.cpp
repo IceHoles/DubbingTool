@@ -45,8 +45,8 @@ ManualRenderWidget::ManualRenderWidget(QWidget* parent) : QWidget(parent), ui(ne
     connect(ui->browseChaptersManualButton, &QPushButton::clicked, this,
             [this]()
             {
-                QString path = QFileDialog::getOpenFileName(this, "Файл глав Matroska XML", "",
-                                                            "XML (*.xml);;Все файлы (*)");
+                QString path =
+                    QFileDialog::getOpenFileName(this, "Файл глав Matroska XML", "", "XML (*.xml);;Все файлы (*)");
                 if (!path.isEmpty())
                 {
                     ui->chaptersExternalPathManualEdit->setText(path);
@@ -114,8 +114,7 @@ void ManualRenderWidget::on_renderButton_clicked()
 
     QSettings settings("MyCompany", "DubbingTool");
     settings.setValue("manualRender/lastUsedPreset", ui->renderPresetComboBox->currentText());
-    settings.setValue(QStringLiteral("manualRender/reencodeAudioAac256"),
-                      ui->reencodeAudioAac256CheckBox->isChecked());
+    settings.setValue(QStringLiteral("manualRender/reencodeAudioAac256"), ui->reencodeAudioAac256CheckBox->isChecked());
 
     emit renderRequested();
 }

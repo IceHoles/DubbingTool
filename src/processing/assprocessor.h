@@ -2,8 +2,8 @@
 #define ASSPROCESSOR_H
 
 #include "appsettings.h"
-#include "releasetemplate.h"
 #include "concattbrenderer.h"
+#include "releasetemplate.h"
 
 #include <QObject>
 #include <QStringList>

@@ -61,7 +61,8 @@ public:
     QStringList signStyles;           // Стили ASS, которые считаются надписями
     QString endingChapterName;        // Название главы MKV, обозначающей эндинг
     QString endingStartTime;          // Тайминг эндинга, если нет главы
-    /// Если true — в авто-режиме показывается поле пути к XML глав на главной странице; при отсутствии глав — предупреждение в лог.
+    /// Если true — в авто-режиме показывается поле пути к XML глав на главной странице; при отсутствии глав —
+    /// предупреждение в лог.
     bool chaptersEnabled = true;
     bool useManualTime = false;       // Использовать тайминг по парсингу главы
     bool useOriginalAudio = false;    // Использовать оригинальную аудиодорожку
@@ -94,12 +95,12 @@ public:
     QMap<QString, QString> substitutions; // Карта замен "Найти" -> "Заменить на"
 
     // Шаблоны для постов
-    QMap<QString, QString> postTemplates; // Ключ: "VK", "Telegram", Значение: шаблон
+    QMap<QString, QString> postTemplates;             // Ключ: "VK", "Telegram", Значение: шаблон
     QMap<QString, PostTemplateMeta> postTemplateMeta; // Метаданные для поиска/группировки шаблонов постов
-    QString seriesTitleForPost;           // Название для поста, может отличаться от основного
-    int totalEpisodes = 0;                // Общее число эпизодов для постов
-    QString posterPath;                   // Путь к постеру
-    QMap<QString, QString> linkTemplates; // Ссылки на серию в постах
+    QString seriesTitleForPost;                       // Название для поста, может отличаться от основного
+    int totalEpisodes = 0;                            // Общее число эпизодов для постов
+    QString posterPath;                               // Путь к постеру
+    QMap<QString, QString> linkTemplates;             // Ссылки на серию в постах
 
     // Ссылки для загрузки
     QStringList uploadUrls;

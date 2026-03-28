@@ -3,8 +3,8 @@
 
 #include "releasetemplate.h"
 
-#include <QMap>
 #include <QDialog>
+#include <QMap>
 #include <QPointer>
 #include <QTimer>
 class QLineEdit;

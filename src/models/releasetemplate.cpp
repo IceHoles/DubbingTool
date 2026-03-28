@@ -32,9 +32,8 @@ void ReleaseTemplate::read(const QJsonObject& json)
     else
     {
         // Миграция: старое поле expectsChapters или по умолчанию true
-        chaptersEnabled = json.contains(QStringLiteral("expectsChapters"))
-                                ? json[QStringLiteral("expectsChapters")].toBool()
-                                : true;
+        chaptersEnabled =
+            json.contains(QStringLiteral("expectsChapters")) ? json[QStringLiteral("expectsChapters")].toBool() : true;
     }
     useManualTime = json["useManualTime"].toBool(false);
     useOriginalAudio = json["useOriginalAudio"].toBool(true);

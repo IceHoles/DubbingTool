@@ -7,18 +7,22 @@
 #include "telegrampasteedit.h"
 #include "ui_templateeditor.h"
 
-#include <QApplication>
 #include <QAbstractItemView>
+#include <QApplication>
 #include <QClipboard>
 #include <QComboBox>
+#include <QCoreApplication>
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QDir>
 #include <QFile>
 #include <QFileDialog>
 #include <QFormLayout>
 #include <QGridLayout>
-#include <QHeaderView>
 #include <QHBoxLayout>
+#include <QHeaderView>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
@@ -26,15 +30,13 @@
 #include <QMimeData>
 #include <QPointer>
 #include <QPropertyAnimation>
-#include <QJsonDocument>
-#include <QJsonObject>
 #include <QRegularExpression>
 #include <QSaveFile>
-#include <QSignalBlocker>
 #include <QScrollArea>
 #include <QSettings>
-#include <QStandardPaths>
+#include <QSignalBlocker>
 #include <QSplitter>
+#include <QStandardPaths>
 #include <QTableWidgetItem>
 #include <QTextBrowser>
 #include <QTextDocumentFragment>
@@ -144,8 +146,7 @@ static QString buildVkTemplateFromParseResult(const PostParseResult& parseResult
     QStringList lines;
     if (!seriesTitle.isEmpty())
     {
-        lines << QString("«%1» в %2 от ТО Дубляжная")
-                     .arg("%SERIES_TITLE%", isVoiceover ? "закадре" : "дубляже");
+        lines << QString("«%1» в %2 от ТО Дубляжная").arg("%SERIES_TITLE%", isVoiceover ? "закадре" : "дубляже");
         lines << QString();
     }
     lines << "Серия: %EPISODE_NUMBER%/%TOTAL_EPISODES%";
@@ -339,19 +340,16 @@ static QString sectionCodeFromMeta(const QString& key, const PostTemplateMeta& m
     return "tg_post";
 }
 
-static QString postTemplateCatalogFilePath()
+/// Previous releases stored the catalog under AppData/post_templates/.
+static QString legacyPostTemplateCatalogFilePath()
 {
     const QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QDir dir(appDataPath);
-    if (!dir.exists())
-    {
-        dir.mkpath(".");
-    }
-    if (!dir.exists("post_templates"))
-    {
-        dir.mkpath("post_templates");
-    }
-    return dir.filePath("post_templates/post_template_catalog.json");
+    return QDir(appDataPath).filePath(QStringLiteral("post_templates/post_template_catalog.json"));
+}
+
+static QString postTemplateCatalogFilePath()
+{
+    return QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("post_template_catalog.json"));
 }
 
 TemplateEditor::TemplateEditor(QWidget* parent) : QDialog(parent), ui(new Ui::TemplateEditor)
@@ -704,14 +702,14 @@ void TemplateEditor::buildPostTemplateCatalogDialogUi(QDialog* dialog)
         m_postTemplateTree->header()->restoreState(treeHeaderState);
     }
 
-    connect(m_postTemplateTree, &QTreeWidget::itemSelectionChanged, this, &TemplateEditor::onPostTemplateSelectionChanged);
+    connect(m_postTemplateTree, &QTreeWidget::itemSelectionChanged, this,
+            &TemplateEditor::onPostTemplateSelectionChanged);
     connect(m_postTemplateSearchEdit, &QLineEdit::textChanged, this, &TemplateEditor::onPostTemplateFilterChanged);
     connect(addButton, &QPushButton::clicked, this, &TemplateEditor::onPostTemplateAddClicked);
     connect(m_postTemplateDeleteButton, &QPushButton::clicked, this, &TemplateEditor::onPostTemplateDeleteClicked);
     connect(restoreBuiltinButton, &QPushButton::clicked, this, &TemplateEditor::onPostTemplateRestoreBuiltinClicked);
     connect(m_postTemplateTitleEdit, &QLineEdit::editingFinished, this, &TemplateEditor::onPostTemplateMetaEdited);
-    connect(m_postTemplateTypeEdit, &QComboBox::currentIndexChanged, this,
-            [this](int) { onPostTemplateMetaEdited(); });
+    connect(m_postTemplateTypeEdit, &QComboBox::currentIndexChanged, this, [this](int) { onPostTemplateMetaEdited(); });
     connect(m_postTemplateBodyEdit, &QPlainTextEdit::textChanged, this, &TemplateEditor::onPostTemplateBodyEdited);
     connect(m_postTemplateSaveButton, &QPushButton::clicked, this, &TemplateEditor::onPostTemplateSaveClicked);
 }
@@ -828,7 +826,17 @@ void TemplateEditor::loadPostTemplateCatalogFromDisk(const ReleaseTemplate& t)
     m_postTemplates.clear();
     m_postTemplateMeta.clear();
 
-    QFile catalogFile(postTemplateCatalogFilePath());
+    const QString catalogPath = postTemplateCatalogFilePath();
+    if (!QFile::exists(catalogPath))
+    {
+        const QString legacy = legacyPostTemplateCatalogFilePath();
+        if (QFile::exists(legacy))
+        {
+            QFile::copy(legacy, catalogPath);
+        }
+    }
+
+    QFile catalogFile(catalogPath);
     if (catalogFile.exists() && catalogFile.open(QIODevice::ReadOnly))
     {
         QJsonParseError parseError;
@@ -938,9 +946,9 @@ void TemplateEditor::syncPostTemplateCatalogToTemplate(ReleaseTemplate& t) const
             const QString body = it.value().trimmed();
             const PostTemplateMeta meta = sanitizedMeta.value(key);
             const bool looksGarbageByKey = garbageKeyRx.match(key).hasMatch();
-            const bool looksGarbageByMeta =
-                body.isEmpty() && meta.title.trimmed() == key && meta.platform.trimmed().toLower() == "other" &&
-                meta.category.trimmed() == "Общие" && meta.tags.isEmpty();
+            const bool looksGarbageByMeta = body.isEmpty() && meta.title.trimmed() == key &&
+                                            meta.platform.trimmed().toLower() == "other" &&
+                                            meta.category.trimmed() == "Общие" && meta.tags.isEmpty();
             if (looksGarbageByKey || looksGarbageByMeta)
             {
                 keysToDrop.append(key);
@@ -971,7 +979,8 @@ void TemplateEditor::rebuildPostTemplateTree(const QString& filterText)
     }
 
     const QString filter = filterText.trimmed().toLower();
-    const QString previousKey = !m_selectedPostTemplateKey.isEmpty() ? m_selectedPostTemplateKey : selectedPostTemplateKey();
+    const QString previousKey =
+        !m_selectedPostTemplateKey.isEmpty() ? m_selectedPostTemplateKey : selectedPostTemplateKey();
     QTreeWidgetItem* itemToSelect = nullptr;
 
     m_postTemplateTree->clear();
@@ -1102,8 +1111,7 @@ void TemplateEditor::loadSelectedPostTemplateToEditor()
     m_postTemplateTypeEdit->setEnabled(!protectedBuiltin);
     if (protectedBuiltin)
     {
-        m_postTemplateDeleteButton->setToolTip(
-            "Базовые шаблоны tg_mp4, tg_mkv, vk и vk_comment удалять нельзя.");
+        m_postTemplateDeleteButton->setToolTip("Базовые шаблоны tg_mp4, tg_mkv, vk и vk_comment удалять нельзя.");
         m_postTemplateTitleEdit->setToolTip("Для базовых шаблонов метаданные фиксированы.");
         m_postTemplateTypeEdit->setToolTip("Для базовых шаблонов раздел фиксирован.");
     }
@@ -1198,9 +1206,9 @@ void TemplateEditor::sanitizePostTemplateCatalog()
         const QString body = it.value().trimmed();
         const PostTemplateMeta meta = m_postTemplateMeta.value(key);
         const bool looksGarbageByKey = garbageKeyRx.match(key).hasMatch();
-        const bool looksGarbageByMeta =
-            body.isEmpty() && meta.title.trimmed() == key && meta.platform.trimmed().toLower() == "other" &&
-            meta.category.trimmed() == "Общие" && meta.tags.isEmpty();
+        const bool looksGarbageByMeta = body.isEmpty() && meta.title.trimmed() == key &&
+                                        meta.platform.trimmed().toLower() == "other" &&
+                                        meta.category.trimmed() == "Общие" && meta.tags.isEmpty();
 
         if (looksGarbageByKey || looksGarbageByMeta)
         {
@@ -1381,8 +1389,7 @@ void TemplateEditor::onPostTemplateAddClicked()
     rebuildPostTemplateTree(m_postTemplateSearchEdit->text());
     savePostTemplateCatalogToDisk();
 
-    QList<QTreeWidgetItem*> items =
-        m_postTemplateTree->findItems(meta.title, Qt::MatchExactly | Qt::MatchRecursive, 0);
+    QList<QTreeWidgetItem*> items = m_postTemplateTree->findItems(meta.title, Qt::MatchExactly | Qt::MatchRecursive, 0);
     if (!items.isEmpty())
     {
         m_postTemplateTree->setCurrentItem(items.first());
@@ -1405,8 +1412,7 @@ void TemplateEditor::onPostTemplateDeleteClicked()
         return;
     }
 
-    const auto reply =
-        QMessageBox::question(this, "Удалить шаблон", "Удалить выбранный пост-шаблон из каталога?");
+    const auto reply = QMessageBox::question(this, "Удалить шаблон", "Удалить выбранный пост-шаблон из каталога?");
     if (reply != QMessageBox::Yes)
     {
         return;
@@ -1555,7 +1561,9 @@ void TemplateEditor::onParsePostToTemplateClicked()
 void TemplateEditor::applyParsedFieldsToTemplate(const PostParseResult& parseResult)
 {
     auto value = [&parseResult](const QString& placeholder) -> QString
-    { return parseResult.fields.value(placeholder).trimmed(); };
+    {
+        return parseResult.fields.value(placeholder).trimmed();
+    };
 
     if (!value("%SERIES_TITLE%").isEmpty())
     {
@@ -1743,11 +1751,10 @@ void TemplateEditor::slotValidateAndAccept()
     const QStringList duplicateCastPairs = findDuplicatedCastNamePairs(ui->castEdit->toPlainText());
     if (!duplicateCastPairs.isEmpty())
     {
-        QMessageBox::warning(
-            this, "Повторы в касте",
-            QString("В списке каста найдены повторяющиеся ФИО (Имя Фамилия):\n\n%1\n\n"
-                    "Проверьте поле \"Каст\" и удалите дубли.")
-                .arg(duplicateCastPairs.join("\n")));
+        QMessageBox::warning(this, "Повторы в касте",
+                             QString("В списке каста найдены повторяющиеся ФИО (Имя Фамилия):\n\n%1\n\n"
+                                     "Проверьте поле \"Каст\" и удалите дубли.")
+                                 .arg(duplicateCastPairs.join("\n")));
         ui->castEdit->setFocus();
         return;
     }

@@ -4,6 +4,8 @@
 
 namespace
 {
+constexpr qsizetype kNoMatch = static_cast<qsizetype>(-1);
+
 QString normalizeForStructureParsing(QString text)
 {
     text.replace("\r\n", "\n");
@@ -11,7 +13,7 @@ QString normalizeForStructureParsing(QString text)
     return text.trimmed();
 }
 
-int findSectionHeaderStart(const QString& postText, const QStringList& anchors)
+qsizetype findSectionHeaderStart(const QString& postText, const QStringList& anchors)
 {
     for (const QString& anchor : anchors)
     {
@@ -23,12 +25,12 @@ int findSectionHeaderStart(const QString& postText, const QStringList& anchors)
             return match.capturedStart();
         }
     }
-    return -1;
+    return kNoMatch;
 }
 
-int findNextSectionHeaderStart(const QString& postText, int fromPos, const QStringList& allAnchors)
+qsizetype findNextSectionHeaderStart(const QString& postText, qsizetype fromPos, const QStringList& allAnchors)
 {
-    int nextPos = -1;
+    qsizetype nextPos = kNoMatch;
     for (const QString& anchor : allAnchors)
     {
         const QString escaped = QRegularExpression::escape(anchor);
@@ -36,7 +38,7 @@ int findNextSectionHeaderStart(const QString& postText, int fromPos, const QStri
         const QRegularExpressionMatch match = rx.match(postText, fromPos);
         if (match.hasMatch())
         {
-            const int pos = match.capturedStart();
+            const qsizetype pos = match.capturedStart();
             if (nextPos < 0 || pos < nextPos)
             {
                 nextPos = pos;
@@ -48,36 +50,36 @@ int findNextSectionHeaderStart(const QString& postText, int fromPos, const QStri
 
 QString extractSectionValue(const QString& postText, const QStringList& anchors, const QStringList& allAnchors)
 {
-    const int sectionStart = findSectionHeaderStart(postText, anchors);
+    const qsizetype sectionStart = findSectionHeaderStart(postText, anchors);
     if (sectionStart < 0)
     {
         return QString();
     }
 
-    const int lineEnd = postText.indexOf('\n', sectionStart);
-    const int headerEnd = (lineEnd >= 0) ? lineEnd : postText.size();
+    const qsizetype lineEnd = postText.indexOf('\n', sectionStart);
+    const qsizetype headerEnd = (lineEnd >= 0) ? lineEnd : postText.size();
     const QString headerLine = postText.mid(sectionStart, headerEnd - sectionStart);
-    const int colonIndex = headerLine.indexOf(':');
+    const qsizetype colonIndex = headerLine.indexOf(':');
     const QString inlineValue = (colonIndex >= 0) ? headerLine.mid(colonIndex + 1).trimmed() : QString();
     if (!inlineValue.isEmpty())
     {
         return inlineValue;
     }
 
-    const int bodyStart = (lineEnd >= 0) ? (lineEnd + 1) : headerEnd;
+    const qsizetype bodyStart = (lineEnd >= 0) ? (lineEnd + 1) : headerEnd;
     if (bodyStart >= postText.size())
     {
         return QString();
     }
 
-    int bodyEnd = findNextSectionHeaderStart(postText, bodyStart, allAnchors);
+    qsizetype bodyEnd = findNextSectionHeaderStart(postText, bodyStart, allAnchors);
     if (bodyEnd < 0)
     {
         bodyEnd = postText.size();
     }
 
     QString value = postText.mid(bodyStart, bodyEnd - bodyStart).trimmed();
-    const int hashtagsPos = value.indexOf(QRegularExpression("(?m)^\\s*#"));
+    const qsizetype hashtagsPos = value.indexOf(QRegularExpression("(?m)^\\s*#"));
     if (hashtagsPos >= 0)
     {
         value = value.left(hashtagsPos).trimmed();
@@ -91,7 +93,7 @@ void replaceFirstIfFound(QString& text, const QString& needle, const QString& re
     {
         return;
     }
-    const int pos = text.indexOf(needle);
+    const qsizetype pos = text.indexOf(needle);
     if (pos >= 0)
     {
         text.replace(pos, needle.size(), replacement);
@@ -104,8 +106,7 @@ QString extractPlatformLink(const QString& postText, const QString& platformLabe
 
     // Markdown-like link: [Anime365](https://...)
     {
-        const QRegularExpression markdownLinkRx(
-            QString("(?im)\\[%1\\]\\((https?://[^\\s\\)]+)\\)").arg(escaped));
+        const QRegularExpression markdownLinkRx(QString("(?im)\\[%1\\]\\((https?://[^\\s\\)]+)\\)").arg(escaped));
         const QRegularExpressionMatch match = markdownLinkRx.match(postText);
         if (match.hasMatch())
         {
@@ -217,10 +218,10 @@ QMap<QString, PostVersions> PostGenerator::generate(const ReleaseTemplate& t, co
 
 QStringList PostGenerator::supportedPlaceholders()
 {
-    return {"%SERIES_TITLE%",      "%EPISODE_NUMBER%",  "%TOTAL_EPISODES%", "%CAST_LIST%",        "%DIRECTOR%",
-            "%SOUND_ENGINEER%",    "%SONG_ENGINEER%",   "%EPISODE_ENGINEER%", "%RECORDING_ENGINEER%",
-            "%SUB_AUTHOR%",        "%TIMING_AUTHOR%",   "%SIGNS_AUTHOR%",     "%TRANSLATION_EDITOR%",
-            "%RELEASE_BUILDER%",   "%LINK_ANILIB%",     "%LINK_ANIME365%"};
+    return {"%SERIES_TITLE%",       "%EPISODE_NUMBER%",  "%TOTAL_EPISODES%", "%CAST_LIST%",
+            "%DIRECTOR%",           "%SOUND_ENGINEER%",  "%SONG_ENGINEER%",  "%EPISODE_ENGINEER%",
+            "%RECORDING_ENGINEER%", "%SUB_AUTHOR%",      "%TIMING_AUTHOR%",  "%SIGNS_AUTHOR%",
+            "%TRANSLATION_EDITOR%", "%RELEASE_BUILDER%", "%LINK_ANILIB%",    "%LINK_ANIME365%"};
 }
 
 PostParseResult PostGenerator::parsePostToFields(const QString& postTextRaw, const QString& sourceType)
@@ -261,14 +262,26 @@ PostParseResult PostGenerator::parsePostToFields(const QString& postTextRaw, con
         replaceFirstIfFound(templateText, title, "%SERIES_TITLE%");
     }
 
-    const QStringList allAnchors = {"роли дублировали",    "роли озвучивали", "озвучивали роли",
-                                    "режиссёр дубляжа",    "режиссер дубляжа", "режиссёр",
-                                    "режиссер",            "куратор закадра",  "звукорежиссёр",
-                                    "звукорежиссер",       "звукорежиссёр эпизода",
-                                    "звукорежиссер эпизода", "звукорежиссёр записи",
+    const QStringList allAnchors = {"роли дублировали",
+                                    "роли озвучивали",
+                                    "озвучивали роли",
+                                    "режиссёр дубляжа",
+                                    "режиссер дубляжа",
+                                    "режиссёр",
+                                    "режиссер",
+                                    "куратор закадра",
+                                    "звукорежиссёр",
+                                    "звукорежиссер",
+                                    "звукорежиссёр эпизода",
+                                    "звукорежиссер эпизода",
+                                    "звукорежиссёр записи",
                                     "звукорежиссер записи",
-                                    "перевод",             "разметка",         "тайминг",
-                                    "локализация надписей", "локализация видеоряда", "сборка релиза"};
+                                    "перевод",
+                                    "разметка",
+                                    "тайминг",
+                                    "локализация надписей",
+                                    "локализация видеоряда",
+                                    "сборка релиза"};
 
     const QString castValue =
         extractSectionValue(postText, {"роли дублировали", "роли озвучивали", "озвучивали роли"}, allAnchors);
@@ -278,10 +291,8 @@ PostParseResult PostGenerator::parsePostToFields(const QString& postTextRaw, con
         replaceFirstIfFound(templateText, castValue, "%CAST_LIST%");
     }
 
-    const QString directorValue =
-        extractSectionValue(postText, {"режиссёр дубляжа", "режиссер дубляжа", "режиссёр", "режиссер",
-                                       "куратор закадра"},
-                            allAnchors);
+    const QString directorValue = extractSectionValue(
+        postText, {"режиссёр дубляжа", "режиссер дубляжа", "режиссёр", "режиссер", "куратор закадра"}, allAnchors);
     if (!directorValue.isEmpty())
     {
         result.fields.insert("%DIRECTOR%", directorValue);

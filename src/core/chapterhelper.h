@@ -36,7 +36,7 @@ bool writeFfmetadata(const QList<ChapterMarker>& chapters, qint64 durationNs, co
 
 /// Remux MP4 with chapters from ffmetadata (stream copy). Returns false on error.
 bool applyChaptersToMp4(const QString& mp4Path, const QList<ChapterMarker>& chapters, qint64 durationNs,
-                          const QString& ffmpegPath, ProcessManager* proc, QString* errorMessage = nullptr);
+                        const QString& ffmpegPath, ProcessManager* proc, QString* errorMessage = nullptr);
 } // namespace ChapterHelper
 
 #endif

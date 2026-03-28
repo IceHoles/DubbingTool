@@ -1,13 +1,14 @@
 #include "chapterhelper.h"
+
 #include "processmanager.h"
 
 #include <QCryptographicHash>
 #include <QDateTime>
 #include <QDir>
 #include <QDomDocument>
-#include <QFileInfo>
 #include <QDomElement>
 #include <QFile>
+#include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -82,8 +83,7 @@ qint64 parseMatroskaTimeToNs(const QString& text)
         frac = frac.left(9);
     }
     const qint64 fracNs = frac.toLongLong();
-    const qint64 secPart =
-        static_cast<qint64>(h) * 3600LL + static_cast<qint64>(min) * 60LL + static_cast<qint64>(sec);
+    const qint64 secPart = static_cast<qint64>(h) * 3600LL + static_cast<qint64>(min) * 60LL + static_cast<qint64>(sec);
     return fracNs + secPart * 1000000000LL;
 }
 
@@ -159,7 +159,8 @@ QDomElement findEditionEntry(const QDomElement& chaptersEl)
                     if (c.isElement())
                     {
                         QDomElement ce = c.toElement();
-                        if (ce.tagName() == QLatin1String("EditionFlagDefault") && ce.text().trimmed() == QLatin1String("1"))
+                        if (ce.tagName() == QLatin1String("EditionFlagDefault") &&
+                            ce.text().trimmed() == QLatin1String("1"))
                         {
                             defaultEdition = e;
                             break;
@@ -228,14 +229,15 @@ QList<ChapterMarker> parseOgmChaptersData(const QByteArray& data)
         }
         out.append(m);
     }
-    std::sort(out.begin(), out.end(), [](const ChapterMarker& a, const ChapterMarker& b) { return a.startNs < b.startNs; });
+    std::sort(out.begin(), out.end(),
+              [](const ChapterMarker& a, const ChapterMarker& b) { return a.startNs < b.startNs; });
     return out;
 }
 
 QString uidFromIndex(int i)
 {
-    const QByteArray h = QCryptographicHash::hash(QByteArray::number(i) + QByteArray::number(QDateTime::currentMSecsSinceEpoch()),
-                                                  QCryptographicHash::Sha256);
+    const QByteArray h = QCryptographicHash::hash(
+        QByteArray::number(i) + QByteArray::number(QDateTime::currentMSecsSinceEpoch()), QCryptographicHash::Sha256);
     quint64 v = 0;
     for (int k = 0; k < 8 && k < h.size(); ++k)
     {
@@ -276,7 +278,8 @@ QList<ChapterMarker> ChapterHelper::parseMatroskaChapterXmlData(const QByteArray
         n = n.nextSibling();
     }
 
-    std::sort(out.begin(), out.end(), [](const ChapterMarker& a, const ChapterMarker& b) { return a.startNs < b.startNs; });
+    std::sort(out.begin(), out.end(),
+              [](const ChapterMarker& a, const ChapterMarker& b) { return a.startNs < b.startNs; });
     return out;
 }
 
@@ -351,8 +354,8 @@ bool ChapterHelper::extractEmbeddedChaptersToFile(const QString& mkvextractPath,
     }
 
     const QByteArray low = data.left(2048).toLower();
-    if (low.startsWith("<?xml") || low.contains("<chapters") || low.contains("chapteratom")
-        || low.contains("<editionentry") || data.contains("CHAPTER"))
+    if (low.startsWith("<?xml") || low.contains("<chapters") || low.contains("chapteratom") ||
+        low.contains("<editionentry") || data.contains("CHAPTER"))
     {
         return true;
     }
@@ -403,7 +406,8 @@ QList<ChapterMarker> ChapterHelper::parseFfprobeChaptersJson(const QByteArray& j
         m.title = title.isEmpty() ? QStringLiteral("Chapter") : title;
         out.append(m);
     }
-    std::sort(out.begin(), out.end(), [](const ChapterMarker& a, const ChapterMarker& b) { return a.startNs < b.startNs; });
+    std::sort(out.begin(), out.end(),
+              [](const ChapterMarker& a, const ChapterMarker& b) { return a.startNs < b.startNs; });
     return out;
 }
 
@@ -527,28 +531,29 @@ bool ChapterHelper::applyChaptersToMp4(const QString& mp4Path, const QList<Chapt
     QStringList stripArgs;
     stripArgs << QStringLiteral("-y") << QStringLiteral("-i") << QFileInfo(mp4Path).absoluteFilePath()
               << QStringLiteral("-map") << QStringLiteral("0:v") << QStringLiteral("-map") << QStringLiteral("0:a")
-              << QStringLiteral("-map_chapters") << QStringLiteral("-1") << QStringLiteral("-codec") << QStringLiteral("copy")
-              << QFileInfo(stripPath).absoluteFilePath();
+              << QStringLiteral("-map_chapters") << QStringLiteral("-1") << QStringLiteral("-codec")
+              << QStringLiteral("copy") << QFileInfo(stripPath).absoluteFilePath();
     bool stripOk = proc->executeAndWait(ffmpegPath, stripArgs, stripErr);
     if (!stripOk || !QFileInfo::exists(stripPath))
     {
         stripArgs.clear();
         stripArgs << QStringLiteral("-y") << QStringLiteral("-i") << QFileInfo(mp4Path).absoluteFilePath()
-                  << QStringLiteral("-map") << QStringLiteral("0:v") << QStringLiteral("-map_chapters") << QStringLiteral("-1")
-                  << QStringLiteral("-codec") << QStringLiteral("copy") << QFileInfo(stripPath).absoluteFilePath();
+                  << QStringLiteral("-map") << QStringLiteral("0:v") << QStringLiteral("-map_chapters")
+                  << QStringLiteral("-1") << QStringLiteral("-codec") << QStringLiteral("copy")
+                  << QFileInfo(stripPath).absoluteFilePath();
         stripErr.clear();
         stripOk = proc->executeAndWait(ffmpegPath, stripArgs, stripErr);
     }
-    const QString inputForChapterMux =
-        (stripOk && QFileInfo::exists(stripPath)) ? QFileInfo(stripPath).absoluteFilePath()
-                                                  : QFileInfo(mp4Path).absoluteFilePath();
+    const QString inputForChapterMux = (stripOk && QFileInfo::exists(stripPath))
+                                           ? QFileInfo(stripPath).absoluteFilePath()
+                                           : QFileInfo(mp4Path).absoluteFilePath();
 
     QStringList args;
     // Only video+audio; chapters from ffmetadata (input 1).
     args << QStringLiteral("-y") << QStringLiteral("-i") << inputForChapterMux << QStringLiteral("-i")
-         << QFileInfo(ffmetaPath).absoluteFilePath() << QStringLiteral("-map") << QStringLiteral("0:v") << QStringLiteral("-map")
-         << QStringLiteral("0:a") << QStringLiteral("-map_chapters") << QStringLiteral("1") << QStringLiteral("-codec")
-         << QStringLiteral("copy") << QFileInfo(tmpPath).absoluteFilePath();
+         << QFileInfo(ffmetaPath).absoluteFilePath() << QStringLiteral("-map") << QStringLiteral("0:v")
+         << QStringLiteral("-map") << QStringLiteral("0:a") << QStringLiteral("-map_chapters") << QStringLiteral("1")
+         << QStringLiteral("-codec") << QStringLiteral("copy") << QFileInfo(tmpPath).absoluteFilePath();
 
     QByteArray errOut;
     if (!proc->executeAndWait(ffmpegPath, args, errOut))

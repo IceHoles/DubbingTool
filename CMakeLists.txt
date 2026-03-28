@@ -204,11 +204,21 @@ if(ENABLE_CLANG_TIDY)
     endif()
 endif()
 
+include(GNUInstallDirs)
+
+# Ship default post template catalog next to the executable (edit data/post_template_catalog.json for releases).
+set(POST_TEMPLATE_CATALOG ${CMAKE_SOURCE_DIR}/data/post_template_catalog.json)
+add_custom_command(
+    TARGET ${PROJECT_NAME}
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${POST_TEMPLATE_CATALOG}"
+            "$<TARGET_FILE_DIR:${PROJECT_NAME}>/post_template_catalog.json"
+    COMMENT "Copy post_template_catalog.json next to executable")
+
 # Install rules
-install(TARGETS ${PROJECT_NAME}
-    BUNDLE DESTINATION .
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-)
+install(TARGETS ${PROJECT_NAME} BUNDLE DESTINATION . RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+install(FILES ${POST_TEMPLATE_CATALOG} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # ============================================================================
 # Testing

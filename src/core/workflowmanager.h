@@ -15,10 +15,10 @@
 
 #include <QDir>
 #include <QFileInfo>
+#include <QJsonObject>
 #include <QNetworkAccessManager>
 #include <QNetworkCookie>
 #include <QNetworkReply>
-#include <QJsonObject>
 #include <QObject>
 #include <QSettings>
 #include <QTimer>
@@ -63,8 +63,8 @@ struct UserInputResponse
 
     bool isValid() const
     {
-        return !audioPath.isEmpty() || !resolvedFonts.isEmpty() || !time.isEmpty() || !chaptersXmlPath.isEmpty()
-               || buildWithoutChapters;
+        return !audioPath.isEmpty() || !resolvedFonts.isEmpty() || !time.isEmpty() || !chaptersXmlPath.isEmpty() ||
+               buildWithoutChapters;
     }
 };
 

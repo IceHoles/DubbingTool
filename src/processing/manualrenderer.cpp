@@ -8,9 +8,9 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QJsonArray>
 #include <QProcess>
 #include <QRegularExpression>
 
@@ -215,16 +215,17 @@ void ManualRenderer::start()
         else if (hardsubMode == "internal")
         {
             const int subtitleTrackIndex = m_params.value("subtitleTrackIndex").toInt();
-            const QString tempAssPath =
-                QDir(QFileInfo(inputMkv).absolutePath()).filePath(QString("temp_internal_subs_%1.ass").arg(subtitleTrackIndex));
+            const QString tempAssPath = QDir(QFileInfo(inputMkv).absolutePath())
+                                            .filePath(QString("temp_internal_subs_%1.ass").arg(subtitleTrackIndex));
             QFile::remove(tempAssPath);
 
             QByteArray extractOutput;
             const QString ffmpegPath = AppSettings::instance().ffmpegPath();
             QStringList extractArgs;
-            extractArgs << "-y" << "-i" << inputMkv << "-map" << QString("0:s:%1").arg(subtitleTrackIndex)
-                        << "-c:s" << "ass" << tempAssPath;
-            if (m_processManager->executeAndWait(ffmpegPath, extractArgs, extractOutput) && QFileInfo::exists(tempAssPath))
+            extractArgs << "-y" << "-i" << inputMkv << "-map" << QString("0:s:%1").arg(subtitleTrackIndex) << "-c:s"
+                        << "ass" << tempAssPath;
+            if (m_processManager->executeAndWait(ffmpegPath, extractArgs, extractOutput) &&
+                QFileInfo::exists(tempAssPath))
             {
                 segment = AssProcessor::detectTbSegmentFromFile(tempAssPath);
             }
@@ -260,11 +261,10 @@ void ManualRenderer::start()
             }
 
             const bool reencodeAudioAac = m_params.value(QStringLiteral("reencodeAudioAac256"), true).toBool();
-            m_concatRenderer = new ConcatTbRenderer(inputMkv, outputMp4, segment, m_sourceDurationS, videoCodecExtension,
-                                                    hardsubModeForConcat, subtitleTrackIndex, externalSubsPath,
-                                                    detectedVideoBitrateKbps, detectedVideoFrameRate,
-                                                    detectedVideoAvgFrameRate, detectedVideoIsCfr, reencodeAudioAac,
-                                                    m_processManager, this);
+            m_concatRenderer = new ConcatTbRenderer(
+                inputMkv, outputMp4, segment, m_sourceDurationS, videoCodecExtension, hardsubModeForConcat,
+                subtitleTrackIndex, externalSubsPath, detectedVideoBitrateKbps, detectedVideoFrameRate,
+                detectedVideoAvgFrameRate, detectedVideoIsCfr, reencodeAudioAac, m_processManager, this);
             connect(m_concatRenderer, &ConcatTbRenderer::logMessage, this, &ManualRenderer::logMessage);
             connect(m_concatRenderer, &ConcatTbRenderer::progressUpdated, this, &ManualRenderer::progressUpdated);
             connect(m_concatRenderer, &ConcatTbRenderer::finished, this,
@@ -386,7 +386,7 @@ QStringList ManualRenderer::prepareCommandArguments(const QString& commandTempla
         (!extCh.isEmpty() && QFileInfo::exists(extCh)) || (xfer && QFileInfo::exists(inputMkv));
     if (willApplyChaptersLater)
     {
-        const int outIdx = args.size() - 1;
+        const qsizetype outIdx = args.size() - 1;
         if (outIdx >= 0)
         {
             args.insert(outIdx, QStringLiteral("-1"));
@@ -547,12 +547,11 @@ void ManualRenderer::applyChaptersIfNeeded()
         return;
     }
 
-    const qint64 durNs =
-        m_sourceDurationS > 0 ? static_cast<qint64>(static_cast<double>(m_sourceDurationS) * 1e9) : 0;
+    const qint64 durNs = m_sourceDurationS > 0 ? static_cast<qint64>(static_cast<double>(m_sourceDurationS) * 1e9) : 0;
     QString err;
     emit logMessage(QStringLiteral("Запись глав в MP4..."), LogCategory::APP);
-    if (ChapterHelper::applyChaptersToMp4(outMp4, markers, durNs, AppSettings::instance().ffmpegPath(), m_processManager,
-                                          &err))
+    if (ChapterHelper::applyChaptersToMp4(outMp4, markers, durNs, AppSettings::instance().ffmpegPath(),
+                                          m_processManager, &err))
     {
         emit logMessage(QStringLiteral("Главы записаны в MP4."), LogCategory::APP);
     }

@@ -130,8 +130,7 @@ bool MissingFilesDialog::getBuildWithoutChapters() const
 
 void MissingFilesDialog::on_browseChaptersButton_clicked()
 {
-    QString path = QFileDialog::getOpenFileName(this, "Файл глав Matroska (XML)", "",
-                                                "XML (*.xml);;Все файлы (*)");
+    QString path = QFileDialog::getOpenFileName(this, "Файл глав Matroska (XML)", "", "XML (*.xml);;Все файлы (*)");
     if (!path.isEmpty())
     {
         ui->buildWithoutChaptersCheckBox->setChecked(false);

@@ -596,8 +596,7 @@ void MainWindow::on_selectMkvButton_clicked()
         lastDir = QFileInfo(ui->mkvPathLineEdit->text()).absolutePath();
     }
 
-    QString filePath =
-        QFileDialog::getOpenFileName(this, "Выберите видеофайл", lastDir, "Видеофайлы (*.mkv *.mp4)");
+    QString filePath = QFileDialog::getOpenFileName(this, "Выберите видеофайл", lastDir, "Видеофайлы (*.mkv *.mp4)");
     if (filePath.isEmpty())
     {
         return;
@@ -725,8 +724,8 @@ void MainWindow::on_selectAudioButton_clicked()
         lastDir = QFileInfo(ui->audioPathLineEdit->text()).absolutePath();
     }
 
-    QString filePath = QFileDialog::getOpenFileName(this, "Выберите аудиофайл", lastDir,
-                                                    "Аудиофайлы (*.wav *.flac *.aac)");
+    QString filePath =
+        QFileDialog::getOpenFileName(this, "Выберите аудиофайл", lastDir, "Аудиофайлы (*.wav *.flac *.aac)");
     if (!filePath.isEmpty())
     {
         ui->audioPathLineEdit->setText(filePath);
@@ -929,8 +928,8 @@ void MainWindow::on_browseChaptersXmlButton_clicked()
         lastDir = QFileInfo(ui->chaptersXmlPathLineEdit->text()).absolutePath();
     }
 
-    QString filePath = QFileDialog::getOpenFileName(this, "Файл глав Matroska (XML)", lastDir,
-                                                    "XML (*.xml);;Все файлы (*)");
+    QString filePath =
+        QFileDialog::getOpenFileName(this, "Файл глав Matroska (XML)", lastDir, "XML (*.xml);;Все файлы (*)");
     if (!filePath.isEmpty())
     {
         ui->chaptersXmlPathLineEdit->setText(filePath);

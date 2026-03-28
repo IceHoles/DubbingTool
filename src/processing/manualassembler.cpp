@@ -294,9 +294,13 @@ QString ManualAssembler::resolveChaptersPathForMkvMerge()
         if (!ffprobePath.isEmpty() && QFileInfo::exists(ffprobePath))
         {
             QByteArray json;
-            const QStringList args = {QStringLiteral("-v"), QStringLiteral("quiet"), QStringLiteral("-show_chapters"),
-                                      QStringLiteral("-print_format"), QStringLiteral("json"),
-                                      QStringLiteral("-i"), videoPath};
+            const QStringList args = {QStringLiteral("-v"),
+                                      QStringLiteral("quiet"),
+                                      QStringLiteral("-show_chapters"),
+                                      QStringLiteral("-print_format"),
+                                      QStringLiteral("json"),
+                                      QStringLiteral("-i"),
+                                      videoPath};
             if (m_processManager->executeAndWait(ffprobePath, args, json))
             {
                 const QList<ChapterMarker> markers = ChapterHelper::parseFfprobeChaptersJson(json);

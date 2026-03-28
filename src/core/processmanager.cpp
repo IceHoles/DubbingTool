@@ -48,7 +48,8 @@ void ProcessManager::startProcess(const QString& program, const QStringList& arg
     m_workingDir.clear();
 }
 
-bool ProcessManager::executeAndWait(const QString& program, const QStringList& arguments, QByteArray& output, int timeoutMs)
+bool ProcessManager::executeAndWait(const QString& program, const QStringList& arguments, QByteArray& output,
+                                    int timeoutMs)
 {
     emit processOutput(QString("Запуск (синхронный): %1 %2").arg(program, arguments.join(" ")));
 

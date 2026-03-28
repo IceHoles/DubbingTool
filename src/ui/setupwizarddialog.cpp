@@ -211,21 +211,22 @@ void SetupWizardDialog::buildToolsPage()
 
     auto* browseProjectDir = new QPushButton("Обзор...", page);
     browseProjectDir->setFixedWidth(80);
-    connect(browseProjectDir, &QPushButton::clicked, this, [this]() {
-        QString dir =
-            QFileDialog::getExistingDirectory(this, "Выберите директорию проектов", m_projectDirectoryEdit->text());
-        if (!dir.isEmpty())
-        {
-            m_projectDirectoryEdit->setText(dir);
-        }
-    });
+    connect(browseProjectDir, &QPushButton::clicked, this,
+            [this]()
+            {
+                QString dir = QFileDialog::getExistingDirectory(this, "Выберите директорию проектов",
+                                                                m_projectDirectoryEdit->text());
+                if (!dir.isEmpty())
+                {
+                    m_projectDirectoryEdit->setText(dir);
+                }
+            });
     dirRowLayout->addWidget(browseProjectDir);
     layout->addLayout(dirRowLayout);
 
-    auto* dirHint =
-        new QLabel("Папка, в которой создаётся структура проекта (Sources/, Result/). "
-                    "Если не указана — используется downloads/ рядом с программой.",
-                    page);
+    auto* dirHint = new QLabel("Папка, в которой создаётся структура проекта (Sources/, Result/). "
+                               "Если не указана — используется downloads/ рядом с программой.",
+                               page);
     dirHint->setWordWrap(true);
     dirHint->setStyleSheet("color: gray; font-size: 11px;");
     layout->addWidget(dirHint);

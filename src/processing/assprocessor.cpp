@@ -566,7 +566,6 @@ TbSegment AssProcessor::detectTbSegmentFromFile(const QString& assPath)
     return segment;
 }
 
-
 QStringList AssProcessor::generateTb(const ReleaseTemplate& t, const QString& startTime, int detectedResX)
 {
     if (!t.generateTb)

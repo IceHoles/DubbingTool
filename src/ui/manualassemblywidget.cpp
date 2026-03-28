@@ -27,10 +27,7 @@ ManualAssemblyWidget::ManualAssemblyWidget(QWidget* parent)
     connect(ui->modeSwitchButton, &QToolButton::toggled, this, &ManualAssemblyWidget::onModeSwitched);
     connect(ui->convertAudioCheckBox, &QCheckBox::toggled, ui->convertAudioFormatComboBox, &QComboBox::setVisible);
     connect(ui->manualChaptersCustomCheckBox, &QCheckBox::toggled, this,
-            [this](bool)
-            {
-                updateChaptersUiVisibility();
-            });
+            [this](bool) { updateChaptersUiVisibility(); });
     ui->modeSwitchButton->setChecked(false);
     onModeSwitched(false);
     ui->convertAudioFormatComboBox->setVisible(ui->convertAudioCheckBox->isChecked());
@@ -77,8 +74,7 @@ void ManualAssemblyWidget::updateChaptersUiVisibility()
     const bool manualMode = ui->modeSwitchButton->isChecked();
     const bool chaptersUi = m_templateChaptersEnabled || manualMode;
     ui->manualChaptersCustomCheckBox->setVisible(chaptersUi);
-    const bool showPathRow =
-        manualMode || (chaptersUi && ui->manualChaptersCustomCheckBox->isChecked());
+    const bool showPathRow = manualMode || (chaptersUi && ui->manualChaptersCustomCheckBox->isChecked());
     ui->manualChaptersXmlPathRowWidget->setVisible(showPathRow);
 }
 

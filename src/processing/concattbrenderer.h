@@ -11,7 +11,10 @@ struct TbSegment
 {
     double startSeconds = 0.0;
     double endSeconds = 0.0;
-    bool isValid() const { return endSeconds > startSeconds; }
+    bool isValid() const
+    {
+        return endSeconds > startSeconds;
+    }
 };
 
 class ConcatTbRenderer : public QObject
@@ -23,8 +26,7 @@ public:
                      qint64 sourceDurationS, const QString& videoCodecExtension, const QString& hardsubMode,
                      int subtitleTrackIndex, const QString& externalSubsPath, int videoBitrateKbps,
                      const QString& videoFrameRate, const QString& videoAvgFrameRate, bool videoIsCfr,
-                     bool reencodeAudioAac256, ProcessManager* processManager,
-                     QObject* parent = nullptr);
+                     bool reencodeAudioAac256, ProcessManager* processManager, QObject* parent = nullptr);
 
     void start();
 
@@ -92,4 +94,3 @@ private:
 };
 
 #endif // CONCATTBRENDERER_H
-

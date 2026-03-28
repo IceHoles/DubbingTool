@@ -2,8 +2,8 @@
 #define MANUALRENDERER_H
 
 #include "appsettings.h"
-#include "renderhelper.h"
 #include "concattbrenderer.h"
+#include "renderhelper.h"
 
 #include <QDir>
 #include <QObject>
