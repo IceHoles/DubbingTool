@@ -2,6 +2,153 @@
 
 #include <QRegularExpression>
 
+namespace
+{
+QString normalizeForStructureParsing(QString text)
+{
+    text.replace("\r\n", "\n");
+    text.replace('\r', '\n');
+    return text.trimmed();
+}
+
+int findSectionHeaderStart(const QString& postText, const QStringList& anchors)
+{
+    for (const QString& anchor : anchors)
+    {
+        const QString escaped = QRegularExpression::escape(anchor);
+        const QRegularExpression rx(QString("(?im)^[^\\n]*%1[^\\n]*:").arg(escaped));
+        const QRegularExpressionMatch match = rx.match(postText);
+        if (match.hasMatch())
+        {
+            return match.capturedStart();
+        }
+    }
+    return -1;
+}
+
+int findNextSectionHeaderStart(const QString& postText, int fromPos, const QStringList& allAnchors)
+{
+    int nextPos = -1;
+    for (const QString& anchor : allAnchors)
+    {
+        const QString escaped = QRegularExpression::escape(anchor);
+        const QRegularExpression rx(QString("(?im)^[^\\n]*%1[^\\n]*:").arg(escaped));
+        const QRegularExpressionMatch match = rx.match(postText, fromPos);
+        if (match.hasMatch())
+        {
+            const int pos = match.capturedStart();
+            if (nextPos < 0 || pos < nextPos)
+            {
+                nextPos = pos;
+            }
+        }
+    }
+    return nextPos;
+}
+
+QString extractSectionValue(const QString& postText, const QStringList& anchors, const QStringList& allAnchors)
+{
+    const int sectionStart = findSectionHeaderStart(postText, anchors);
+    if (sectionStart < 0)
+    {
+        return QString();
+    }
+
+    const int lineEnd = postText.indexOf('\n', sectionStart);
+    const int headerEnd = (lineEnd >= 0) ? lineEnd : postText.size();
+    const QString headerLine = postText.mid(sectionStart, headerEnd - sectionStart);
+    const int colonIndex = headerLine.indexOf(':');
+    const QString inlineValue = (colonIndex >= 0) ? headerLine.mid(colonIndex + 1).trimmed() : QString();
+    if (!inlineValue.isEmpty())
+    {
+        return inlineValue;
+    }
+
+    const int bodyStart = (lineEnd >= 0) ? (lineEnd + 1) : headerEnd;
+    if (bodyStart >= postText.size())
+    {
+        return QString();
+    }
+
+    int bodyEnd = findNextSectionHeaderStart(postText, bodyStart, allAnchors);
+    if (bodyEnd < 0)
+    {
+        bodyEnd = postText.size();
+    }
+
+    QString value = postText.mid(bodyStart, bodyEnd - bodyStart).trimmed();
+    const int hashtagsPos = value.indexOf(QRegularExpression("(?m)^\\s*#"));
+    if (hashtagsPos >= 0)
+    {
+        value = value.left(hashtagsPos).trimmed();
+    }
+    return value;
+}
+
+void replaceFirstIfFound(QString& text, const QString& needle, const QString& replacement)
+{
+    if (needle.trimmed().isEmpty())
+    {
+        return;
+    }
+    const int pos = text.indexOf(needle);
+    if (pos >= 0)
+    {
+        text.replace(pos, needle.size(), replacement);
+    }
+}
+
+QString extractPlatformLink(const QString& postText, const QString& platformLabelPattern)
+{
+    const QString escaped = platformLabelPattern;
+
+    // Markdown-like link: [Anime365](https://...)
+    {
+        const QRegularExpression markdownLinkRx(
+            QString("(?im)\\[%1\\]\\((https?://[^\\s\\)]+)\\)").arg(escaped));
+        const QRegularExpressionMatch match = markdownLinkRx.match(postText);
+        if (match.hasMatch())
+        {
+            return match.captured(1).trimmed();
+        }
+    }
+
+    // Parentheses style: Anime365 (https://...)
+    {
+        const QRegularExpression parenthesisRx(QString("(?im)%1\\s*\\((https?://[^\\s\\)]+)\\)").arg(escaped));
+        const QRegularExpressionMatch match = parenthesisRx.match(postText);
+        if (match.hasMatch())
+        {
+            return match.captured(1).trimmed();
+        }
+    }
+
+    // Colon style: Anime365: https://...
+    {
+        const QRegularExpression colonRx(QString("(?im)%1\\s*:\\s*(https?://[^\\s\\n]+)").arg(escaped));
+        const QRegularExpressionMatch match = colonRx.match(postText);
+        if (match.hasMatch())
+        {
+            return match.captured(1).trimmed();
+        }
+    }
+
+    // Next-line style:
+    // Anime365
+    // https://...
+    {
+        const QRegularExpression nextLineRx(QString("(?ims)%1\\s*\\n\\s*(https?://[^\\s\\n]+)").arg(escaped));
+        const QRegularExpressionMatch match = nextLineRx.match(postText);
+        if (match.hasMatch())
+        {
+            return match.captured(1).trimmed();
+        }
+    }
+
+    return QString();
+}
+} // namespace
+
 PostGenerator::PostGenerator(QObject* parent) : QObject(parent)
 {
 }
@@ -66,4 +213,142 @@ QMap<QString, PostVersions> PostGenerator::generate(const ReleaseTemplate& t, co
     }
 
     return generatedPosts;
+}
+
+QStringList PostGenerator::supportedPlaceholders()
+{
+    return {"%SERIES_TITLE%",      "%EPISODE_NUMBER%",  "%TOTAL_EPISODES%", "%CAST_LIST%",        "%DIRECTOR%",
+            "%SOUND_ENGINEER%",    "%SONG_ENGINEER%",   "%EPISODE_ENGINEER%", "%RECORDING_ENGINEER%",
+            "%SUB_AUTHOR%",        "%TIMING_AUTHOR%",   "%SIGNS_AUTHOR%",     "%TRANSLATION_EDITOR%",
+            "%RELEASE_BUILDER%",   "%LINK_ANILIB%",     "%LINK_ANIME365%"};
+}
+
+PostParseResult PostGenerator::parsePostToFields(const QString& postTextRaw, const QString& sourceType)
+{
+    PostParseResult result;
+    const QString postText = normalizeForStructureParsing(postTextRaw);
+    if (postText.isEmpty())
+    {
+        result.errors << "Текст поста пуст.";
+        return result;
+    }
+
+    const QString normalizedSourceType = sourceType.trimmed().toLower();
+    if (normalizedSourceType != "telegram" && normalizedSourceType != "vk")
+    {
+        result.errors << "Для парсинга поддерживаются только Telegram и VK посты.";
+        return result;
+    }
+
+    QString templateText = postText;
+    const QRegularExpression episodeRx("(?im)(серия\\s*[:№-]?\\s*)(\\d+)\\s*/\\s*(\\d+)");
+    const QRegularExpressionMatch episodeMatch = episodeRx.match(postText);
+    if (episodeMatch.hasMatch())
+    {
+        result.fields.insert("%EPISODE_NUMBER%", episodeMatch.captured(2).trimmed());
+        result.fields.insert("%TOTAL_EPISODES%", episodeMatch.captured(3).trimmed());
+        const QString episodeReplacement =
+            QString("%1%2/%3").arg(episodeMatch.captured(1), "%EPISODE_NUMBER%", "%TOTAL_EPISODES%");
+        templateText.replace(episodeMatch.capturedStart(0), episodeMatch.capturedLength(0), episodeReplacement);
+    }
+
+    const QRegularExpression titleRx("[«\"]([^»\"]+)[»\"]");
+    const QRegularExpressionMatch titleMatch = titleRx.match(postText);
+    if (titleMatch.hasMatch())
+    {
+        const QString title = titleMatch.captured(1).trimmed();
+        result.fields.insert("%SERIES_TITLE%", title);
+        replaceFirstIfFound(templateText, title, "%SERIES_TITLE%");
+    }
+
+    const QStringList allAnchors = {"роли дублировали",    "роли озвучивали", "озвучивали роли",
+                                    "режиссёр дубляжа",    "режиссер дубляжа", "режиссёр",
+                                    "режиссер",            "куратор закадра",  "звукорежиссёр",
+                                    "звукорежиссер",       "звукорежиссёр эпизода",
+                                    "звукорежиссер эпизода", "звукорежиссёр записи",
+                                    "звукорежиссер записи",
+                                    "перевод",             "разметка",         "тайминг",
+                                    "локализация надписей", "локализация видеоряда", "сборка релиза"};
+
+    const QString castValue =
+        extractSectionValue(postText, {"роли дублировали", "роли озвучивали", "озвучивали роли"}, allAnchors);
+    if (!castValue.isEmpty())
+    {
+        result.fields.insert("%CAST_LIST%", castValue);
+        replaceFirstIfFound(templateText, castValue, "%CAST_LIST%");
+    }
+
+    const QString directorValue =
+        extractSectionValue(postText, {"режиссёр дубляжа", "режиссер дубляжа", "режиссёр", "режиссер",
+                                       "куратор закадра"},
+                            allAnchors);
+    if (!directorValue.isEmpty())
+    {
+        result.fields.insert("%DIRECTOR%", directorValue);
+        replaceFirstIfFound(templateText, directorValue, "%DIRECTOR%");
+    }
+
+    const QString soundValue = extractSectionValue(postText, {"звукорежиссёр", "звукорежиссер"}, allAnchors);
+    if (!soundValue.isEmpty())
+    {
+        result.fields.insert("%SOUND_ENGINEER%", soundValue);
+        replaceFirstIfFound(templateText, soundValue, "%SOUND_ENGINEER%");
+    }
+
+    const QString episodeEngineerValue =
+        extractSectionValue(postText, {"звукорежиссёр эпизода", "звукорежиссер эпизода"}, allAnchors);
+    if (!episodeEngineerValue.isEmpty())
+    {
+        result.fields.insert("%EPISODE_ENGINEER%", episodeEngineerValue);
+        replaceFirstIfFound(templateText, episodeEngineerValue, "%EPISODE_ENGINEER%");
+    }
+
+    const QString recordingEngineerValue =
+        extractSectionValue(postText, {"звукорежиссёр записи", "звукорежиссер записи"}, allAnchors);
+    if (!recordingEngineerValue.isEmpty())
+    {
+        result.fields.insert("%RECORDING_ENGINEER%", recordingEngineerValue);
+        replaceFirstIfFound(templateText, recordingEngineerValue, "%RECORDING_ENGINEER%");
+    }
+
+    const QString subAuthorValue = extractSectionValue(postText, {"перевод"}, allAnchors);
+    if (!subAuthorValue.isEmpty())
+    {
+        result.fields.insert("%SUB_AUTHOR%", subAuthorValue);
+        result.fields.insert("%TRANSLATION_EDITOR%", subAuthorValue);
+        replaceFirstIfFound(templateText, subAuthorValue, "%SUB_AUTHOR%");
+        replaceFirstIfFound(templateText, subAuthorValue, "%TRANSLATION_EDITOR%");
+    }
+
+    const QString timingValue = extractSectionValue(postText, {"разметка", "тайминг"}, allAnchors);
+    if (!timingValue.isEmpty())
+    {
+        result.fields.insert("%TIMING_AUTHOR%", timingValue);
+        replaceFirstIfFound(templateText, timingValue, "%TIMING_AUTHOR%");
+    }
+
+    const QString releaseBuilderValue = extractSectionValue(postText, {"сборка релиза"}, allAnchors);
+    if (!releaseBuilderValue.isEmpty())
+    {
+        result.fields.insert("%RELEASE_BUILDER%", releaseBuilderValue);
+        replaceFirstIfFound(templateText, releaseBuilderValue, "%RELEASE_BUILDER%");
+    }
+
+    const QString anime365Link = extractPlatformLink(postText, "Anime365");
+    if (!anime365Link.isEmpty())
+    {
+        result.fields.insert("%LINK_ANIME365%", anime365Link);
+        replaceFirstIfFound(templateText, anime365Link, "%LINK_ANIME365%");
+    }
+
+    const QString anilibLink = extractPlatformLink(postText, "AnimeLib(?:\\s*4[КK])?");
+    if (!anilibLink.isEmpty())
+    {
+        result.fields.insert("%LINK_ANILIB%", anilibLink);
+        replaceFirstIfFound(templateText, anilibLink, "%LINK_ANILIB%");
+    }
+
+    result.fields.insert("%PARSED_TEMPLATE_TEXT%", templateText);
+    result.success = true;
+    return result;
 }

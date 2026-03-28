@@ -161,13 +161,13 @@ ConcatTbRenderer::ConcatTbRenderer(const QString& inputMkvPath, const QString& o
                                    qint64 sourceDurationS, const QString& videoCodecExtension, const QString& hardsubMode,
                                    int subtitleTrackIndex, const QString& externalSubsPath, int videoBitrateKbps,
                                    const QString& videoFrameRate, const QString& videoAvgFrameRate, bool videoIsCfr,
-                                   ProcessManager* processManager,
+                                   bool reencodeAudioAac256, ProcessManager* processManager,
                                    QObject* parent)
     : QObject(parent), m_inputMkvPath(inputMkvPath), m_outputMp4Path(outputMp4Path), m_segment(segment),
       m_sourceDurationS(sourceDurationS), m_processManager(processManager), m_videoCodecExtension(videoCodecExtension),
       m_hardsubMode(hardsubMode), m_subtitleTrackIndex(subtitleTrackIndex), m_externalSubsPath(externalSubsPath),
       m_videoBitrateKbps(videoBitrateKbps), m_videoFrameRate(videoFrameRate), m_videoAvgFrameRate(videoAvgFrameRate),
-      m_videoIsCfr(videoIsCfr)
+      m_videoIsCfr(videoIsCfr), m_reencodeAudioAac256(reencodeAudioAac256)
 {
     m_ffmpegPath = AppSettings::instance().ffmpegPath();
     m_ffprobePath = AppSettings::instance().ffprobePath();
@@ -659,9 +659,19 @@ void ConcatTbRenderer::concatJoinSegments()
          << "-map"
          << "1:a:0"
          << "-c:v"
-         << "copy"
-         << "-c:a"
          << "copy";
+    if (m_reencodeAudioAac256)
+    {
+        args << "-c:a"
+             << "aac"
+             << "-b:a"
+             << "256k";
+    }
+    else
+    {
+        args << "-c:a"
+             << "copy";
+    }
 
     const QString settsExpr = m_videoIsCfr ? buildSettsExprForFps(m_videoFrameRate) : "";
     const bool applySetts = !settsExpr.isEmpty();

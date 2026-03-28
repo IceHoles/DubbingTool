@@ -23,7 +23,7 @@ public:
                      qint64 sourceDurationS, const QString& videoCodecExtension, const QString& hardsubMode,
                      int subtitleTrackIndex, const QString& externalSubsPath, int videoBitrateKbps,
                      const QString& videoFrameRate, const QString& videoAvgFrameRate, bool videoIsCfr,
-                     ProcessManager* processManager,
+                     bool reencodeAudioAac256, ProcessManager* processManager,
                      QObject* parent = nullptr);
 
     void start();
@@ -66,6 +66,7 @@ private:
     QString m_videoFrameRate;
     QString m_videoAvgFrameRate;
     bool m_videoIsCfr = false;
+    bool m_reencodeAudioAac256 = true;
     QString m_tempFilterSubsPath;
     QString m_pendingStepErrorMessage;
     bool m_isRunningAsyncStep = false;

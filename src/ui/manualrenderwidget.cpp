@@ -23,6 +23,11 @@ ManualRenderWidget::ManualRenderWidget(QWidget* parent) : QWidget(parent), ui(ne
     {
         ui->renderPresetComboBox->setCurrentText(lastPreset);
     }
+    if (settings.contains(QStringLiteral("manualRender/reencodeAudioAac256")))
+    {
+        ui->reencodeAudioAac256CheckBox->setChecked(
+            settings.value(QStringLiteral("manualRender/reencodeAudioAac256"), true).toBool());
+    }
     connect(ui->hardsubCheckBox, &QCheckBox::toggled, this, &ManualRenderWidget::updateHardsubOptions);
     connect(ui->internalSubsRadio, &QRadioButton::toggled, this, &ManualRenderWidget::updateHardsubOptions);
     connect(ui->externalSubsRadio, &QRadioButton::toggled, this, &ManualRenderWidget::updateHardsubOptions);
@@ -109,6 +114,8 @@ void ManualRenderWidget::on_renderButton_clicked()
 
     QSettings settings("MyCompany", "DubbingTool");
     settings.setValue("manualRender/lastUsedPreset", ui->renderPresetComboBox->currentText());
+    settings.setValue(QStringLiteral("manualRender/reencodeAudioAac256"),
+                      ui->reencodeAudioAac256CheckBox->isChecked());
 
     emit renderRequested();
 }
@@ -223,6 +230,7 @@ QVariantMap ManualRenderWidget::getParameters() const
     params["useConcatTb"] = useConcatTb;
     params["chaptersExternalPath"] = ui->chaptersExternalPathManualEdit->text().trimmed();
     params["transferEmbeddedChapters"] = ui->transferEmbeddedChaptersCheckBox->isChecked();
+    params[QStringLiteral("reencodeAudioAac256")] = ui->reencodeAudioAac256CheckBox->isChecked();
 
     if (useHardsub)
     {

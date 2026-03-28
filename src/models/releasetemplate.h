@@ -23,6 +23,19 @@ struct TbStyleInfo
     void write(QJsonObject& json) const;
 };
 
+struct PostTemplateMeta
+{
+    QString title;
+    QString platform;
+    QString category;
+    QStringList tags;
+    int sortOrder = 0;
+    bool builtin = false;
+
+    void read(const QJsonObject& json);
+    void write(QJsonObject& json) const;
+};
+
 class ReleaseTemplate
 {
 public:
@@ -82,6 +95,7 @@ public:
 
     // Шаблоны для постов
     QMap<QString, QString> postTemplates; // Ключ: "VK", "Telegram", Значение: шаблон
+    QMap<QString, PostTemplateMeta> postTemplateMeta; // Метаданные для поиска/группировки шаблонов постов
     QString seriesTitleForPost;           // Название для поста, может отличаться от основного
     int totalEpisodes = 0;                // Общее число эпизодов для постов
     QString posterPath;                   // Путь к постеру

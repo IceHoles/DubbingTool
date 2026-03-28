@@ -25,6 +25,7 @@
 #include <QMessageBox>
 #include <QRegularExpression>
 #include <QSettings>
+#include <QStandardPaths>
 #include <QThread>
 
 static QString logCategoryToString(LogCategory category)
@@ -43,6 +44,59 @@ static QString logCategoryToString(LogCategory category)
         return "DEBUG";
     }
     return "UNKNOWN";
+}
+
+static QString newTemplateDraftFilePath()
+{
+    const QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir templatesDir(QDir(appDataPath).filePath("templates"));
+    if (!templatesDir.exists())
+    {
+        templatesDir.mkpath(".");
+    }
+    return templatesDir.filePath(".new_template_draft.json");
+}
+
+static QDir templatesStorageDir()
+{
+    const QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir templatesDir(QDir(appDataPath).filePath("templates"));
+    if (!templatesDir.exists())
+    {
+        templatesDir.mkpath(".");
+    }
+
+    // One-time migration from legacy relative storage (e.g. build/templates).
+    QDir legacyDir("templates");
+    if (legacyDir.exists() && templatesDir.entryList({"*.json"}, QDir::Files).isEmpty())
+    {
+        const QStringList legacyFiles = legacyDir.entryList({"*.json"}, QDir::Files);
+        for (const QString& fileName : legacyFiles)
+        {
+            QFile::copy(legacyDir.filePath(fileName), templatesDir.filePath(fileName));
+        }
+    }
+
+    return templatesDir;
+}
+
+static bool loadTemplateFromJsonFile(const QString& filePath, ReleaseTemplate& outTemplate)
+{
+    QFile draftFile(filePath);
+    if (!draftFile.open(QIODevice::ReadOnly))
+    {
+        return false;
+    }
+
+    QJsonParseError parseError;
+    const QJsonDocument doc = QJsonDocument::fromJson(draftFile.readAll(), &parseError);
+    if (parseError.error != QJsonParseError::NoError || !doc.isObject())
+    {
+        return false;
+    }
+
+    outTemplate.read(doc.object());
+    return !outTemplate.templateName.isEmpty();
 }
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWindow), m_currentWorker(nullptr)
@@ -155,12 +209,7 @@ void MainWindow::loadTemplates()
     m_templates.clear();
     ui->templateComboBox->clear();
 
-    QDir templatesDir("templates");
-    if (!templatesDir.exists())
-    {
-        templatesDir.mkpath(".");
-        logMessage("Создана папка 'templates' для хранения шаблонов.", LogCategory::APP);
-    }
+    QDir templatesDir = templatesStorageDir();
 
     QStringList filter("*.json");
     QFileInfoList fileList = templatesDir.entryInfoList(filter, QDir::Files);
@@ -212,10 +261,10 @@ void MainWindow::saveTemplate(const ReleaseTemplate& t)
 
     if (!m_editingTemplateFileName.isEmpty() && m_editingTemplateFileName != t.templateName)
     {
-        QFile::remove("templates/" + m_editingTemplateFileName + ".json");
+        QFile::remove(templatesStorageDir().filePath(m_editingTemplateFileName + ".json"));
     }
 
-    QDir templatesDir("templates");
+    QDir templatesDir = templatesStorageDir();
     QFile file(templatesDir.filePath(t.templateName + ".json"));
     if (!file.open(QIODevice::WriteOnly))
     {
@@ -243,6 +292,7 @@ void MainWindow::on_createTemplateButton_clicked()
 {
     m_editingTemplateFileName.clear();
     TemplateEditor editor(this);
+    const QString draftPath = newTemplateDraftFilePath();
 
     ReleaseTemplate defaultTemplate;
     defaultTemplate.templateName = "Новый шаблон";
@@ -299,9 +349,71 @@ void MainWindow::on_createTemplateButton_clicked()
         "А также вы можете поддержать наш коллектив на бусти: https://boosty.to/dubl/single-payment/donation/634652\n\n"
         "ТГ: https://t.me/dublyajnaya\n\n"
         "TVOЁ (99 руб. по промокоду: Dublyazhnaya): https://tvoe.live/p/";
+
+    PostTemplateMeta tgMp4Meta;
+    tgMp4Meta.title = "Telegram (Канал)";
+    tgMp4Meta.platform = "telegram";
+    tgMp4Meta.category = "База";
+    tgMp4Meta.tags = {"tg", "mp4", "дубляж"};
+    tgMp4Meta.sortOrder = 10;
+    tgMp4Meta.builtin = true;
+    defaultTemplate.postTemplateMeta.insert("tg_mp4", tgMp4Meta);
+
+    PostTemplateMeta tgMkvMeta = tgMp4Meta;
+    tgMkvMeta.title = "Telegram (Архив)";
+    tgMkvMeta.tags = {"tg", "mkv", "архив"};
+    tgMkvMeta.sortOrder = 20;
+    defaultTemplate.postTemplateMeta.insert("tg_mkv", tgMkvMeta);
+
+    PostTemplateMeta vkMeta;
+    vkMeta.title = "VK (Пост)";
+    vkMeta.platform = "vk";
+    vkMeta.category = "База";
+    vkMeta.tags = {"vk", "пост"};
+    vkMeta.sortOrder = 30;
+    vkMeta.builtin = true;
+    defaultTemplate.postTemplateMeta.insert("vk", vkMeta);
+
+    PostTemplateMeta vkCommentMeta = vkMeta;
+    vkCommentMeta.title = "VK (Комментарий)";
+    vkCommentMeta.tags = {"vk", "комментарий"};
+    vkCommentMeta.sortOrder = 40;
+    defaultTemplate.postTemplateMeta.insert("vk_comment", vkCommentMeta);
     defaultTemplate.uploadUrls << "https://vk.com/dublyajnaya" << "https://converter.kodik.biz/media-files"
                                << "https://anime-365.ru/" << "https://v4.anilib.me/ru";
-    editor.setTemplate(defaultTemplate);
+
+    ReleaseTemplate templateToEdit = defaultTemplate;
+    if (QFile::exists(draftPath))
+    {
+        const auto restoreReply = QMessageBox::question(
+            this, "Найден черновик шаблона",
+            "Найден несохраненный черновик нового шаблона. Восстановить его и продолжить редактирование?",
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+
+        if (restoreReply == QMessageBox::Yes)
+        {
+            ReleaseTemplate draftTemplate;
+            if (loadTemplateFromJsonFile(draftPath, draftTemplate))
+            {
+                templateToEdit = draftTemplate;
+                logMessage("Восстановлен черновик нового шаблона.", LogCategory::APP);
+            }
+            else
+            {
+                logMessage("Черновик найден, но не удалось его прочитать. Загружен шаблон по умолчанию.",
+                           LogCategory::APP);
+                QFile::remove(draftPath);
+            }
+        }
+        else
+        {
+            QFile::remove(draftPath);
+            logMessage("Черновик нового шаблона отклонен и удален.", LogCategory::APP);
+        }
+    }
+
+    editor.setTemplate(templateToEdit);
+    editor.enableDraftAutosave(draftPath);
 
     if (editor.exec() == QDialog::Accepted)
     {
@@ -312,6 +424,15 @@ void MainWindow::on_createTemplateButton_clicked()
             return;
         }
         saveTemplate(newTemplate);
+        const QString savedTemplatePath = templatesStorageDir().filePath(newTemplate.templateName + ".json");
+        if (QFile::exists(savedTemplatePath))
+        {
+            QFile::remove(draftPath);
+        }
+        else
+        {
+            logMessage("Сохранение шаблона не подтверждено, черновик оставлен.", LogCategory::APP);
+        }
     }
 }
 
@@ -350,7 +471,7 @@ void MainWindow::on_deleteTemplateButton_clicked()
 
     if (reply == QMessageBox::Yes)
     {
-        QFile::remove("templates/" + currentName + ".json");
+        QFile::remove(templatesStorageDir().filePath(currentName + ".json"));
         logMessage("Шаблон '" + currentName + "' удален.", LogCategory::APP);
         loadTemplates();
     }

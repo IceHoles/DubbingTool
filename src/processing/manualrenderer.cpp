@@ -50,6 +50,41 @@ bool isLikelyCfr(const QString& rFrameRate, const QString& avgFrameRate)
     const double avg = static_cast<double>(avgNum) / static_cast<double>(avgDen);
     return qAbs(r - avg) < 0.001;
 }
+
+void applyForcedAac256AudioArgs(QStringList& args)
+{
+    for (int i = 0; i < args.size(); ++i)
+    {
+        if (args.at(i) != QLatin1String("-c:a") && args.at(i) != QLatin1String("-codec:a"))
+        {
+            continue;
+        }
+        if (i + 1 >= args.size())
+        {
+            return;
+        }
+        args[i + 1] = QLatin1String("aac");
+        const int afterCodec = i + 2;
+        if (afterCodec < args.size() &&
+            (args.at(afterCodec) == QLatin1String("-b:a") || args.at(afterCodec) == QLatin1String("-audio_bitrate")))
+        {
+            if (afterCodec + 1 < args.size())
+            {
+                args[afterCodec + 1] = QLatin1String("256k");
+            }
+            else
+            {
+                args.append(QLatin1String("256k"));
+            }
+        }
+        else
+        {
+            args.insert(afterCodec, QLatin1String("-b:a"));
+            args.insert(afterCodec + 1, QLatin1String("256k"));
+        }
+        return;
+    }
+}
 } // namespace
 
 ManualRenderer::ManualRenderer(const QVariantMap& params, QObject* parent)
@@ -224,10 +259,11 @@ void ManualRenderer::start()
                 externalSubsPath = m_tempConcatSubsPath;
             }
 
+            const bool reencodeAudioAac = m_params.value(QStringLiteral("reencodeAudioAac256"), true).toBool();
             m_concatRenderer = new ConcatTbRenderer(inputMkv, outputMp4, segment, m_sourceDurationS, videoCodecExtension,
                                                     hardsubModeForConcat, subtitleTrackIndex, externalSubsPath,
                                                     detectedVideoBitrateKbps, detectedVideoFrameRate,
-                                                    detectedVideoAvgFrameRate, detectedVideoIsCfr,
+                                                    detectedVideoAvgFrameRate, detectedVideoIsCfr, reencodeAudioAac,
                                                     m_processManager, this);
             connect(m_concatRenderer, &ConcatTbRenderer::logMessage, this, &ManualRenderer::logMessage);
             connect(m_concatRenderer, &ConcatTbRenderer::progressUpdated, this, &ManualRenderer::progressUpdated);
@@ -356,6 +392,11 @@ QStringList ManualRenderer::prepareCommandArguments(const QString& commandTempla
             args.insert(outIdx, QStringLiteral("-1"));
             args.insert(outIdx, QStringLiteral("-map_chapters"));
         }
+    }
+    if (m_params.value(QStringLiteral("reencodeAudioAac256"), true).toBool())
+    {
+        applyForcedAac256AudioArgs(args);
+        emit logMessage(QStringLiteral("Аудио: принудительно AAC 256 kbps."), LogCategory::APP);
     }
     return args;
 }

@@ -7,30 +7,11 @@ ReleaseTemplate::ReleaseTemplate()
 {
 }
 
-// Вспомогательная функция для чтения QMap<QString, QUrl> из QJsonObject
-static QMap<QString, QUrl> readUrlMap(const QJsonObject& json)
-{
-    QMap<QString, QUrl> map;
-    for (auto it = json.constBegin(); it != json.constEnd(); ++it)
-    {
-        map.insert(it.key(), QUrl(it.value().toString()));
-    }
-    return map;
-}
-
-// Вспомогательная функция для записи QMap<QString, QUrl> в QJsonObject
-static QJsonObject writeUrlMap(const QMap<QString, QUrl>& map)
-{
-    QJsonObject json;
-    for (auto it = map.constBegin(); it != map.constEnd(); ++it)
-    {
-        json[it.key()] = it.value().toString();
-    }
-    return json;
-}
-
 void ReleaseTemplate::read(const QJsonObject& json)
 {
+    releaseTags.clear();
+    cast.clear();
+    uploadUrls.clear();
     templateName = json["templateName"].toString();
     seriesTitle = json["seriesTitle"].toString();
     QJsonArray tagsArray = json["releaseTags"].toArray();
@@ -106,6 +87,41 @@ void ReleaseTemplate::read(const QJsonObject& json)
         postTemplates.insert(key, postTemplatesObj[key].toString());
     }
 
+    postTemplateMeta.clear();
+    const QJsonObject postTemplateMetaObj = json["postTemplateMeta"].toObject();
+    for (const QString& key : postTemplateMetaObj.keys())
+    {
+        PostTemplateMeta meta;
+        meta.read(postTemplateMetaObj.value(key).toObject());
+        postTemplateMeta.insert(key, meta);
+    }
+
+    // Backward compatibility: infer basic metadata for old templates without postTemplateMeta.
+    for (auto it = postTemplates.constBegin(); it != postTemplates.constEnd(); ++it)
+    {
+        if (postTemplateMeta.contains(it.key()))
+        {
+            continue;
+        }
+
+        PostTemplateMeta inferred;
+        inferred.title = it.key();
+        if (it.key().startsWith("tg_"))
+        {
+            inferred.platform = "telegram";
+        }
+        else if (it.key().startsWith("vk"))
+        {
+            inferred.platform = "vk";
+        }
+        else
+        {
+            inferred.platform = "other";
+        }
+        inferred.category = "Общие";
+        postTemplateMeta.insert(it.key(), inferred);
+    }
+
     linkTemplates.clear();
     const QJsonObject linkTemplatesObj = json["linkTemplates"].toObject();
     for (const QString& key : linkTemplatesObj.keys())
@@ -179,6 +195,15 @@ void ReleaseTemplate::write(QJsonObject& json) const
     }
     json["postTemplates"] = postTemplatesObj;
 
+    QJsonObject postTemplateMetaObj;
+    for (auto it = postTemplateMeta.constBegin(); it != postTemplateMeta.constEnd(); ++it)
+    {
+        QJsonObject metaObj;
+        it.value().write(metaObj);
+        postTemplateMetaObj.insert(it.key(), metaObj);
+    }
+    json["postTemplateMeta"] = postTemplateMetaObj;
+
     QJsonObject linkTemplatesObj;
     for (auto it = linkTemplates.constBegin(); it != linkTemplates.constEnd(); ++it)
     {
@@ -197,6 +222,31 @@ void TbStyleInfo::read(const QJsonObject& json)
     marginRight = json["marginRight"].toInt(30);
     marginV = json["marginV"].toInt(10);
     styleName = json["styleName"].toString("Основной");
+}
+
+void PostTemplateMeta::read(const QJsonObject& json)
+{
+    title = json["title"].toString();
+    platform = json["platform"].toString();
+    category = json["category"].toString();
+    sortOrder = json["sortOrder"].toInt(0);
+    builtin = json["builtin"].toBool(false);
+    tags.clear();
+    const QJsonArray tagsArray = json["tags"].toArray();
+    for (const QJsonValue& value : tagsArray)
+    {
+        tags.append(value.toString());
+    }
+}
+
+void PostTemplateMeta::write(QJsonObject& json) const
+{
+    json["title"] = title;
+    json["platform"] = platform;
+    json["category"] = category;
+    json["sortOrder"] = sortOrder;
+    json["builtin"] = builtin;
+    json["tags"] = QJsonArray::fromStringList(tags);
 }
 
 void TbStyleInfo::write(QJsonObject& json) const

@@ -134,6 +134,19 @@
       </widget>
      </item>
      <item>
+      <widget class="QCheckBox" name="reencodeAudioAac256CheckBox">
+       <property name="toolTip">
+        <string>Если выключено: обычный рендер использует аудио из командной строки пресета (часто копирование); concat — копирование дорожки при склейке.</string>
+       </property>
+       <property name="text">
+        <string>Перекодировать аудио в AAC 256 kbps</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="QCheckBox" name="hardsubCheckBox">
        <property name="text">
         <string>Встроить субтитры в видео (Hardsub)</string>
