@@ -14,7 +14,6 @@
 #include <QVBoxLayout>
 #include <QWidget>
 
-
 class DraggableLabel : public QLabel
 {
     Q_OBJECT
