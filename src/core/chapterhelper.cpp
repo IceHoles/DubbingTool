@@ -484,8 +484,7 @@ QList<ChapterTimingSeconds> ChapterHelper::buildChapterTimingSeconds(const QList
         const ChapterMarker& current = sorted.at(i);
         const qint64 fallbackEndNs = (i + 1 < sorted.size()) ? sorted.at(i + 1).startNs : boundedDurationNs;
         const qint64 explicitEndNs = current.endNs;
-        const qint64 rawEndNs =
-            (explicitEndNs > current.startNs) ? explicitEndNs : fallbackEndNs;
+        const qint64 rawEndNs = (explicitEndNs > current.startNs) ? explicitEndNs : fallbackEndNs;
         const qint64 safeEndNs = std::max(rawEndNs, current.startNs);
 
         ChapterTimingSeconds row;

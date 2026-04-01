@@ -9,10 +9,11 @@
 #include <QDrag>
 #include <QGroupBox>
 #include <QLabel>
-#include <QVBoxLayout>
 #include <QMap>
 #include <QMimeData>
+#include <QVBoxLayout>
 #include <QWidget>
+
 
 class DraggableLabel : public QLabel
 {

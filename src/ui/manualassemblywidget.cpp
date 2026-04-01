@@ -315,7 +315,8 @@ QVariantMap ManualAssemblyWidget::getParameters() const
 
 QString ManualAssemblyWidget::chapterTimingSourcePath() const
 {
-    const bool useCustomXml = ui->manualChaptersCustomCheckBox->isVisible() && ui->manualChaptersCustomCheckBox->isChecked();
+    const bool useCustomXml =
+        ui->manualChaptersCustomCheckBox->isVisible() && ui->manualChaptersCustomCheckBox->isChecked();
     if (useCustomXml)
     {
         const QString chaptersXml = ui->chaptersXmlPathManualAssemblyEdit->text().trimmed();

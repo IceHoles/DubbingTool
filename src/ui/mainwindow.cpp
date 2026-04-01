@@ -1250,10 +1250,9 @@ QList<ChapterMarker> MainWindow::loadChaptersFromSourcePath(const QString& sourc
     }
 
     QProcess process;
-    process.start(ffprobePath,
-                  {QStringLiteral("-v"), QStringLiteral("quiet"), QStringLiteral("-show_chapters"),
-                   QStringLiteral("-show_format"), QStringLiteral("-print_format"), QStringLiteral("json"),
-                   QStringLiteral("-i"), path});
+    process.start(ffprobePath, {QStringLiteral("-v"), QStringLiteral("quiet"), QStringLiteral("-show_chapters"),
+                                QStringLiteral("-show_format"), QStringLiteral("-print_format"), QStringLiteral("json"),
+                                QStringLiteral("-i"), path});
     if (!process.waitForFinished(10000) || process.exitCode() != 0)
     {
         return {};
