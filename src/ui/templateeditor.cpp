@@ -1381,7 +1381,7 @@ void TemplateEditor::onPostTemplateAddClicked()
     meta.platform = "telegram";
     meta.category = "tg_post";
     meta.tags = {};
-    meta.sortOrder = 1000 + m_postTemplates.size();
+    meta.sortOrder = 1000 + static_cast<int>(m_postTemplates.size());
     meta.builtin = false;
 
     m_postTemplates.insert(key, "");
@@ -1418,8 +1418,8 @@ void TemplateEditor::onPostTemplateDeleteClicked()
         return;
     }
 
-    int removedTemplates = m_postTemplates.remove(key);
-    int removedMeta = m_postTemplateMeta.remove(key);
+    qsizetype removedTemplates = m_postTemplates.remove(key);
+    qsizetype removedMeta = m_postTemplateMeta.remove(key);
     if (removedTemplates == 0 && currentItem != nullptr)
     {
         const QString fallbackTitle = currentItem->text(0).trimmed();
@@ -1551,11 +1551,11 @@ void TemplateEditor::onParsePostToTemplateClicked()
     }
 
     applyParsedFieldsToTemplate(parseResult);
-    const int extractedFieldsCount =
+    const qsizetype extractedFieldsCount =
         parseResult.fields.size() - (parseResult.fields.contains("%PARSED_TEMPLATE_TEXT%") ? 1 : 0);
     QMessageBox::information(this, "Готово",
                              QString("Извлечено полей: %1.\nПроверьте вкладки \"Создание ТБ\" и \"Публикация\".")
-                                 .arg(qMax(0, extractedFieldsCount)));
+                                 .arg(static_cast<int>(qMax(qsizetype(0), extractedFieldsCount))));
 }
 
 void TemplateEditor::applyParsedFieldsToTemplate(const PostParseResult& parseResult)
