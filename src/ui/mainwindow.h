@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include "appsettings.h"
+#include "chapterhelper.h"
 #include "manualassemblywidget.h"
 #include "manualextractionwidget.h"
 #include "manualrenderwidget.h"
@@ -56,6 +57,7 @@ public slots:
     void onMkvFileReady(const QString& mkvPath);
     void onFilesReady(const QString& mkvPath, const QString& mp4Path);
     void onPostsUpdateRequest(const QMap<QString, QString>& viewLinks);
+    void onChapterMarkersReady(const QList<ChapterMarker>& chapters, qint64 durationNs);
     void onSignStylesRequest(const QString& subFilePath);
     void onMultipleAudioTracksFound(const QList<AudioTrackInfo>& candidates);
     void onBitrateCheckRequest(const RenderPreset& preset, double actualBitrate);
@@ -84,6 +86,7 @@ private slots:
     void on_browseOverrideSubsButton_clicked();
     void on_browseOverrideSignsButton_clicked();
     void on_browseChaptersXmlButton_clicked();
+    void onManualChapterTimingsRequested(const QString& sourcePath);
 
     void startManualAssembly();
     void startManualRender();
@@ -106,6 +109,8 @@ private:
     EpisodeData m_lastEpisodeData;
     QString m_lastMkvPath;
     QString m_lastMp4Path;
+    QList<ChapterMarker> m_lastChapterMarkers;
+    qint64 m_lastChapterDurationNs = 0;
 
     QList<ProcessManager*> m_activeProcessManagers;
     QPointer<QObject> m_currentWorker;
@@ -113,6 +118,7 @@ private:
     void setUiEnabled(bool enabled);
     void switchToCancelMode();
     void restoreUiAfterFinish();
+    QList<ChapterMarker> loadChaptersFromSourcePath(const QString& sourcePath, qint64* durationNs) const;
 
     void loadTemplates();
     void saveTemplate(const ReleaseTemplate& t);

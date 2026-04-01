@@ -194,6 +194,7 @@ signals:
     void postsReady(const ReleaseTemplate& t, const EpisodeData& data);
     void mkvFileReady(const QString& mkvPath);
     void filesReady(const QString& mkvPath, const QString& mp4Path);
+    void chapterMarkersReady(const QList<ChapterMarker>& chapters, qint64 durationNs);
     void finished(const ReleaseTemplate& t, const EpisodeData& data, const QString& mkvPath, const QString& mp4Path);
     void workflowAborted();
     void userInputRequired(const UserInputRequest& request);

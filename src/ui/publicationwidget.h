@@ -2,11 +2,14 @@
 #define PUBLICATIONWIDGET_H
 
 #include "appsettings.h"
+#include "chapterhelper.h"
 #include "postgenerator.h"
 #include "releasetemplate.h"
 
 #include <QDrag>
+#include <QGroupBox>
 #include <QLabel>
+#include <QVBoxLayout>
 #include <QMap>
 #include <QMimeData>
 #include <QWidget>
@@ -45,6 +48,7 @@ public:
     void updateData(const ReleaseTemplate& t, const EpisodeData& data, const QMap<QString, PostVersions>& posts,
                     const QString& mkvPath, const QString& mp4Path);
     void setFilePaths(const QString& mkvPath, const QString& mp4Path);
+    void setChapterTimings(const QList<ChapterMarker>& chapters, qint64 durationNs);
     void clearData();
 
 signals:
@@ -56,11 +60,16 @@ private slots:
     void onUpdatePosts();
 
 private:
+    void rebuildChapterRows();
+
     Ui::PublicationWidget* ui;
 
     ReleaseTemplate m_template;
     EpisodeData m_episodeData;
     QMap<QString, PostVersions> m_currentPosts;
+    QList<ChapterTimingSeconds> m_chapterTimings;
+    QGroupBox* m_chapterTimingsGroup = nullptr;
+    QVBoxLayout* m_chapterRowsLayout = nullptr;
 };
 
 #endif // PUBLICATIONWIDGET_H

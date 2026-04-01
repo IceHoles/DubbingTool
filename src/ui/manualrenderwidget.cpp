@@ -52,6 +52,8 @@ ManualRenderWidget::ManualRenderWidget(QWidget* parent) : QWidget(parent), ui(ne
                     ui->chaptersExternalPathManualEdit->setText(path);
                 }
             });
+    connect(ui->chapterTimingsButton, &QPushButton::clicked, this,
+            [this]() { emit chapterTimingsRequested(chapterTimingSourcePath()); });
 
     updateHardsubOptions();
 }
@@ -127,6 +129,15 @@ void ManualRenderWidget::setRendering(bool rendering)
 QString ManualRenderWidget::getCurrentPresetName() const
 {
     return ui->renderPresetComboBox->currentText();
+}
+
+QString ManualRenderWidget::chapterTimingSourcePath() const
+{
+    if (ui->transferEmbeddedChaptersCheckBox->isChecked())
+    {
+        return ui->inputMkvPathEdit->text().trimmed();
+    }
+    return ui->chaptersExternalPathManualEdit->text().trimmed();
 }
 
 void ManualRenderWidget::analyzeMkvForSubtitles(const QString& path)

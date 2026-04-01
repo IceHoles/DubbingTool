@@ -64,16 +64,46 @@ qint64 parseMatroskaTimeToNs(const QString& text)
         return plain;
     }
 
-    static const QRegularExpression re(R"((\d+):(\d{2}):(\d{2})\.(\d+))");
-    const QRegularExpressionMatch m = re.match(t);
-    if (!m.hasMatch())
+    const QStringList parts = t.split(QLatin1Char(':'));
+    if (parts.size() < 2 || parts.size() > 3)
     {
         return -1;
     }
-    const int h = m.captured(1).toInt();
-    const int min = m.captured(2).toInt();
-    const int sec = m.captured(3).toInt();
-    QString frac = m.captured(4);
+
+    bool okHours = true;
+    bool okMinutes = true;
+    bool okSeconds = true;
+    qint64 hours = 0;
+    qint64 minutes = 0;
+    QString secToken;
+    if (parts.size() == 3)
+    {
+        hours = parts.at(0).toLongLong(&okHours);
+        minutes = parts.at(1).toLongLong(&okMinutes);
+        secToken = parts.at(2);
+    }
+    else
+    {
+        minutes = parts.at(0).toLongLong(&okMinutes);
+        secToken = parts.at(1);
+    }
+    if (!okHours || !okMinutes)
+    {
+        return -1;
+    }
+
+    int fracSeparator = secToken.indexOf(QLatin1Char('.'));
+    if (fracSeparator < 0)
+    {
+        fracSeparator = secToken.indexOf(QLatin1Char(','));
+    }
+    const QString secWholeToken = fracSeparator >= 0 ? secToken.left(fracSeparator) : secToken;
+    QString frac = fracSeparator >= 0 ? secToken.mid(fracSeparator + 1) : QString();
+    const qint64 sec = secWholeToken.toLongLong(&okSeconds);
+    if (!okSeconds)
+    {
+        return -1;
+    }
     while (frac.length() < 9)
     {
         frac += QLatin1Char('0');
@@ -83,13 +113,14 @@ qint64 parseMatroskaTimeToNs(const QString& text)
         frac = frac.left(9);
     }
     const qint64 fracNs = frac.toLongLong();
-    const qint64 secPart = static_cast<qint64>(h) * 3600LL + static_cast<qint64>(min) * 60LL + static_cast<qint64>(sec);
+    const qint64 secPart = hours * 3600LL + minutes * 60LL + sec;
     return fracNs + secPart * 1000000000LL;
 }
 
 void parseChapterAtomElement(const QDomElement& atomEl, QList<ChapterMarker>& out)
 {
     qint64 startNs = -1;
+    qint64 endNs = -1;
     QString title;
     QList<QDomElement> nestedAtoms;
 
@@ -102,6 +133,10 @@ void parseChapterAtomElement(const QDomElement& atomEl, QList<ChapterMarker>& ou
             if (e.tagName() == QLatin1String("ChapterTimeStart"))
             {
                 startNs = parseMatroskaTimeToNs(e.text());
+            }
+            else if (e.tagName() == QLatin1String("ChapterTimeEnd"))
+            {
+                endNs = parseMatroskaTimeToNs(e.text());
             }
             else if (e.tagName() == QLatin1String("ChapterDisplay"))
             {
@@ -128,6 +163,7 @@ void parseChapterAtomElement(const QDomElement& atomEl, QList<ChapterMarker>& ou
     {
         ChapterMarker m;
         m.startNs = startNs;
+        m.endNs = endNs;
         m.title = title.isEmpty() ? QStringLiteral("Chapter") : title;
         out.append(m);
     }
@@ -222,6 +258,7 @@ QList<ChapterMarker> parseOgmChaptersData(const QByteArray& data)
         }
         ChapterMarker m;
         m.startNs = ns;
+        m.endNs = -1;
         m.title = numToName.value(k);
         if (m.title.isEmpty())
         {
@@ -376,25 +413,38 @@ QList<ChapterMarker> ChapterHelper::parseFfprobeChaptersJson(const QByteArray& j
     for (const QJsonValue& v : chapters)
     {
         const QJsonObject o = v.toObject();
-        double startSec = 0.0;
-        const QJsonValue st = o.value(QStringLiteral("start_time"));
-        if (st.isString())
+        auto parseJsonSeconds = [](const QJsonValue& value, bool* okOut) -> double
         {
-            bool ok = false;
-            startSec = st.toString().toDouble(&ok);
-            if (!ok)
+            bool okLocal = false;
+            double seconds = 0.0;
+            if (value.isString())
             {
-                continue;
+                seconds = value.toString().toDouble(&okLocal);
             }
-        }
-        else if (st.isDouble())
-        {
-            startSec = st.toDouble();
-        }
-        else
+            else if (value.isDouble())
+            {
+                seconds = value.toDouble();
+                okLocal = true;
+            }
+            if (okOut)
+            {
+                *okOut = okLocal;
+            }
+            return seconds;
+        };
+
+        const QJsonValue st = o.value(QStringLiteral("start_time"));
+        bool startOk = false;
+        const double startSec = parseJsonSeconds(st, &startOk);
+        if (!startOk)
         {
             continue;
         }
+
+        const QJsonValue et = o.value(QStringLiteral("end_time"));
+        bool endOk = false;
+        const double endSec = parseJsonSeconds(et, &endOk);
+
         QString title;
         const QJsonObject tags = o.value(QStringLiteral("tags")).toObject();
         if (tags.contains(QStringLiteral("title")))
@@ -403,11 +453,47 @@ QList<ChapterMarker> ChapterHelper::parseFfprobeChaptersJson(const QByteArray& j
         }
         ChapterMarker m;
         m.startNs = static_cast<qint64>(startSec * 1e9);
+        m.endNs = endOk ? static_cast<qint64>(endSec * 1e9) : -1;
         m.title = title.isEmpty() ? QStringLiteral("Chapter") : title;
         out.append(m);
     }
     std::sort(out.begin(), out.end(),
               [](const ChapterMarker& a, const ChapterMarker& b) { return a.startNs < b.startNs; });
+    return out;
+}
+
+QList<ChapterTimingSeconds> ChapterHelper::buildChapterTimingSeconds(const QList<ChapterMarker>& chapters,
+                                                                     qint64 durationNs)
+{
+    QList<ChapterTimingSeconds> out;
+    if (chapters.isEmpty())
+    {
+        return out;
+    }
+
+    QList<ChapterMarker> sorted = chapters;
+    std::sort(sorted.begin(), sorted.end(),
+              [](const ChapterMarker& a, const ChapterMarker& b) { return a.startNs < b.startNs; });
+
+    const qint64 defaultLastEndNs = sorted.last().startNs + 1000000000LL;
+    const qint64 boundedDurationNs = durationNs > 0 ? durationNs : defaultLastEndNs;
+
+    out.reserve(sorted.size());
+    for (int i = 0; i < sorted.size(); ++i)
+    {
+        const ChapterMarker& current = sorted.at(i);
+        const qint64 fallbackEndNs = (i + 1 < sorted.size()) ? sorted.at(i + 1).startNs : boundedDurationNs;
+        const qint64 explicitEndNs = current.endNs;
+        const qint64 rawEndNs =
+            (explicitEndNs > current.startNs) ? explicitEndNs : fallbackEndNs;
+        const qint64 safeEndNs = std::max(rawEndNs, current.startNs);
+
+        ChapterTimingSeconds row;
+        row.title = current.title;
+        row.startSeconds = static_cast<int>(std::max<qint64>(0, current.startNs / 1000000000LL));
+        row.endSeconds = static_cast<int>(std::max<qint64>(row.startSeconds, safeEndNs / 1000000000LL));
+        out.append(row);
+    }
     return out;
 }
 
@@ -471,7 +557,9 @@ bool ChapterHelper::writeFfmetadata(const QList<ChapterMarker>& chapters, qint64
     for (int i = 0; i < chapters.size(); ++i)
     {
         const qint64 start = chapters.at(i).startNs;
-        const qint64 end = (i + 1 < chapters.size()) ? chapters.at(i + 1).startNs : durNs;
+        const qint64 fallbackEnd = (i + 1 < chapters.size()) ? chapters.at(i + 1).startNs : durNs;
+        const qint64 explicitEnd = chapters.at(i).endNs;
+        const qint64 end = (explicitEnd > start) ? explicitEnd : fallbackEnd;
         if (end <= start)
         {
             continue;

@@ -6,12 +6,15 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QDesktopServices>
+#include <QHBoxLayout>
 #include <QMessageBox>
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QPixmap>
+#include <QPushButton>
 #include <QTextDocument>
 #include <QUrl>
+#include <utility>
 
 void DraggableLabel::mousePressEvent(QMouseEvent* event)
 {
@@ -33,6 +36,14 @@ void DraggableLabel::mousePressEvent(QMouseEvent* event)
 PublicationWidget::PublicationWidget(QWidget* parent) : QWidget(parent), ui(new Ui::PublicationWidget)
 {
     ui->setupUi(this);
+
+    m_chapterTimingsGroup = new QGroupBox(QStringLiteral("Тайминги глав (секунды)"), this);
+    m_chapterRowsLayout = new QVBoxLayout();
+    m_chapterRowsLayout->setContentsMargins(6, 6, 6, 6);
+    m_chapterRowsLayout->setSpacing(6);
+    m_chapterTimingsGroup->setLayout(m_chapterRowsLayout);
+    m_chapterTimingsGroup->setVisible(false);
+    ui->leftColumnLayout->addWidget(m_chapterTimingsGroup);
 
     // Подключаем кнопки копирования напрямую к данным в m_currentPosts
     connect(ui->copyTgMp4Button, &QPushButton::clicked, this,
@@ -120,6 +131,12 @@ void PublicationWidget::setFilePaths(const QString& mkvPath, const QString& mp4P
         ui->mp4FileLabel->setText("MP4 файл");
 }
 
+void PublicationWidget::setChapterTimings(const QList<ChapterMarker>& chapters, qint64 durationNs)
+{
+    m_chapterTimings = ChapterHelper::buildChapterTimingSeconds(chapters, durationNs);
+    rebuildChapterRows();
+}
+
 void PublicationWidget::clearData()
 {
     m_template = ReleaseTemplate();
@@ -130,7 +147,71 @@ void PublicationWidget::clearData()
     ui->vkCommentEdit->clear();
     ui->linkAnime365Edit->clear();
     ui->linkAnilibEdit->clear();
+    m_chapterTimings.clear();
+    rebuildChapterRows();
     setFilePaths("", "");
+}
+
+void PublicationWidget::rebuildChapterRows()
+{
+    if (!m_chapterRowsLayout || !m_chapterTimingsGroup)
+    {
+        return;
+    }
+
+    while (QLayoutItem* item = m_chapterRowsLayout->takeAt(0))
+    {
+        if (QWidget* widget = item->widget())
+        {
+            widget->deleteLater();
+        }
+        delete item;
+    }
+
+    if (m_chapterTimings.isEmpty())
+    {
+        m_chapterTimingsGroup->setVisible(false);
+        return;
+    }
+
+    for (const ChapterTimingSeconds& row : std::as_const(m_chapterTimings))
+    {
+        QWidget* line = new QWidget(m_chapterTimingsGroup);
+        auto* layout = new QHBoxLayout(line);
+        layout->setContentsMargins(0, 0, 0, 0);
+        layout->setSpacing(6);
+
+        auto* titleLabel = new QLabel(row.title.isEmpty() ? QStringLiteral("Chapter") : row.title, line);
+        auto* startValueLabel = new QLabel(QString::number(row.startSeconds), line);
+        auto* endValueLabel = new QLabel(QString::number(row.endSeconds), line);
+        auto* copyStartButton = new QPushButton(QStringLiteral("Копировать"), line);
+        auto* copyEndButton = new QPushButton(QStringLiteral("Копировать"), line);
+
+        connect(copyStartButton, &QPushButton::clicked, this,
+                [this, row]()
+                {
+                    QApplication::clipboard()->setText(QString::number(row.startSeconds));
+                    emit logMessage(QStringLiteral("Скопировано начало главы '%1'.").arg(row.title), LogCategory::APP);
+                });
+        connect(copyEndButton, &QPushButton::clicked, this,
+                [this, row]()
+                {
+                    QApplication::clipboard()->setText(QString::number(row.endSeconds));
+                    emit logMessage(QStringLiteral("Скопирован конец главы '%1'.").arg(row.title), LogCategory::APP);
+                });
+
+        layout->addWidget(titleLabel, 2);
+        layout->addWidget(new QLabel(QStringLiteral("Начало:"), line));
+        layout->addWidget(startValueLabel);
+        layout->addWidget(copyStartButton);
+        layout->addSpacing(8);
+        layout->addWidget(new QLabel(QStringLiteral("Конец:"), line));
+        layout->addWidget(endValueLabel);
+        layout->addWidget(copyEndButton);
+        m_chapterRowsLayout->addWidget(line);
+    }
+
+    m_chapterTimingsGroup->setVisible(true);
 }
 
 void PublicationWidget::onOpenUploadUrls()

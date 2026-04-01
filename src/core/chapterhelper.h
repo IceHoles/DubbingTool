@@ -3,6 +3,7 @@
 
 #include <QByteArray>
 #include <QList>
+#include <QMetaType>
 #include <QString>
 
 class ProcessManager;
@@ -10,7 +11,17 @@ class ProcessManager;
 struct ChapterMarker
 {
     qint64 startNs = 0;
+    qint64 endNs = -1;
     QString title;
+};
+Q_DECLARE_METATYPE(ChapterMarker)
+Q_DECLARE_METATYPE(QList<ChapterMarker>)
+
+struct ChapterTimingSeconds
+{
+    QString title;
+    int startSeconds = 0;
+    int endSeconds = 0;
 };
 
 namespace ChapterHelper
@@ -27,6 +38,9 @@ bool extractEmbeddedChaptersToFile(const QString& mkvextractPath, const QString&
                                    ProcessManager* proc);
 
 QList<ChapterMarker> parseFfprobeChaptersJson(const QByteArray& json);
+
+/// Build second-based ranges from chapter starts.
+QList<ChapterTimingSeconds> buildChapterTimingSeconds(const QList<ChapterMarker>& chapters, qint64 durationNs = 0);
 
 /// Write XML suitable for mkvmerge --chapters
 bool writeMatroskaChapterXml(const QList<ChapterMarker>& chapters, const QString& outPath);

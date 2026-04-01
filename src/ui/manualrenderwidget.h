@@ -18,6 +18,7 @@ public:
 
     QVariantMap getParameters() const;
     QString getCurrentPresetName() const;
+    QString chapterTimingSourcePath() const;
 
 public slots:
     void updateRenderPresets();
@@ -32,6 +33,7 @@ private slots:
 
 signals:
     void renderRequested();
+    void chapterTimingsRequested(const QString& sourcePath);
 
 private:
     Ui::ManualRenderWidget* ui;

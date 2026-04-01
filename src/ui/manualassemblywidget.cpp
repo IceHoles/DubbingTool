@@ -28,6 +28,8 @@ ManualAssemblyWidget::ManualAssemblyWidget(QWidget* parent)
     connect(ui->convertAudioCheckBox, &QCheckBox::toggled, ui->convertAudioFormatComboBox, &QComboBox::setVisible);
     connect(ui->manualChaptersCustomCheckBox, &QCheckBox::toggled, this,
             [this](bool) { updateChaptersUiVisibility(); });
+    connect(ui->chapterTimingsButton, &QPushButton::clicked, this,
+            [this]() { emit chapterTimingsRequested(chapterTimingSourcePath()); });
     ui->modeSwitchButton->setChecked(false);
     onModeSwitched(false);
     ui->convertAudioFormatComboBox->setVisible(ui->convertAudioCheckBox->isChecked());
@@ -309,6 +311,20 @@ QVariantMap ManualAssemblyWidget::getParameters() const
     }
 
     return params;
+}
+
+QString ManualAssemblyWidget::chapterTimingSourcePath() const
+{
+    const bool useCustomXml = ui->manualChaptersCustomCheckBox->isVisible() && ui->manualChaptersCustomCheckBox->isChecked();
+    if (useCustomXml)
+    {
+        const QString chaptersXml = ui->chaptersXmlPathManualAssemblyEdit->text().trimmed();
+        if (!chaptersXml.isEmpty())
+        {
+            return chaptersXml;
+        }
+    }
+    return ui->videoPathEdit->text().trimmed();
 }
 
 void ManualAssemblyWidget::on_assembleButton_clicked()

@@ -21,6 +21,7 @@ public:
     ~ManualAssemblyWidget();
 
     QVariantMap getParameters() const;
+    QString chapterTimingSourcePath() const;
 
     void updateTemplateList(const QStringList& templateNames);
 
@@ -56,6 +57,7 @@ private:
 signals:
     void templateDataRequested(const QString& templateName);
     void assemblyRequested();
+    void chapterTimingsRequested(const QString& sourcePath);
 
 public slots:
     void onTemplateDataReceived(const ReleaseTemplate& t);

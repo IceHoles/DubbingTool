@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 
 #include "appsettings.h"
+#include "chaptertimingsdialog.h"
 #include "manualassembler.h"
 #include "manualextractionwidget.h"
 #include "manualrenderer.h"
@@ -23,6 +24,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMessageBox>
+#include <QProcess>
 #include <QRegularExpression>
 #include <QSettings>
 #include <QStandardPaths>
@@ -103,6 +105,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWi
 {
     ui->setupUi(this);
     setWindowIcon(QIcon(":/icon.png"));
+    qRegisterMetaType<ChapterMarker>("ChapterMarker");
+    qRegisterMetaType<QList<ChapterMarker>>("QList<ChapterMarker>");
 
     QSettings settings("MyCompany", "DubbingTool");
     restoreGeometry(settings.value("ui/mainWindowGeometry").toByteArray());
@@ -136,7 +140,11 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWi
             &MainWindow::onRequestTemplateData);
 
     connect(m_manualAssemblyWidget, &ManualAssemblyWidget::assemblyRequested, this, &MainWindow::startManualAssembly);
+    connect(m_manualAssemblyWidget, &ManualAssemblyWidget::chapterTimingsRequested, this,
+            &MainWindow::onManualChapterTimingsRequested);
     connect(m_manualRenderWidget, &ManualRenderWidget::renderRequested, this, &MainWindow::startManualRender);
+    connect(m_manualRenderWidget, &ManualRenderWidget::chapterTimingsRequested, this,
+            &MainWindow::onManualChapterTimingsRequested);
 
     connect(m_publicationWidget, &PublicationWidget::logMessage, this, &MainWindow::logMessage);
     connect(m_publicationWidget, &PublicationWidget::postsUpdateRequest, this, &MainWindow::onPostsUpdateRequest);
@@ -495,6 +503,8 @@ void MainWindow::on_startButton_clicked()
     }
 
     m_publicationWidget->clearData();
+    m_lastChapterMarkers.clear();
+    m_lastChapterDurationNs = 0;
     int pubIndex = ui->mainTabWidget->indexOf(m_publicationWidget);
     if (pubIndex != -1)
     {
@@ -577,6 +587,7 @@ void MainWindow::on_startButton_clicked()
     connect(workflowManager, &WorkflowManager::workflowAborted, this, &MainWindow::finishWorkerProcess);
 
     connect(workflowManager, &WorkflowManager::postsReady, this, &MainWindow::onPostsReady);
+    connect(workflowManager, &WorkflowManager::chapterMarkersReady, this, &MainWindow::onChapterMarkersReady);
     connect(workflowManager, &WorkflowManager::mkvFileReady, this, &MainWindow::onMkvFileReady);
     connect(workflowManager, &WorkflowManager::filesReady, this, &MainWindow::onFilesReady);
     connect(thread, &QThread::finished, workflowManager, &WorkflowManager::deleteLater);
@@ -829,11 +840,14 @@ void MainWindow::onPostsReady(const ReleaseTemplate& t, const EpisodeData& data)
     m_lastEpisodeData = data;
     m_lastMkvPath = "";
     m_lastMp4Path = "";
+    m_lastChapterMarkers.clear();
+    m_lastChapterDurationNs = 0;
 
     PostGenerator generator;
     QMap<QString, PostVersions> postTexts = generator.generate(m_lastTemplate, m_lastEpisodeData);
 
     m_publicationWidget->updateData(m_lastTemplate, m_lastEpisodeData, postTexts, m_lastMkvPath, m_lastMp4Path);
+    m_publicationWidget->setChapterTimings(m_lastChapterMarkers, m_lastChapterDurationNs);
 
     int pubIndex = ui->mainTabWidget->indexOf(m_publicationWidget);
     if (pubIndex != -1)
@@ -856,6 +870,13 @@ void MainWindow::onFilesReady(const QString& mkvPath, const QString& mp4Path)
     m_lastMp4Path = mp4Path;
 
     m_publicationWidget->setFilePaths(mkvPath, mp4Path);
+}
+
+void MainWindow::onChapterMarkersReady(const QList<ChapterMarker>& chapters, qint64 durationNs)
+{
+    m_lastChapterMarkers = chapters;
+    m_lastChapterDurationNs = durationNs;
+    m_publicationWidget->setChapterTimings(m_lastChapterMarkers, m_lastChapterDurationNs);
 }
 
 void MainWindow::closeEvent(QCloseEvent* event)
@@ -965,6 +986,7 @@ void MainWindow::onPostsUpdateRequest(const QMap<QString, QString>& viewLinks)
     PostGenerator generator;
     QMap<QString, PostVersions> postTexts = generator.generate(m_lastTemplate, m_lastEpisodeData);
     m_publicationWidget->updateData(m_lastTemplate, m_lastEpisodeData, postTexts, m_lastMkvPath, m_lastMp4Path);
+    m_publicationWidget->setChapterTimings(m_lastChapterMarkers, m_lastChapterDurationNs);
 
     QMessageBox::information(m_publicationWidget, "Успех", "Тексты постов обновлены.");
 }
@@ -1202,4 +1224,74 @@ void MainWindow::updateChaptersAutoVisibility()
         return;
     }
     ui->chaptersAutoContainerWidget->setVisible(m_templates.value(name).chaptersEnabled);
+}
+
+QList<ChapterMarker> MainWindow::loadChaptersFromSourcePath(const QString& sourcePath, qint64* durationNs) const
+{
+    if (durationNs)
+    {
+        *durationNs = 0;
+    }
+    const QString path = sourcePath.trimmed();
+    if (path.isEmpty() || !QFileInfo::exists(path))
+    {
+        return {};
+    }
+
+    if (path.endsWith(QStringLiteral(".xml"), Qt::CaseInsensitive))
+    {
+        return ChapterHelper::loadChaptersFromFile(path);
+    }
+
+    const QString ffprobePath = AppSettings::instance().ffprobePath();
+    if (ffprobePath.isEmpty() || !QFileInfo::exists(ffprobePath))
+    {
+        return {};
+    }
+
+    QProcess process;
+    process.start(ffprobePath,
+                  {QStringLiteral("-v"), QStringLiteral("quiet"), QStringLiteral("-show_chapters"),
+                   QStringLiteral("-show_format"), QStringLiteral("-print_format"), QStringLiteral("json"),
+                   QStringLiteral("-i"), path});
+    if (!process.waitForFinished(10000) || process.exitCode() != 0)
+    {
+        return {};
+    }
+
+    const QByteArray json = process.readAllStandardOutput();
+    if (durationNs)
+    {
+        const QJsonDocument doc = QJsonDocument::fromJson(json);
+        const QJsonObject formatObj = doc.object().value(QStringLiteral("format")).toObject();
+        bool ok = false;
+        const double durationSec = formatObj.value(QStringLiteral("duration")).toString().toDouble(&ok);
+        if (ok && durationSec > 0.0)
+        {
+            *durationNs = static_cast<qint64>(durationSec * 1e9);
+        }
+    }
+    return ChapterHelper::parseFfprobeChaptersJson(json);
+}
+
+void MainWindow::onManualChapterTimingsRequested(const QString& sourcePath)
+{
+    if (sourcePath.isEmpty())
+    {
+        QMessageBox::information(this, QStringLiteral("Тайминги глав"),
+                                 QStringLiteral("Укажите источник глав (MKV/MP4 или XML), чтобы показать тайминги."));
+        return;
+    }
+
+    qint64 durationNs = 0;
+    const QList<ChapterMarker> chapters = loadChaptersFromSourcePath(sourcePath, &durationNs);
+    if (chapters.isEmpty())
+    {
+        QMessageBox::warning(this, QStringLiteral("Тайминги глав"),
+                             QStringLiteral("Не удалось получить главы из выбранного источника."));
+        return;
+    }
+
+    ChapterTimingsDialog dialog(ChapterHelper::buildChapterTimingSeconds(chapters, durationNs), this);
+    dialog.exec();
 }

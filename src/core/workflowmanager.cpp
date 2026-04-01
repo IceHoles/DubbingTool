@@ -1677,6 +1677,9 @@ void WorkflowManager::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
 
 void WorkflowManager::finishWorkflow()
 {
+    const qint64 durationNs =
+        m_sourceDurationS > 0 ? static_cast<qint64>(static_cast<double>(m_sourceDurationS) * 1e9) : 0;
+    emit chapterMarkersReady(m_chapterMarkers, durationNs);
     maybeApplyChaptersToFinalMp4();
     emit logMessage("Все шаги автоматического процесса выполнены.", LogCategory::APP);
     emit filesReady(m_finalMkvPath, m_outputMp4Path);

@@ -41,6 +41,7 @@ set(SOURCES_PROCESSING
 
 set(SOURCES_UI
     src/ui/main.cpp
+    src/ui/chaptertimingsdialog.cpp
     src/ui/mainwindow.cpp
     src/ui/manualassemblywidget.cpp
     src/ui/manualrenderwidget.cpp
@@ -80,6 +81,7 @@ set(HEADERS_PROCESSING
 )
 
 set(HEADERS_UI
+    src/ui/chaptertimingsdialog.h
     src/ui/mainwindow.h
     src/ui/manualassemblywidget.h
     src/ui/manualrenderwidget.h

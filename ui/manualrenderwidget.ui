@@ -101,6 +101,13 @@
           </property>
          </widget>
         </item>
+        <item>
+         <widget class="QPushButton" name="chapterTimingsButton">
+          <property name="text">
+           <string>Тайминг глав</string>
+          </property>
+         </widget>
+        </item>
        </layout>
       </item>
      </layout>
