@@ -19,6 +19,14 @@ enum class LogCategory
     DEBUG
 };
 
+enum class LogLevel
+{
+    Info,
+    Warning,
+    Error,
+    Success
+};
+
 enum class UserFileAction
 {
     Move,
@@ -74,6 +82,8 @@ public:
     void setQbittorrentPath(const QString& path);
     QString nugenAmbPath() const;
     void setNugenAmbPath(const QString& path);
+    QString mp4boxPath() const;
+    void setMp4boxPath(const QString& path);
     bool deleteTempFiles() const;
     void setDeleteTempFiles(bool enabled);
     UserFileAction userFileAction() const;
@@ -93,9 +103,13 @@ public:
     bool isSetupCompleted() const;
     void setSetupCompleted(bool completed);
 
+    bool hasAacAtCodec() const;
+
 private:
     void loadDefaults();
     bool m_setupCompleted = false;
+    mutable bool m_aacAtCodecChecked = false;
+    mutable bool m_hasAacAtCodec = false;
     QSet<LogCategory> m_enabledLogCategories;
     QString m_qbittorrentHost;
     int m_qbittorrentPort;
@@ -106,6 +120,7 @@ private:
     QString m_ffmpegPath;
     QString m_qbittorrentPath;
     QString m_nugenAmbPath;
+    QString m_mp4boxPath;
     bool m_deleteTempFiles;
     UserFileAction m_userFileAction;
     QString m_projectDirectory;

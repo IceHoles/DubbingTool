@@ -23,7 +23,7 @@ public:
 
 signals:
     // Используем ваш enum LogCategory, убедитесь что он виден (через include appsettings.h или workflowmanager.h)
-    void logMessage(const QString& message, LogCategory category);
+    void logMessage(const QString& message, LogCategory category, LogLevel level = LogLevel::Info);
     void progressUpdated(int value, const QString& status);
 
 protected:

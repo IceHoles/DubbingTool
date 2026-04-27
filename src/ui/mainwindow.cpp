@@ -15,6 +15,7 @@
 #include "ui_mainwindow.h"
 
 #include <QCloseEvent>
+#include <QColor>
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
@@ -26,9 +27,14 @@
 #include <QMessageBox>
 #include <QProcess>
 #include <QRegularExpression>
+#include <QScrollBar>
 #include <QSettings>
+#include <QSyntaxHighlighter>
 #include <QStandardPaths>
 #include <QThread>
+#include <QTextBlock>
+#include <QTextCharFormat>
+#include <QTextCursor>
 
 static QString logCategoryToString(LogCategory category)
 {
@@ -48,10 +54,98 @@ static QString logCategoryToString(LogCategory category)
     return "UNKNOWN";
 }
 
+static QString logLevelToString(LogLevel level)
+{
+    switch (level)
+    {
+    case LogLevel::Info:
+        return "INFO";
+    case LogLevel::Warning:
+        return "WARN";
+    case LogLevel::Error:
+        return "ERROR";
+    case LogLevel::Success:
+        return "SUCCESS";
+    }
+    return "INFO";
+}
+
+class LogLevelHighlighter final : public QSyntaxHighlighter
+{
+public:
+    explicit LogLevelHighlighter(QTextDocument* parent) : QSyntaxHighlighter(parent)
+    {
+    }
+
+protected:
+    void highlightBlock(const QString& text) override
+    {
+        static const QRegularExpression headerRe(QStringLiteral(R"(^\[([^\]]+)\]\[([^\]]+)\])"));
+        const QRegularExpressionMatch hm = headerRe.match(text);
+        const QString category = hm.hasMatch() ? hm.captured(1) : QString();
+        const QString level = hm.hasMatch() ? hm.captured(2) : QString();
+
+        auto paintWholeLine = [&](const QColor& fg, const QColor& bg)
+        {
+            QTextCharFormat fmt;
+            if (fg.isValid())
+            {
+                fmt.setForeground(fg);
+            }
+            if (bg.isValid())
+            {
+                fmt.setBackground(bg);
+            }
+            setFormat(0, text.length(), fmt);
+        };
+
+        if (level == QStringLiteral("ERROR") || text.contains(QStringLiteral("[ERROR]")))
+        {
+            paintWholeLine(QColor(220, 70, 70), QColor(180, 50, 50, 55));
+            return;
+        }
+        if (level == QStringLiteral("WARN") || text.contains(QStringLiteral("[WARN]")))
+        {
+            paintWholeLine(QColor(230, 150, 40), QColor(200, 120, 30, 50));
+            return;
+        }
+        if (level == QStringLiteral("SUCCESS") || text.contains(QStringLiteral("[SUCCESS]")))
+        {
+            paintWholeLine(QColor(70, 190, 110), QColor(40, 140, 80, 45));
+            return;
+        }
+
+        if (category == QStringLiteral("FFMPEG"))
+        {
+            paintWholeLine(QColor(), QColor(70, 130, 200, 58));
+            return;
+        }
+        if (category == QStringLiteral("MKVTOOLNIX"))
+        {
+            paintWholeLine(QColor(), QColor(120, 80, 170, 52));
+            return;
+        }
+        if (category == QStringLiteral("QBITTORRENT"))
+        {
+            paintWholeLine(QColor(), QColor(60, 140, 90, 48));
+            return;
+        }
+        if (category == QStringLiteral("DEBUG"))
+        {
+            paintWholeLine(QColor(), QColor(90, 90, 100, 40));
+            return;
+        }
+        if (category == QStringLiteral("APP"))
+        {
+            paintWholeLine(QColor(), QColor(85, 90, 100, 38));
+            return;
+        }
+    }
+};
+
 static QString newTemplateDraftFilePath()
 {
-    const QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QDir templatesDir(QDir(appDataPath).filePath("templates"));
+    QDir templatesDir(QDir(QCoreApplication::applicationDirPath()).filePath("templates"));
     if (!templatesDir.exists())
     {
         templatesDir.mkpath(".");
@@ -61,21 +155,21 @@ static QString newTemplateDraftFilePath()
 
 static QDir templatesStorageDir()
 {
-    const QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QDir templatesDir(QDir(appDataPath).filePath("templates"));
+    QDir templatesDir(QDir(QCoreApplication::applicationDirPath()).filePath("templates"));
     if (!templatesDir.exists())
     {
         templatesDir.mkpath(".");
     }
 
-    // One-time migration from legacy relative storage (e.g. build/templates).
-    QDir legacyDir("templates");
-    if (legacyDir.exists() && templatesDir.entryList({"*.json"}, QDir::Files).isEmpty())
+    // One-time migration from AppData back to local templates folder
+    const QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir appDataDir(QDir(appDataPath).filePath("templates"));
+    if (appDataDir.exists() && templatesDir.entryList({"*.json"}, QDir::Files).isEmpty())
     {
-        const QStringList legacyFiles = legacyDir.entryList({"*.json"}, QDir::Files);
-        for (const QString& fileName : legacyFiles)
+        const QStringList appDataFiles = appDataDir.entryList({"*.json"}, QDir::Files);
+        for (const QString& fileName : appDataFiles)
         {
-            QFile::copy(legacyDir.filePath(fileName), templatesDir.filePath(fileName));
+            QFile::copy(appDataDir.filePath(fileName), templatesDir.filePath(fileName));
         }
     }
 
@@ -104,6 +198,7 @@ static bool loadTemplateFromJsonFile(const QString& filePath, ReleaseTemplate& o
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWindow), m_currentWorker(nullptr)
 {
     ui->setupUi(this);
+    new LogLevelHighlighter(ui->logOutput->document());
     setWindowIcon(QIcon(":/icon.png"));
     qRegisterMetaType<ChapterMarker>("ChapterMarker");
     qRegisterMetaType<QList<ChapterMarker>>("QList<ChapterMarker>");
@@ -186,22 +281,8 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
-void MainWindow::logMessage(const QString& message, LogCategory category)
+void MainWindow::logMessage(const QString& message, LogCategory category, LogLevel level)
 {
-    QString categoryName = logCategoryToString(category);
-    QString timedMessage = QString("[%1] %2 - %3")
-                               .arg(categoryName)
-                               .arg(QDateTime::currentDateTime().toString("hh:mm:ss"))
-                               .arg(message.trimmed());
-
-    // Always write to log file (all categories)
-    if (m_logFile.isOpen())
-    {
-        m_logFile.write(timedMessage.toUtf8());
-        m_logFile.write("\n");
-        m_logFile.flush();
-    }
-
     // Filter for UI display
     const auto& enabledCategories = AppSettings::instance().enabledLogCategories();
     if (!enabledCategories.contains(category))
@@ -209,7 +290,120 @@ void MainWindow::logMessage(const QString& message, LogCategory category)
         return;
     }
 
-    ui->logOutput->appendPlainText(timedMessage);
+    QScrollBar* scrollBar = ui->logOutput->verticalScrollBar();
+    const bool shouldAutoScroll = (scrollBar == nullptr) || (scrollBar->value() >= scrollBar->maximum() - 2);
+    QTextDocument* doc = ui->logOutput->document();
+
+    auto processSingleLine = [&](const QString& rawLine)
+    {
+        const QString trimmedMsg = rawLine.trimmed();
+        if (trimmedMsg.isEmpty())
+        {
+            return;
+        }
+
+        auto stripStderrPrefix = [](const QString& s) -> QString
+        {
+            if (s.startsWith(QStringLiteral("STDERR: ")))
+            {
+                return s.mid(QStringLiteral("STDERR: ").size()).trimmed();
+            }
+            return s;
+        };
+        const QString payload = stripStderrPrefix(trimmedMsg);
+
+        bool isProgress = false;
+        if (category == LogCategory::FFMPEG)
+        {
+            if (payload.startsWith(QStringLiteral("frame=")) || payload.startsWith(QStringLiteral("size=")))
+            {
+                isProgress = true;
+            }
+            else if (payload.contains(QStringLiteral("time=")) && payload.contains(QStringLiteral("bitrate=")))
+            {
+                isProgress = true;
+            }
+        }
+        else if (category == LogCategory::MKVTOOLNIX || category == LogCategory::APP)
+        {
+            if (payload.startsWith(QStringLiteral("Progress: ")) || payload.contains(QStringLiteral("ISO File Writing:")))
+            {
+                isProgress = true;
+            }
+        }
+
+        const QString categoryName = logCategoryToString(category);
+        const QString levelName = logLevelToString(level);
+        const QString timedMessage = QString("[%1][%2] %3 - %4")
+                                         .arg(categoryName)
+                                         .arg(levelName)
+                                         .arg(QDateTime::currentDateTime().toString("hh:mm:ss"))
+                                         .arg(trimmedMsg);
+        const QDateTime now = QDateTime::currentDateTime();
+
+        bool replaceLastLine = false;
+        if (isProgress && m_logLastProgressBlockNumber >= 0 && m_logLastProgressTime.secsTo(now) < 10)
+        {
+            const QTextBlock oldProgressBlock = doc->findBlockByNumber(m_logLastProgressBlockNumber);
+            replaceLastLine = oldProgressBlock.isValid();
+        }
+
+        // Always write to file, except when replacing progress in-place
+        if (!replaceLastLine && m_logFile.isOpen())
+        {
+            m_logFile.write(timedMessage.toUtf8());
+            m_logFile.write("\n");
+            m_logFile.flush();
+        }
+
+        if (replaceLastLine)
+        {
+            QTextBlock oldProgressBlock = doc->findBlockByNumber(m_logLastProgressBlockNumber);
+            if (oldProgressBlock.isValid())
+            {
+                QTextCursor replaceCursor(oldProgressBlock);
+                replaceCursor.movePosition(QTextCursor::StartOfBlock);
+                replaceCursor.movePosition(QTextCursor::EndOfBlock, QTextCursor::KeepAnchor);
+                replaceCursor.removeSelectedText();
+                replaceCursor.insertText(timedMessage);
+            }
+        }
+        else
+        {
+            QTextCursor appendCursor(doc);
+            appendCursor.movePosition(QTextCursor::End);
+            const bool isInitiallyEmpty = (doc->blockCount() == 1 && doc->firstBlock().text().isEmpty());
+            if (!isInitiallyEmpty)
+            {
+                appendCursor.insertBlock();
+            }
+            appendCursor.insertText(timedMessage);
+            m_logLastProgressBlockNumber = appendCursor.blockNumber();
+        }
+
+        if (isProgress)
+        {
+            m_logLastProgressTime = now;
+        }
+        else
+        {
+            m_logLastProgressBlockNumber = -1;
+        }
+    };
+
+    QString normalized = message;
+    normalized.replace("\r\n", "\n");
+    normalized.replace('\r', '\n');
+    const QStringList lines = normalized.split('\n', Qt::SkipEmptyParts);
+    for (const QString& line : lines)
+    {
+        processSingleLine(line);
+    }
+
+    if (shouldAutoScroll && scrollBar != nullptr)
+    {
+        scrollBar->setValue(scrollBar->maximum());
+    }
 }
 
 void MainWindow::loadTemplates()
@@ -227,7 +421,7 @@ void MainWindow::loadTemplates()
         QFile file(fileInfo.absoluteFilePath());
         if (!file.open(QIODevice::ReadOnly))
         {
-            logMessage("Ошибка: не удалось открыть файл шаблона " + fileInfo.fileName(), LogCategory::APP);
+            logMessage("Ошибка: не удалось открыть файл шаблона " + fileInfo.fileName(), LogCategory::APP, LogLevel::Error);
             continue;
         }
 
@@ -261,7 +455,7 @@ void MainWindow::saveTemplate(const ReleaseTemplate& t)
 {
     if (t.templateName.isEmpty())
     {
-        logMessage("Ошибка: имя шаблона не может быть пустым.", LogCategory::APP);
+        logMessage("Ошибка: имя шаблона не может быть пустым.", LogCategory::APP, LogLevel::Error);
         return;
     }
 
@@ -276,7 +470,7 @@ void MainWindow::saveTemplate(const ReleaseTemplate& t)
     QFile file(templatesDir.filePath(t.templateName + ".json"));
     if (!file.open(QIODevice::WriteOnly))
     {
-        logMessage("Ошибка: не удалось сохранить файл шаблона " + t.templateName, LogCategory::APP);
+        logMessage("Ошибка: не удалось сохранить файл шаблона " + t.templateName, LogCategory::APP, LogLevel::Error);
         return;
     }
 
@@ -449,7 +643,7 @@ void MainWindow::on_editTemplateButton_clicked()
     QString currentName = ui->templateComboBox->currentText();
     if (currentName.isEmpty() || !m_templates.contains(currentName))
     {
-        logMessage("Ошибка: выберите существующий шаблон для редактирования.", LogCategory::APP);
+        logMessage("Ошибка: выберите существующий шаблон для редактирования.", LogCategory::APP, LogLevel::Error);
         return;
     }
 
@@ -469,7 +663,7 @@ void MainWindow::on_deleteTemplateButton_clicked()
     QString currentName = ui->templateComboBox->currentText();
     if (currentName.isEmpty())
     {
-        logMessage("Ошибка: нечего удалять.", LogCategory::APP);
+        logMessage("Ошибка: нечего удалять.", LogCategory::APP, LogLevel::Error);
         return;
     }
 
@@ -514,13 +708,13 @@ void MainWindow::on_startButton_clicked()
     QString manualMkvPath = ui->mkvPathLineEdit->text();
     if (manualMkvPath.isEmpty() && ui->episodeNumberLineEdit->text().isEmpty())
     {
-        logMessage("Ошибка: укажите номер серии или выберите MKV-файл.", LogCategory::APP);
+        logMessage("Ошибка: укажите номер серии или выберите MKV-файл.", LogCategory::APP, LogLevel::Error);
         return;
     }
     QString currentName = ui->templateComboBox->currentText();
     if (currentName.isEmpty())
     {
-        logMessage("Ошибка: выберите шаблон.", LogCategory::APP);
+        logMessage("Ошибка: выберите шаблон.", LogCategory::APP, LogLevel::Error);
         return;
     }
 
@@ -533,7 +727,7 @@ void MainWindow::on_startButton_clicked()
     int epNum = episodeNumberStr.toInt(&ok);
     if (!ok && manualMkvPath.isEmpty())
     {
-        logMessage("Ошибка: введенный номер серии не является числом.", LogCategory::APP);
+        logMessage("Ошибка: введенный номер серии не является числом.", LogCategory::APP, LogLevel::Error);
         return;
     }
     else if (ok)
@@ -735,8 +929,8 @@ void MainWindow::on_selectAudioButton_clicked()
         lastDir = QFileInfo(ui->audioPathLineEdit->text()).absolutePath();
     }
 
-    QString filePath =
-        QFileDialog::getOpenFileName(this, "Выберите аудиофайл", lastDir, "Аудиофайлы (*.wav *.flac *.aac)");
+    QString filePath = QFileDialog::getOpenFileName(this, "Выберите аудиофайл", lastDir,
+                                                    "Аудиофайлы (*.wav *.flac *.aac *.m4a *.mka)");
     if (!filePath.isEmpty())
     {
         ui->audioPathLineEdit->setText(filePath);
@@ -1111,6 +1305,9 @@ void MainWindow::setUiEnabled(bool enabled)
 
 void MainWindow::finishWorkerProcess()
 {
+    m_logLastProgressBlockNumber = -1;
+    m_logLastProgressTime = QDateTime();
+
     logMessage("============ ПРОЦЕСС ЗАВЕРШЕН ============", LogCategory::APP);
 
     if (m_currentWorker)

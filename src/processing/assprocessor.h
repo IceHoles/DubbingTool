@@ -29,7 +29,7 @@ public:
     static TbSegment detectTbSegmentFromFile(const QString& assPath);
 
 signals:
-    void logMessage(const QString&, LogCategory);
+    void logMessage(const QString&, LogCategory, LogLevel = LogLevel::Info);
 
 private:
     QStringList generateTb(const ReleaseTemplate& t, const QString& startTime, int detectedResX);

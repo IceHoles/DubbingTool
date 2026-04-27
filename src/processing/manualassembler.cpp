@@ -1,4 +1,4 @@
-#include "manualassembler.h"
+﻿#include "manualassembler.h"
 
 #include "appsettings.h"
 #include "assprocessor.h"
@@ -80,7 +80,7 @@ void ManualAssembler::normalizeAudio()
 
     if (!QFile::copy(originalAudioPath, tempInputPath))
     {
-        emit logMessage("ОШИБКА: Не удалось переименовать аудиофайл. Нормализация отменена.", LogCategory::APP);
+        emit logMessage("ОШИБКА: Не удалось переименовать аудиофайл. Нормализация отменена.", LogCategory::APP, LogLevel::Error);
         if (m_params["convertAudio"].toBool())
         {
             convertAudio();
@@ -101,7 +101,7 @@ void ManualAssembler::normalizeAudio()
 
     if (!QFileInfo::exists(ambCmdPath))
     {
-        emit logMessage("Ошибка: AMBCmd.exe не найден. Нормализация пропущена.", LogCategory::APP);
+        emit logMessage("Ошибка: AMBCmd.exe не найден. Нормализация пропущена.", LogCategory::APP, LogLevel::Error);
         if (m_params["convertAudio"].toBool())
         {
             convertAudio();
@@ -129,8 +129,15 @@ void ManualAssembler::convertAudio()
 
     QString audioPath = m_params["russianAudioPath"].toString();
     QString targetFormat = m_params.value("convertAudioFormat", "aac").toString();
+    const bool isAac = (targetFormat == "aac");
 
-    if (audioPath.endsWith("." + targetFormat, Qt::CaseInsensitive))
+    auto alreadyInTargetFormat = [&](const QString& path) {
+        if (isAac)
+            return path.endsWith(".mka", Qt::CaseInsensitive);
+        return path.endsWith("." + targetFormat, Qt::CaseInsensitive);
+    };
+
+    if (alreadyInTargetFormat(audioPath))
     {
         emit logMessage("Аудио уже в нужном формате, конвертация пропущена.", LogCategory::APP);
         processSubtitlesAndAssemble();
@@ -152,12 +159,14 @@ void ManualAssembler::convertAudio()
     else
     {
         emit logMessage("Предупреждение: не удалось определить длительность аудио. Прогресс не будет отображаться.",
-                        LogCategory::APP);
+                        LogCategory::APP, LogLevel::Warning);
     }
 
     emit progressUpdated(0, "Конвертация аудио");
+    // Для ручной сборки MKV при AAC кодируем в Matroska-аудио контейнер (mka).
+    const QString outputExtension = isAac ? "mka" : targetFormat;
     QString newAudioPath =
-        QFileInfo(audioPath).dir().filePath(QFileInfo(audioPath).baseName() + "_converted." + targetFormat);
+        QFileInfo(audioPath).dir().filePath(QFileInfo(audioPath).baseName() + "_converted." + outputExtension);
     m_params["russianAudioPath"] = newAudioPath;
 
     m_progressLogPath = QDir::temp().filePath("dt_manual_audio_progress.log");
@@ -165,9 +174,16 @@ void ManualAssembler::convertAudio()
 
     QStringList args;
     args << "-y" << "-i" << audioPath;
-    if (targetFormat == "aac")
+    if (isAac)
     {
-        args << "-c:a" << "aac" << "-b:a" << "256k";
+        if (AppSettings::instance().hasAacAtCodec())
+        {
+            args << "-c:a" << "aac_at" << "-b:a" << "256k";
+        }
+        else
+        {
+            args << "-c:a" << "aac" << "-b:a" << "256k";
+        }
     }
     else if (targetFormat == "flac")
     {
@@ -198,7 +214,7 @@ void ManualAssembler::processSubtitlesAndAssemble()
         }
         else
         {
-            emit logMessage("Ошибка: не удалось загрузить шаблон для генерации ТБ.", LogCategory::APP);
+            emit logMessage("Ошибка: не удалось загрузить шаблон для генерации ТБ.", LogCategory::APP, LogLevel::Error);
             assemble();
             return;
         }
@@ -243,7 +259,8 @@ QString ManualAssembler::resolveChaptersPathForMkvMerge()
             emit logMessage(QStringLiteral("Главы: используется указанный XML: %1").arg(abs), LogCategory::APP);
             return abs;
         }
-        emit logMessage(QStringLiteral("ПРЕДУПРЕЖДЕНИЕ: файл глав не найден: %1").arg(customPath), LogCategory::APP);
+        emit logMessage(QStringLiteral("ПРЕДУПРЕЖДЕНИЕ: файл глав не найден: %1").arg(customPath), LogCategory::APP,
+                        LogLevel::Warning);
     }
 
     const bool tplEnabled = m_params.value(QStringLiteral("templateChaptersEnabled"), true).toBool();
@@ -331,7 +348,7 @@ void ManualAssembler::assemble()
 
     if (outputName.isEmpty())
     {
-        emit logMessage("Критическая ошибка: не указан выходной файл.", LogCategory::APP);
+        emit logMessage("Критическая ошибка: не указан выходной файл.", LogCategory::APP, LogLevel::Error);
         emit finished(false);
         return;
     }
@@ -356,7 +373,7 @@ void ManualAssembler::assemble()
 
     if (fullOutputPath.isEmpty())
     {
-        emit logMessage("Критическая ошибка: не удалось определить путь для сохранения файла.", LogCategory::APP);
+        emit logMessage("Критическая ошибка: не удалось определить путь для сохранения файла.", LogCategory::APP, LogLevel::Error);
         emit finished(false);
         return;
     }
@@ -364,6 +381,21 @@ void ManualAssembler::assemble()
     m_finalMkvPath = fullOutputPath;
     QStringList args;
     args << "-o" << fullOutputPath;
+    const QString chaptersMux = resolveChaptersPathForMkvMerge();
+    const bool explicitChaptersProvided = (!chaptersMux.isEmpty() && QFileInfo::exists(chaptersMux));
+
+    auto addNoChaptersForContainer = [&](const QString& path) {
+        if (!explicitChaptersProvided)
+        {
+            return;
+        }
+        const QString ext = QFileInfo(path).suffix().toLower();
+        if (ext == QStringLiteral("mkv") || ext == QStringLiteral("mka") || ext == QStringLiteral("mp4") ||
+            ext == QStringLiteral("m4a"))
+        {
+            args << "--no-chapters";
+        }
+    };
 
     // Шрифты
     QStringList fontPaths = m_params["fontPaths"].toStringList();
@@ -387,7 +419,6 @@ void ManualAssembler::assemble()
         args << "--attach-file" << path;
     }
 
-    const QString chaptersMux = resolveChaptersPathForMkvMerge();
     if (!chaptersMux.isEmpty() && QFileInfo::exists(chaptersMux))
     {
         args << "--chapters" << chaptersMux;
@@ -402,6 +433,7 @@ void ManualAssembler::assemble()
         QString subAuthor = m_params["subAuthor"].toString();
         if (m_params.contains("videoPath"))
         {
+            const QString videoPath = m_params["videoPath"].toString();
             if (!lang.isEmpty())
             {
                 args << "--language" << "0:" + lang;
@@ -410,15 +442,20 @@ void ManualAssembler::assemble()
             {
                 args << "--track-name" << QString("0:Видеоряд [%1]").arg(studio);
             }
-            args << m_params["videoPath"].toString();
+            addNoChaptersForContainer(videoPath);
+            args << videoPath;
         }
         if (m_params.contains("russianAudioPath"))
         {
+            const QString russianAudioPath = m_params["russianAudioPath"].toString();
             args << "--default-track-flag" << "0:yes" << "--language" << "0:rus" << "--track-name"
-                 << "0:Русский [Дубляжная]" << m_params["russianAudioPath"].toString();
+                 << "0:Русский [Дубляжная]";
+            addNoChaptersForContainer(russianAudioPath);
+            args << russianAudioPath;
         }
         if (m_params.contains("originalAudioPath"))
         {
+            const QString originalAudioPath = m_params["originalAudioPath"].toString();
             args << "--default-track-flag" << "0:no";
             if (!lang.isEmpty())
             {
@@ -428,7 +465,8 @@ void ManualAssembler::assemble()
             {
                 args << "--track-name" << QString("0:Оригинал [%1]").arg(studio);
             }
-            args << m_params["originalAudioPath"].toString();
+            addNoChaptersForContainer(originalAudioPath);
+            args << originalAudioPath;
         }
         if (m_params.contains("signsPath"))
         {
@@ -452,18 +490,27 @@ void ManualAssembler::assemble()
         QString subTrackAuthorName = t.isCustomTranslation ? "Дубляжная" : t.subAuthor;
         if (m_params.contains("videoPath"))
         {
+            const QString videoPath = m_params["videoPath"].toString();
             args << "--language" << "0:" + t.originalLanguage << "--track-name"
-                 << QString("0:Видеоряд [%1]").arg(t.animationStudio) << m_params["videoPath"].toString();
+                 << QString("0:Видеоряд [%1]").arg(t.animationStudio);
+            addNoChaptersForContainer(videoPath);
+            args << videoPath;
         }
         if (m_params.contains("russianAudioPath"))
         {
+            const QString russianAudioPath = m_params["russianAudioPath"].toString();
             args << "--default-track-flag" << "0:yes" << "--language" << "0:rus" << "--track-name"
-                 << "0:Русский [Дубляжная]" << m_params["russianAudioPath"].toString();
+                 << "0:Русский [Дубляжная]";
+            addNoChaptersForContainer(russianAudioPath);
+            args << russianAudioPath;
         }
         if (m_params.contains("originalAudioPath"))
         {
+            const QString originalAudioPath = m_params["originalAudioPath"].toString();
             args << "--default-track-flag" << "0:no" << "--language" << "0:" + t.originalLanguage << "--track-name"
-                 << QString("0:Оригинал [%1]").arg(t.animationStudio) << m_params["originalAudioPath"].toString();
+                 << QString("0:Оригинал [%1]").arg(t.animationStudio);
+            addNoChaptersForContainer(originalAudioPath);
+            args << originalAudioPath;
         }
         if (m_params.contains("signsPath"))
         {
@@ -493,7 +540,7 @@ void ManualAssembler::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
 
     if (exitCode != 0 || exitStatus != QProcess::NormalExit)
     {
-        emit logMessage("Ошибка выполнения дочернего процесса. Рабочий процесс остановлен.", LogCategory::APP);
+        emit logMessage("Ошибка выполнения дочернего процесса. Рабочий процесс остановлен.", LogCategory::APP, LogLevel::Error);
         emit finished(false);
         return;
     }
@@ -529,14 +576,14 @@ void ManualAssembler::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
             else
             {
                 emit logMessage("ОШИБКА: Не удалось скопировать нормализованный файл. Будет использован исходный файл.",
-                                LogCategory::APP);
+                                LogCategory::APP, LogLevel::Error);
                 m_params["russianAudioPath"] = m_originalAudioPathBeforeNormalization;
             }
         }
         else
         {
             emit logMessage("ПРЕДУПРЕЖДЕНИЕ: Нормализованный файл не найден. Будет использован исходный.",
-                            LogCategory::APP);
+                            LogCategory::APP, LogLevel::Warning);
             QFile::rename(tempPath, m_originalAudioPathBeforeNormalization);
             m_params["russianAudioPath"] = m_originalAudioPathBeforeNormalization;
         }

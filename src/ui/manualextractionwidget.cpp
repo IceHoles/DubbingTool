@@ -112,7 +112,7 @@ void ManualExtractionWidget::scanFile(const QString& path)
     QString mkvmergeExe = AppSettings::instance().mkvmergePath();
     if (mkvmergeExe.isEmpty() || !QFileInfo::exists(mkvmergeExe))
     {
-        emit logMessage("Ошибка: mkvmerge не найден в настройках!", LogCategory::APP);
+        emit logMessage("Ошибка: mkvmerge не найден в настройках!", LogCategory::APP, LogLevel::Error);
         return;
     }
 
@@ -128,7 +128,7 @@ void ManualExtractionWidget::scanFile(const QString& path)
     }
     else
     {
-        emit logMessage("Ошибка: не удалось просканировать файл", LogCategory::APP);
+        emit logMessage("Ошибка: не удалось просканировать файл", LogCategory::APP, LogLevel::Error);
     }
 }
 
@@ -256,6 +256,7 @@ void ManualExtractionWidget::parseMkvJson(const QByteArray& data)
         item->setData(0, Qt::UserRole, "track");
         item->setData(1, Qt::UserRole, id);
         item->setData(2, Qt::UserRole, ext);
+        item->setData(3, Qt::UserRole, type);
 
         item->setCheckState(0, Qt::Unchecked);
     }
@@ -328,12 +329,26 @@ void ManualExtractionWidget::onExtractClicked()
             if (mode == "track")
             {
                 QString ext = (*it)->data(2, Qt::UserRole).toString();
+                const QString trackType = (*it)->data(3, Qt::UserRole).toString();
                 QString lang = (*it)->text(3);
+
+                if (trackType == "audio")
+                {
+                    ext = isMkv ? "mka" : "m4a";
+                }
 
                 QString outName = QString("%1_track%2_%3.%4").arg(baseName).arg(id).arg(lang).arg(ext);
                 QString outPath = QDir(sourceDir).filePath(outName);
 
-                if (isMkv)
+                if (trackType == "audio")
+                {
+                    if (ffmpegArgs.isEmpty())
+                    {
+                        ffmpegArgs << "-y" << "-i" << m_currentFile;
+                    }
+                    ffmpegArgs << "-map" << QString("0:%1").arg(id) << "-c" << "copy" << outPath;
+                }
+                else if (isMkv)
                 {
                     mkvextractTracks << QString("%1:%2").arg(id).arg(outPath);
                 }
@@ -383,7 +398,7 @@ void ManualExtractionWidget::onExtractClicked()
             QStringList args;
             args << "tracks" << m_currentFile << mkvextractTracks; // "tracks" ПЕРВЫМ
 
-            if (!mkvextractAttach.isEmpty())
+            if (!mkvextractAttach.isEmpty() || !ffmpegArgs.isEmpty())
             {
                 QByteArray dummy;
                 m_processManager->executeAndWait(mkvextractExe, args, dummy);
@@ -400,7 +415,22 @@ void ManualExtractionWidget::onExtractClicked()
         {
             QStringList args;
             args << "attachments" << m_currentFile << mkvextractAttach; // "attachments" ПЕРВЫМ
-            m_processManager->startProcess(mkvextractExe, args);
+            if (!ffmpegArgs.isEmpty())
+            {
+                QByteArray dummy;
+                m_processManager->executeAndWait(mkvextractExe, args, dummy);
+            }
+            else
+            {
+                m_processManager->startProcess(mkvextractExe, args);
+                return;
+            }
+        }
+
+        if (!ffmpegArgs.isEmpty())
+        {
+            QString ffmpegExe = AppSettings::instance().ffmpegPath();
+            m_processManager->startProcess(ffmpegExe, ffmpegArgs);
         }
     }
     else
@@ -420,7 +450,7 @@ void ManualExtractionWidget::onProcessFinished(int exitCode)
     }
     else
     {
-        emit logMessage(QString("Ошибка извлечения (код %1).").arg(exitCode), LogCategory::APP);
+        emit logMessage(QString("Ошибка извлечения (код %1).").arg(exitCode), LogCategory::APP, LogLevel::Error);
     }
     emit progressUpdated(100, "Готово");
 }

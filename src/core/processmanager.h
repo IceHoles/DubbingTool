@@ -4,6 +4,7 @@
 #include <QList>
 #include <QObject>
 #include <QProcess>
+#include <QHash>
 
 class ProcessManager : public QObject
 {
@@ -34,10 +35,15 @@ private slots:
     void onReadyReadStandardError();
 
 private:
+    void emitBufferedLines(QProcess* process, const QByteArray& chunk, bool isStdErr);
+    void flushProcessBuffers(QProcess* process);
+
     // Храним список всех запущенных этим менеджером процессов
     QList<QProcess*> m_activeProcesses;
     bool m_wasKilled = false;
     QString m_workingDir;
+    QHash<QProcess*, QString> m_stdoutBuffers;
+    QHash<QProcess*, QString> m_stderrBuffers;
 };
 
 #endif // PROCESSMANAGER_H

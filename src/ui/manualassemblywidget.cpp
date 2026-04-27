@@ -171,7 +171,7 @@ void ManualAssemblyWidget::on_browseOriginalAudio_clicked()
 void ManualAssemblyWidget::on_browseRussianAudio_clicked()
 {
     browseForFile(ui->russianAudioPathEdit, "Выберите русскую аудиодорожку",
-                  "Аудиофайлы (*.wav *.aac *.flac);;Все файлы (*)");
+                  "Аудиофайлы (*.wav *.aac *.flac *.m4a *.mka);;Все файлы (*)");
 }
 
 void ManualAssemblyWidget::on_browseSubtitles_clicked()

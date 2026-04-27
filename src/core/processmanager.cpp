@@ -11,10 +11,27 @@ ProcessManager::~ProcessManager()
     killProcess();
 }
 
+static QString formatCommand(const QString& program, const QStringList& arguments)
+{
+    QStringList escapedArgs;
+    for (const QString& arg : arguments)
+    {
+        if (arg.contains(' '))
+        {
+            escapedArgs.append(QString("\"%1\"").arg(arg));
+        }
+        else
+        {
+            escapedArgs.append(arg);
+        }
+    }
+    return QString("%1 %2").arg(program, escapedArgs.join(" "));
+}
+
 void ProcessManager::startProcess(const QString& program, const QStringList& arguments)
 {
     m_wasKilled = false;
-    emit processOutput(QString("Запуск (асинхронный): %1 %2").arg(program, arguments.join(" ")));
+    emit processOutput(QString("Запуск (асинхронный): %1").arg(formatCommand(program, arguments)));
 
     QProcess* newProcess = new QProcess(this);
     if (!m_workingDir.isEmpty())
@@ -38,9 +55,12 @@ void ProcessManager::startProcess(const QString& program, const QStringList& arg
     connect(newProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
             [this, newProcess](int exitCode, QProcess::ExitStatus exitStatus)
             {
+                flushProcessBuffers(newProcess);
                 emit processOutput(QString("Процесс (асинхронный) завершен с кодом %1.").arg(exitCode));
                 emit processFinished(exitCode, exitStatus);
                 m_activeProcesses.removeOne(newProcess);
+                m_stdoutBuffers.remove(newProcess);
+                m_stderrBuffers.remove(newProcess);
                 newProcess->deleteLater();
             });
 
@@ -51,7 +71,7 @@ void ProcessManager::startProcess(const QString& program, const QStringList& arg
 bool ProcessManager::executeAndWait(const QString& program, const QStringList& arguments, QByteArray& output,
                                     int timeoutMs)
 {
-    emit processOutput(QString("Запуск (синхронный): %1 %2").arg(program, arguments.join(" ")));
+    emit processOutput(QString("Запуск (синхронный): %1").arg(formatCommand(program, arguments)));
 
     QProcess syncProcess;
     if (!m_workingDir.isEmpty())
@@ -85,7 +105,8 @@ bool ProcessManager::executeAndWait(const QString& program, const QStringList& a
     }
 
     output = syncProcess.readAllStandardOutput();
-    emit processOutput("Процесс успешно завершен. Получено " + QString::number(output.size()) + " байт данных.");
+    QString outStr = QString::fromUtf8(output);
+    emit processOutput("Процесс успешно завершен. Получено " + QString::number(output.size()) + " байт данных:\n" + outStr.trimmed());
     m_workingDir.clear();
     return true;
 }
@@ -126,7 +147,7 @@ void ProcessManager::onReadyReadStandardOutput()
     QProcess* process = qobject_cast<QProcess*>(sender());
     if (!process)
         return;
-    emit processOutput(QString::fromUtf8(process->readAllStandardOutput()));
+    emitBufferedLines(process, process->readAllStandardOutput(), false);
 }
 
 void ProcessManager::onReadyReadStandardError()
@@ -134,5 +155,60 @@ void ProcessManager::onReadyReadStandardError()
     QProcess* process = qobject_cast<QProcess*>(sender());
     if (!process)
         return;
-    emit processStdErr(QString::fromUtf8(process->readAllStandardError()));
+    emitBufferedLines(process, process->readAllStandardError(), true);
+}
+
+void ProcessManager::emitBufferedLines(QProcess* process, const QByteArray& chunk, bool isStdErr)
+{
+    QString& buffer = isStdErr ? m_stderrBuffers[process] : m_stdoutBuffers[process];
+    QString incoming = QString::fromUtf8(chunk);
+    incoming.replace("\r\n", "\n");
+    incoming.replace('\r', '\n');
+    buffer += incoming;
+
+    qsizetype lineEnd = buffer.indexOf('\n');
+    while (lineEnd >= 0)
+    {
+        QString line = buffer.left(lineEnd);
+        buffer.remove(0, lineEnd + 1);
+        if (!line.isEmpty())
+        {
+            if (isStdErr)
+            {
+                emit processStdErr(line);
+            }
+            else
+            {
+                emit processOutput(line);
+            }
+        }
+        lineEnd = buffer.indexOf('\n');
+    }
+}
+
+void ProcessManager::flushProcessBuffers(QProcess* process)
+{
+    auto flushOne = [&](QHash<QProcess*, QString>& map, bool isStdErr)
+    {
+        if (!map.contains(process))
+        {
+            return;
+        }
+        const QString tail = map.value(process);
+        if (!tail.trimmed().isEmpty())
+        {
+            if (isStdErr)
+            {
+                emit processStdErr(tail);
+            }
+            else
+            {
+                emit processOutput(tail);
+            }
+        }
+        map.remove(process);
+    };
+
+    flushOne(m_stdoutBuffers, false);
+    flushOne(m_stderrBuffers, true);
 }

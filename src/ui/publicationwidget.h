@@ -52,7 +52,7 @@ public:
     void clearData();
 
 signals:
-    void logMessage(const QString&, LogCategory);
+    void logMessage(const QString&, LogCategory, LogLevel = LogLevel::Info);
     void postsUpdateRequest(const QMap<QString, QString>& viewLinks);
 
 private slots:

@@ -25,7 +25,7 @@ public:
 
 signals:
     void finished(RerenderDecision decision, const RenderPreset& newPreset);
-    void logMessage(const QString& message, LogCategory category = LogCategory::APP);
+    void logMessage(const QString& message, LogCategory category = LogCategory::APP, LogLevel level = LogLevel::Info);
     void showDialogRequest(const RenderPreset& preset, double actualBitrate);
 
 public slots:

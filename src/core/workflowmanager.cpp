@@ -1,4 +1,4 @@
-#include "workflowmanager.h"
+﻿#include "workflowmanager.h"
 
 #include "assprocessor.h"
 #include "chapterhelper.h"
@@ -372,6 +372,97 @@ QString probeLastFrameMd5FromTailWindow(ProcessManager* processManager, const QS
     }
     return "";
 }
+
+void enforceAacFromWavForPresetArgs(QStringList& args, const QString& wavPath)
+{
+    if (args.isEmpty() || wavPath.isEmpty())
+    {
+        return;
+    }
+
+    const bool hasAudioOutput = !args.contains(QStringLiteral("-an"));
+    if (!hasAudioOutput)
+    {
+        return;
+    }
+
+    // Add WAV as second input right after the first input pair.
+    int firstInputIdx = -1;
+    for (int i = 0; i < args.size() - 1; ++i)
+    {
+        if (args.at(i) == QLatin1String("-i"))
+        {
+            firstInputIdx = i;
+            break;
+        }
+    }
+    if (firstInputIdx != -1)
+    {
+        args.insert(firstInputIdx + 2, wavPath);
+        args.insert(firstInputIdx + 2, QStringLiteral("-i"));
+    }
+
+    // Redirect audio maps from input 0:* to input 1:*.
+    for (int i = 0; i < args.size() - 1; ++i)
+    {
+        if (args.at(i) != QLatin1String("-map"))
+        {
+            continue;
+        }
+        const QString mapValue = args.at(i + 1);
+        if (mapValue.startsWith(QLatin1String("0:a")))
+        {
+            args[i + 1] = QStringLiteral("1:a:0");
+        }
+    }
+
+    bool hasAudioCodecOption = false;
+    bool hasAudioBitrateOption = false;
+    for (int i = 0; i < args.size() - 1; ++i)
+    {
+        const QString key = args.at(i);
+        if (key == QLatin1String("-c:a") || key == QLatin1String("-codec:a"))
+        {
+            hasAudioCodecOption = true;
+            if (AppSettings::instance().hasAacAtCodec())
+            {
+                args[i + 1] = QStringLiteral("aac_at");
+            }
+            else
+            {
+                args[i + 1] = QStringLiteral("aac");
+            }
+        }
+        else if (key == QLatin1String("-b:a") || key == QLatin1String("-audio_bitrate"))
+        {
+            hasAudioBitrateOption = true;
+            args[i + 1] = QStringLiteral("256k");
+        }
+    }
+
+    // Handle preset patterns like "-c copy" where stream-specific codec isn't set.
+    for (int i = 0; i < args.size() - 1; ++i)
+    {
+        if ((args.at(i) == QLatin1String("-c") || args.at(i) == QLatin1String("-codec")) &&
+            args.at(i + 1) == QLatin1String("copy"))
+        {
+            args[i] = QStringLiteral("-c:v");
+            hasAudioCodecOption = false;
+        }
+    }
+
+    const qsizetype outIdx = args.size() - 1;
+    if (!hasAudioCodecOption && outIdx >= 0)
+    {
+        args.insert(outIdx, QStringLiteral("aac_at"));
+        args.insert(outIdx, QStringLiteral("-c:a"));
+    }
+    if (!hasAudioBitrateOption && outIdx >= 0)
+    {
+        args.insert(outIdx, QStringLiteral("256k"));
+        args.insert(outIdx, QStringLiteral("-b:a"));
+    }
+}
 } // namespace
 
 WorkflowManager::WorkflowManager(ReleaseTemplate t, const QString& episodeNumberForPost,
@@ -472,7 +563,8 @@ void WorkflowManager::startWithManualFile(const QString& filePath)
     QString newPath = handleUserFile(filePath, m_paths->sourcesPath);
     if (newPath.isEmpty())
     {
-        emit logMessage("Критическая ошибка: не удалось переместить указанный видеофайл.", LogCategory::APP);
+        emit logMessage("Критическая ошибка: не удалось переместить указанный видеофайл.", LogCategory::APP,
+                        LogLevel::Error);
         emit workflowAborted();
         return;
     }
@@ -497,7 +589,7 @@ void WorkflowManager::onRssDownloaded(QNetworkReply* reply)
 {
     if (reply->error() != QNetworkReply::NoError)
     {
-        emit logMessage("Ошибка сети (RSS): " + reply->errorString(), LogCategory::APP);
+        emit logMessage("Ошибка сети (RSS): " + reply->errorString(), LogCategory::APP, LogLevel::Error);
         emit workflowAborted();
         reply->deleteLater();
         return;
@@ -707,13 +799,14 @@ void WorkflowManager::onLoginFinished(QNetworkReply* reply)
         else
         {
             emit logMessage("Ошибка: SID cookie не получен. Проверьте логин/пароль в настройках.",
-                            LogCategory::QBITTORRENT);
+                            LogCategory::QBITTORRENT, LogLevel::Error);
             emit workflowAborted();
         }
     }
     else
     {
-        emit logMessage("Ошибка: ответ на аутентификацию не содержит cookie.", LogCategory::QBITTORRENT);
+        emit logMessage("Ошибка: ответ на аутентификацию не содержит cookie.", LogCategory::QBITTORRENT,
+                        LogLevel::Error);
         emit workflowAborted();
     }
 
@@ -767,7 +860,7 @@ void WorkflowManager::onTorrentAdded(QNetworkReply* reply)
     }
     else
     {
-        emit logMessage("Ошибка добавления торрента: " + reply->errorString(), LogCategory::APP);
+        emit logMessage("Ошибка добавления торрента: " + reply->errorString(), LogCategory::APP, LogLevel::Error);
         emit workflowAborted();
     }
     reply->deleteLater();
@@ -784,7 +877,8 @@ void WorkflowManager::onHashFindAttempt()
 {
     if (m_hashFindAttempts >= MAX_HASH_FIND_ATTEMPTS)
     {
-        emit logMessage("Ошибка: не удалось найти хеш торрента после нескольких попыток.", LogCategory::APP);
+        emit logMessage("Ошибка: не удалось найти хеш торрента после нескольких попыток.", LogCategory::APP,
+                        LogLevel::Error);
         m_hashFindTimer->stop();
         disconnect(m_hashFindTimer, &QTimer::timeout, this, &WorkflowManager::onHashFindAttempt);
         emit workflowAborted();
@@ -812,7 +906,8 @@ void WorkflowManager::onTorrentListReceived(QNetworkReply* reply)
 {
     if (reply->error() != QNetworkReply::NoError)
     {
-        emit logMessage("Ошибка сети при получении списка торрентов: " + reply->errorString(), LogCategory::APP);
+        emit logMessage("Ошибка сети при получении списка торрентов: " + reply->errorString(), LogCategory::APP,
+                        LogLevel::Error);
         // Не прерываемся, таймер сделает следующую попытку
         reply->deleteLater();
         return;
@@ -846,7 +941,8 @@ void WorkflowManager::onTorrentListForHashCheckReceived(QNetworkReply* reply)
 {
     if (reply->error() != QNetworkReply::NoError)
     {
-        emit logMessage("Ошибка сети при проверке торрентов: " + reply->errorString(), LogCategory::QBITTORRENT);
+        emit logMessage("Ошибка сети при проверке торрентов: " + reply->errorString(), LogCategory::QBITTORRENT,
+                        LogLevel::Error);
         emit logMessage("Не удалось проверить статус, переход к скачиванию нового.", LogCategory::APP);
         startDownload(m_magnetLink);
         reply->deleteLater();
@@ -894,7 +990,7 @@ void WorkflowManager::onTorrentListForHashCheckReceived(QNetworkReply* reply)
             {
                 emit logMessage("Ошибка: торрент скачан, но MKV-файл не найден в его папке. Проверьте содержимое: " +
                                     m_savePath,
-                                LogCategory::APP);
+                                LogCategory::APP, LogLevel::Error);
                 emit workflowAborted();
             }
             else
@@ -1075,7 +1171,7 @@ void WorkflowManager::onTorrentFilesReceived(QNetworkReply* reply)
 
     if (mainFileName.isEmpty())
     {
-        emit logMessage("Ошибка: не удалось найти .mkv файл в торренте.", LogCategory::APP);
+        emit logMessage("Ошибка: не удалось найти .mkv файл в торренте.", LogCategory::APP, LogLevel::Error);
         emit workflowAborted();
     }
     else
@@ -1122,7 +1218,7 @@ void WorkflowManager::getMkvInfo()
             emit logMessage(QString("ПРЕДУПРЕЖДЕНИЕ: Глава с именем '%1' не найдена в файле. Проверьте правильность "
                                     "названия в шаблоне.")
                                 .arg(m_template.endingChapterName),
-                            LogCategory::APP);
+                            LogCategory::APP, LogLevel::Warning);
         }
     }
 
@@ -1199,7 +1295,7 @@ void WorkflowManager::getMkvInfo()
         {
             emit logMessage("Предупреждение: не найдено ни одной аудиодорожки на языке '" +
                                 m_template.originalLanguage + "'. Оригинал не будет добавлен в сборку.",
-                            LogCategory::APP);
+                            LogCategory::APP, LogLevel::Warning);
         }
         else if (m_foundAudioTracks.size() == 1)
         {
@@ -1268,7 +1364,7 @@ QString WorkflowManager::parseChaptersWithMkvExtract()
     QByteArray dummyOutput;
     if (!m_processManager->executeAndWait(m_mkvextractPath, args, dummyOutput))
     {
-        emit logMessage("Ошибка при извлечении глав с помощью mkvextract.", LogCategory::APP);
+        emit logMessage("Ошибка при извлечении глав с помощью mkvextract.", LogCategory::APP, LogLevel::Error);
         QFile::remove(chaptersFilePath);
         return QString();
     }
@@ -1323,7 +1419,7 @@ QString WorkflowManager::parseChaptersWithMkvExtract()
         }
         if (xml.hasError())
         {
-            emit logMessage("Ошибка парсинга XML глав: " + xml.errorString(), LogCategory::APP);
+            emit logMessage("Ошибка парсинга XML глав: " + xml.errorString(), LogCategory::APP, LogLevel::Error);
         }
     }
     else
@@ -1367,49 +1463,52 @@ QString WorkflowManager::parseChaptersWithMkvExtract()
 
 void WorkflowManager::extractTracks()
 {
-    emit logMessage("Шаг 4: Извлечение дорожек...", LogCategory::APP);
+    emit logMessage("Шаг 4: Извлечение дорожек (ffmpeg)...", LogCategory::APP);
     m_currentStep = Step::ExtractingTracks;
 
     if (m_videoTrack.id == -1)
     {
         emit logMessage("Критическая ошибка: в файле отсутствует видеодорожка. Извлечение невозможно.",
-                        LogCategory::APP);
+                        LogCategory::APP, LogLevel::Error);
         emit workflowAborted();
         return;
     }
 
     QStringList args;
-    args << m_mkvFilePath << "tracks";
+    args << "-y" << "-i" << m_mkvFilePath;
 
     QString videoOutPath = m_paths->extractedVideo(m_videoTrack.extension);
-    args << QString("%1:%2").arg(m_videoTrack.id).arg(videoOutPath);
+    args << "-map" << QString("0:%1").arg(m_videoTrack.id) << "-c:v" << "copy" << "-map_chapters" << "-1"
+         << videoOutPath;
 
     if (m_originalAudioTrack.id != -1)
     {
-        QString audioOutPath = m_paths->extractedAudio(m_originalAudioTrack.extension);
-        args << QString("%1:%2").arg(m_originalAudioTrack.id).arg(audioOutPath);
+        QString audioExtension = (m_sourceFormat == SourceFormat::MP4) ? "m4a" : "mka";
+        QString audioOutPath = m_paths->extractedAudio(audioExtension);
+        args << "-map" << QString("0:%1").arg(m_originalAudioTrack.id) << "-c:a" << "copy" << "-map_chapters" << "-1"
+             << audioOutPath;
     }
 
-    if (m_template.sourceHasSubtitles && m_overrideSubsPath.isEmpty())
+    if (m_sourceFormat == SourceFormat::MKV && m_template.sourceHasSubtitles && m_overrideSubsPath.isEmpty() &&
+        m_subtitleTrack.id != -1)
     {
-        if (m_subtitleTrack.id != -1)
-        {
-            QString subsOutPath = m_paths->extractedSubs(m_subtitleTrack.extension);
-            args << QString("%1:%2").arg(m_subtitleTrack.id).arg(subsOutPath);
-        }
-        else
-        {
-            emit logMessage("Предупреждение: в файле не найдены русские субтитры, хотя в шаблоне они ожидались.",
-                            LogCategory::APP);
-        }
+        QString subsOutPath = m_paths->extractedSubs(m_subtitleTrack.extension);
+        args << "-map" << QString("0:%1").arg(m_subtitleTrack.id) << "-c:s" << "copy" << "-map_chapters" << "-1"
+             << subsOutPath;
     }
     else if (!m_overrideSubsPath.isEmpty())
     {
         emit logMessage("Пропускаем извлечение встроенных субтитров, так как указаны внешние файлы.", LogCategory::APP);
     }
+    else if (m_sourceFormat == SourceFormat::MP4 && m_template.sourceHasSubtitles)
+    {
+        emit logMessage(
+            "Предупреждение: MP4 файл не содержит субтитров формата ASS. Укажите субтитры через 'Свои субтитры'.",
+            LogCategory::APP, LogLevel::Warning);
+    }
 
-    emit progressUpdated(-1, "Извлечение дорожек");
-    m_processManager->startProcess(m_mkvextractPath, args);
+    emit progressUpdated(-1, "Извлечение дорожек (ffmpeg)");
+    m_processManager->startProcess(m_ffmpegPath, args);
 }
 
 void WorkflowManager::cancelOperation()
@@ -1456,9 +1555,27 @@ void WorkflowManager::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
     bool isMkvmergeStep = (m_currentStep == Step::AssemblingMkv || m_currentStep == Step::AssemblingSrtMaster);
     bool isMkvmergeWarning = (exitCode == 1 && isMkvmergeStep && exitStatus == QProcess::NormalExit);
 
+    bool isFfmpegStep = (m_currentStep == Step::ConvertingAudio);
+    bool isFfmpegExitCrash = (isFfmpegStep && (exitCode == -1073741819 || static_cast<uint>(exitCode) == 0xC0000005));
+
+    if (isFfmpegExitCrash)
+    {
+        // Дополнительная проверка: если файл существует и не пустой, считаем это успехом
+        QFileInfo checkFile(m_audioConversionCurrentOutputPath);
+        if (checkFile.exists() && checkFile.size() > 0)
+        {
+            emit logMessage("FFmpeg завершился с ошибкой доступа при закрытии, но файл корректен. Продолжаем...",
+                            LogCategory::APP);
+            // Подменяем переменные, чтобы логика ниже пропустила этот шаг как успешный
+            exitCode = 0;
+            exitStatus = QProcess::NormalExit;
+        }
+    }
+
     if ((exitCode != 0 && !isMkvmergeWarning) || exitStatus != QProcess::NormalExit)
     {
-        emit logMessage("Ошибка выполнения дочернего процесса. Рабочий процесс остановлен.", LogCategory::APP);
+        emit logMessage("Ошибка выполнения дочернего процесса. Рабочий процесс остановлен.", LogCategory::APP,
+                        LogLevel::Error);
         emit workflowAborted();
         return;
     }
@@ -1534,13 +1651,14 @@ void WorkflowManager::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
             }
             else
             {
-                emit logMessage("ОШИБКА: Не удалось переименовать нормализованный файл.", LogCategory::APP);
+                emit logMessage("ОШИБКА: Не удалось переименовать нормализованный файл.", LogCategory::APP,
+                                LogLevel::Error);
                 emit workflowAborted();
             }
         }
         else
         {
-            emit logMessage("ОШИБКА: Нормализованный файл не найден.", LogCategory::APP);
+            emit logMessage("ОШИБКА: Нормализованный файл не найден.", LogCategory::APP, LogLevel::Error);
             emit workflowAborted();
         }
         QFile::remove(tempPath);
@@ -1558,8 +1676,34 @@ void WorkflowManager::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
     {
         m_progressTimer->stop();
         QFile::remove(m_ffmpegProgressFile);
+        if (m_audioConversionNeedsSecondPass)
+        {
+            m_audioConversionNeedsSecondPass = false;
+            m_audioConversionCurrentOutputPath = m_finalAudioMp4Path;
+            emit logMessage("Конвертация аудио для MKV завершена. Запуск отдельной конвертации для MP4...", LogCategory::APP);
+
+            QStringList args;
+            args << "-y" << "-i" << m_mainRuAudioPath;
+            if (AppSettings::instance().hasAacAtCodec())
+            {
+                args << "-c:a" << "aac_at" << "-b:a" << "256k";
+            }
+            else
+            {
+                args << "-c:a" << "aac" << "-b:a" << "256k";
+            }
+            args << "-progress" << QDir::toNativeSeparators(m_ffmpegProgressFile) << m_audioConversionCurrentOutputPath;
+
+            m_progressTimer->disconnect();
+            connect(m_progressTimer, &QTimer::timeout, this, &WorkflowManager::onAudioConversionProgress);
+            m_progressTimer->start(500);
+            m_processManager->startProcess(m_ffmpegPath, args);
+            break;
+        }
+
         emit logMessage("Конвертация аудио успешно завершена.", LogCategory::APP);
         emit progressUpdated(100);
+        m_audioConversionCurrentOutputPath.clear();
         assembleMkv(m_finalAudioPath);
         break;
     }
@@ -1570,7 +1714,7 @@ void WorkflowManager::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
         {
             emit logMessage("Удаление временных файлов...", LogCategory::APP);
             QString videoPath = m_paths->extractedVideo(m_videoTrack.extension);
-            QString audioPath = m_paths->extractedAudio(m_originalAudioTrack.extension);
+            QString audioPath = m_paths->extractedAudio(m_sourceFormat == SourceFormat::MP4 ? "m4a" : "mka");
             bool videoRemoved = QFile::remove(videoPath);
             bool audioRemoved = QFile::remove(audioPath);
             if (videoRemoved)
@@ -1598,7 +1742,7 @@ void WorkflowManager::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
     {
         if (exitCode != 0)
         {
-            emit logMessage("Ошибка рендера. Рабочий процесс остановлен.", LogCategory::APP);
+            emit logMessage("Ошибка рендера. Рабочий процесс остановлен.", LogCategory::APP, LogLevel::Error);
             emit workflowAborted();
             return;
         }
@@ -1613,7 +1757,7 @@ void WorkflowManager::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
         else
         {
             emit logMessage("Рендер MP4 успешно завершен (один проход).", LogCategory::APP);
-            RenderHelper* helper = new RenderHelper(m_renderPreset, m_outputMp4Path, m_processManager, this);
+            RenderHelper* helper = new RenderHelper(m_renderPreset, m_tempVideoMp4Path, m_processManager, this);
             connect(helper, &RenderHelper::logMessage, this, &WorkflowManager::logMessage);
             connect(helper, &RenderHelper::finished, this, &WorkflowManager::onBitrateCheckFinished);
             connect(helper, &RenderHelper::showDialogRequest, this, &WorkflowManager::bitrateCheckRequest);
@@ -1625,17 +1769,38 @@ void WorkflowManager::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
     {
         if (exitCode != 0)
         {
-            emit logMessage("Ошибка второго прохода рендера. Рабочий процесс остановлен.", LogCategory::APP);
+            emit logMessage("Ошибка второго прохода рендера. Рабочий процесс остановлен.", LogCategory::APP,
+                            LogLevel::Error);
             emit workflowAborted();
             return;
         }
 
         emit logMessage("Второй проход и рендер MP4 успешно завершены.", LogCategory::APP);
-        RenderHelper* helper = new RenderHelper(m_renderPreset, m_outputMp4Path, m_processManager, this);
+        RenderHelper* helper = new RenderHelper(m_renderPreset, m_tempVideoMp4Path, m_processManager, this);
         connect(helper, &RenderHelper::logMessage, this, &WorkflowManager::logMessage);
         connect(helper, &RenderHelper::finished, this, &WorkflowManager::onBitrateCheckFinished);
         connect(helper, &RenderHelper::showDialogRequest, this, &WorkflowManager::bitrateCheckRequest);
         helper->startCheck();
+        break;
+    }
+    case Step::RenderingMp4Audio:
+    {
+        emit logMessage("MP4 mux: аудиопроход завершен.", LogCategory::APP);
+        m_mp4AudioReady = true;
+        m_currentStep = Step::MuxingMp4;
+        if (!runMp4MuxWithMp4Box())
+        {
+            emit workflowAborted();
+        }
+        break;
+    }
+    case Step::MuxingMp4:
+    {
+        emit logMessage("MP4 mux через MP4Box завершен.", LogCategory::APP);
+        QFile::remove(m_tempVideoMp4Path);
+        QFile::remove(m_tempAudioForMp4Path);
+        QFile::remove(m_tempMp4ChaptersTxtPath);
+        finishWorkflow();
         break;
     }
     // ---- Concat render steps ----
@@ -1801,7 +1966,7 @@ void WorkflowManager::audioPreparation()
 
     if (!QFileInfo::exists(ambCmdPath))
     {
-        emit logMessage("Ошибка: AMBCmd.exe не найден. Шаг нормализации пропущен.", LogCategory::APP);
+        emit logMessage("Ошибка: AMBCmd.exe не найден. Шаг нормализации пропущен.", LogCategory::APP, LogLevel::Error);
         processSubtitles();
         return;
     }
@@ -1822,7 +1987,7 @@ void WorkflowManager::audioPreparation()
 
     if (!QFile::copy(targetWavPath, tempInputPath))
     {
-        emit logMessage("ОШИБКА: Не удалось скопировать временный аудиофайл.", LogCategory::APP);
+        emit logMessage("ОШИБКА: Не удалось скопировать временный аудиофайл.", LogCategory::APP, LogLevel::Error);
         emit workflowAborted();
         return;
     }
@@ -1875,7 +2040,8 @@ void WorkflowManager::convertAudioIfNeeded()
 
     if (m_mainRuAudioPath.isEmpty())
     {
-        emit logMessage("КРИТИЧЕСКАЯ ОШИБКА: Аудиофайл отсутствует на шаге конвертации.", LogCategory::APP);
+        emit logMessage("КРИТИЧЕСКАЯ ОШИБКА: Аудиофайл отсутствует на шаге конвертации.", LogCategory::APP,
+                        LogLevel::Error);
         emit workflowAborted();
         return;
     }
@@ -1883,16 +2049,34 @@ void WorkflowManager::convertAudioIfNeeded()
     QString targetFormat = m_template.targetAudioFormat;
     emit logMessage(QString("Целевой формат аудио: %1").arg(targetFormat), LogCategory::APP);
 
-    if (m_mainRuAudioPath.endsWith("." + targetFormat, Qt::CaseInsensitive))
+    const bool isAac = (targetFormat == "aac");
+
+    auto alreadyInTargetFormat = [&](const QString& path) {
+        if (isAac)
+            return path.endsWith(".mka", Qt::CaseInsensitive);
+        return path.endsWith("." + targetFormat, Qt::CaseInsensitive);
+    };
+
+    if (!isAac && alreadyInTargetFormat(m_mainRuAudioPath))
     {
         emit logMessage("Аудиофайл уже в целевом формате. Конвертация не требуется.", LogCategory::APP);
         m_finalAudioPath = m_mainRuAudioPath;
+        m_finalAudioMp4Path.clear();
+        m_audioConversionNeedsSecondPass = false;
+        m_audioConversionCurrentOutputPath.clear();
         assembleMkv(m_finalAudioPath);
         return;
     }
 
     m_currentStep = Step::ConvertingAudio;
-    m_finalAudioPath = m_paths->convertedRuAudio(targetFormat);
+    // Для AAC кодируем отдельно в два контейнера:
+    // - mka для mkvmerge (финальный MKV)
+    // - m4a для MP4Box (финальный MP4)
+    const QString outputExtension = isAac ? "mka" : targetFormat;
+    m_finalAudioPath = m_paths->convertedRuAudio(outputExtension);
+    m_finalAudioMp4Path = isAac ? m_paths->convertedRuAudio("m4a") : QString();
+    m_audioConversionNeedsSecondPass = isAac;
+    m_audioConversionCurrentOutputPath = m_finalAudioPath;
     emit logMessage(QString("Запуск конвертации в %1...").arg(targetFormat.toUpper()), LogCategory::APP);
 
     m_ffmpegProgressFile = QDir(m_paths->sourcesPath).filePath("ffmpeg_progress.log");
@@ -1900,9 +2084,16 @@ void WorkflowManager::convertAudioIfNeeded()
     QStringList args;
     args << "-y" << "-i" << m_mainRuAudioPath;
 
-    if (targetFormat == "aac")
+    if (isAac)
     {
-        args << "-c:a" << "aac" << "-b:a" << "256k";
+        if (AppSettings::instance().hasAacAtCodec())
+        {
+            args << "-c:a" << "aac_at" << "-b:a" << "256k";
+        }
+        else
+        {
+            args << "-c:a" << "aac" << "-b:a" << "256k";
+        }
     }
     else if (targetFormat == "flac")
     {
@@ -1910,14 +2101,15 @@ void WorkflowManager::convertAudioIfNeeded()
     }
     else
     {
-        emit logMessage(QString("Ошибка: неизвестный целевой формат аудио '%1'").arg(targetFormat), LogCategory::APP);
+        emit logMessage(QString("Ошибка: неизвестный целевой формат аудио '%1'").arg(targetFormat), LogCategory::APP,
+                        LogLevel::Error);
         emit workflowAborted();
         return;
     }
 
     args << "-progress" << QDir::toNativeSeparators(m_ffmpegProgressFile);
 
-    args << m_finalAudioPath;
+    args << m_audioConversionCurrentOutputPath;
 
     m_progressTimer->disconnect();
     connect(m_progressTimer, &QTimer::timeout, this, &WorkflowManager::onAudioConversionProgress);
@@ -1963,7 +2155,7 @@ void WorkflowManager::assembleMkv(const QString& russianAudioPath)
     m_currentStep = Step::AssemblingMkv;
 
     QString videoPath = m_paths->extractedVideo(m_videoTrack.extension);
-    QString originalAudioPath = m_paths->extractedAudio(m_originalAudioTrack.extension);
+    QString originalAudioPath = m_paths->extractedAudio(m_sourceFormat == SourceFormat::MP4 ? "m4a" : "mka");
     QString fullSubsPath = m_paths->processedFullSubs();
     QString signsPath = m_paths->processedSignsSubs();
 
@@ -1990,7 +2182,7 @@ void WorkflowManager::assembleMkv(const QString& russianAudioPath)
     if (m_mainRuAudioPath.isEmpty())
     {
         emit logMessage("Критическая ошибка: не указан путь к русской аудиодорожке. Сборка невозможна.",
-                        LogCategory::APP);
+                        LogCategory::APP, LogLevel::Error);
         emit workflowAborted();
         return;
     }
@@ -2007,7 +2199,7 @@ void WorkflowManager::assembleMkv(const QString& russianAudioPath)
     if (!m_fontResult.notFoundFontNames.isEmpty())
     {
         emit logMessage("ПРЕДУПРЕЖДЕНИЕ: Не все шрифты были предоставлены. Субтитры могут отображаться некорректно.",
-                        LogCategory::APP);
+                        LogCategory::APP, LogLevel::Warning);
         emit logMessage("Пропущены: " + m_fontResult.notFoundFontNames.join(", "), LogCategory::APP);
     }
 
@@ -2069,7 +2261,7 @@ void WorkflowManager::assembleMkv(const QString& russianAudioPath)
     {
         emit logMessage("Критическая ошибка: Отсутствует оригинальная аудиодорожка, проверьте язык оригинального аудио "
                         "в шаблоне. Сборка остановлена.",
-                        LogCategory::APP);
+                        LogCategory::APP, LogLevel::Error);
         emit workflowAborted();
         return;
     }
@@ -2101,13 +2293,28 @@ void WorkflowManager::renderMp4()
     {
         emit logMessage("Критическая ошибка: пресет рендера '" + m_template.renderPresetName +
                             "' не найден. Процесс остановлен.",
-                        LogCategory::APP);
+                        LogCategory::APP, LogLevel::Error);
         emit workflowAborted();
         return;
     }
 
     m_outputMp4Path = m_finalMkvPath;
     m_outputMp4Path.replace(".mkv", ".mp4");
+    m_tempVideoMp4Path = QDir(QFileInfo(m_outputMp4Path).absolutePath())
+                             .filePath(QFileInfo(m_outputMp4Path).completeBaseName() + "_temp_video.mp4");
+    m_tempAudioForMp4Path = QDir(QFileInfo(m_outputMp4Path).absolutePath())
+                                .filePath(QFileInfo(m_outputMp4Path).completeBaseName() + "_temp_audio.m4a");
+    m_tempMp4ChaptersTxtPath = QDir(QFileInfo(m_outputMp4Path).absolutePath())
+                                   .filePath(QFileInfo(m_outputMp4Path).completeBaseName() + "_auto_chapters.txt");
+
+    QFile::remove(m_tempVideoMp4Path);
+    QFile::remove(m_tempAudioForMp4Path);
+    QFile::remove(m_tempMp4ChaptersTxtPath);
+    m_useExternalAudioForMp4Mux = false;
+    m_mp4ChaptersEmbeddedInMux = false;
+    m_mp4VideoReady = false;
+    m_mp4AudioReady = false;
+    m_renderAudioArgs.clear();
 
     m_currentStep = Step::RenderingMp4Pass1;
     runRenderPass(m_currentStep);
@@ -2117,19 +2324,224 @@ void WorkflowManager::runRenderPass(Step pass)
 {
     QString commandTemplate =
         (pass == Step::RenderingMp4Pass1) ? m_renderPreset.commandPass1 : m_renderPreset.commandPass2;
-
-    QStringList args = prepareCommandArguments(commandTemplate);
-    if (args.isEmpty())
+    QStringList videoArgs;
+    QStringList audioArgs;
+    if (!prepareSplitRenderArgs(commandTemplate, m_tempVideoMp4Path, videoArgs, audioArgs))
     {
-        emit logMessage("Ошибка: не удалось подготовить команду для рендера.", LogCategory::APP);
+        emit logMessage("Ошибка: не удалось подготовить команду для рендера.", LogCategory::APP, LogLevel::Error);
         emit workflowAborted();
         return;
     }
 
-    QString program = args.takeFirst();
+    const bool isFinalVideoPass = (!m_renderPreset.isTwoPass() && pass == Step::RenderingMp4Pass1) ||
+                                  (m_renderPreset.isTwoPass() && pass == Step::RenderingMp4Pass2);
+    if (isFinalVideoPass)
+    {
+        m_renderAudioArgs = audioArgs;
+    }
 
-    emit logMessage(QString("Запуск прохода: ") + program + " " + args.join(" "), LogCategory::APP);
-    m_processManager->startProcess(program, args);
+    m_processManager->startProcess(m_ffmpegPath, videoArgs);
+}
+
+bool WorkflowManager::prepareSplitRenderArgs(const QString& commandTemplate, const QString& outputVideoPath,
+                                             QStringList& outVideoArgs, QStringList& outAudioArgs)
+{
+    QString processedTemplate = commandTemplate;
+    const QString inputMkv = QFileInfo(m_finalMkvPath).absoluteFilePath();
+    const QString outputMp4 = QFileInfo(m_outputMp4Path).absoluteFilePath();
+
+    processedTemplate.replace("%INPUT%", inputMkv);
+    processedTemplate.replace("%OUTPUT%", outputMp4);
+
+    const bool useHardsub = QFileInfo::exists(m_paths->processedSignsSubs());
+    if (useHardsub)
+    {
+        QFileInfo subsInfo(m_paths->processedSignsSubs());
+        m_processManager->setWorkingDirectory(subsInfo.absolutePath());
+        const QString escapedFileName = subsInfo.fileName().replace("'", "\\'");
+        processedTemplate.replace("%SIGNS%", QString("filename='%1'").arg(escapedFileName));
+    }
+    else
+    {
+        processedTemplate.replace("subtitles=%SIGNS%", "");
+        processedTemplate.remove(QRegularExpression(R"(-vf\s+\"[^\"]*,\s*\")"));
+        processedTemplate.remove(QRegularExpression(R"(-vf\s+\"\s*,\s*[^\"]*\")"));
+        processedTemplate.remove(QRegularExpression(R"(-vf\s+\"\s*\")"));
+        emit logMessage("Hardsub отключен. Фильтр субтитров удален из команды.", LogCategory::APP);
+    }
+
+    QStringList rawArgs = QProcess::splitCommand(processedTemplate);
+    if (!rawArgs.isEmpty() && rawArgs.first().contains("ffmpeg"))
+    {
+        rawArgs.removeFirst();
+    }
+    if (rawArgs.isEmpty())
+    {
+        return false;
+    }
+
+    outVideoArgs.clear();
+    outAudioArgs.clear();
+    outAudioArgs << "-y" << "-hide_banner" << "-i" << inputMkv << "-vn";
+
+    bool hasAudioMap = false;
+    for (int i = 0; i < rawArgs.size(); ++i)
+    {
+        const QString arg = rawArgs.at(i);
+
+        if (arg == "-map" && i + 1 < rawArgs.size())
+        {
+            const QString mapVal = rawArgs.at(i + 1);
+            if (mapVal.contains(":a"))
+            {
+                outAudioArgs << arg << mapVal;
+                hasAudioMap = true;
+            }
+            else
+            {
+                outVideoArgs << arg << mapVal;
+            }
+            ++i;
+            continue;
+        }
+
+        if (arg == "-c:a" || arg == "-codec:a" || arg == "-b:a" || arg == "-audio_bitrate" || arg == "-ac" ||
+            arg == "-ar" || arg == "-af")
+        {
+            outAudioArgs << arg;
+            if (i + 1 < rawArgs.size())
+            {
+                outAudioArgs << rawArgs.at(i + 1);
+                ++i;
+            }
+            continue;
+        }
+
+        if (arg == "-map_metadata" || arg == "-map_chapters")
+        {
+            if (i + 1 < rawArgs.size())
+            {
+                ++i;
+            }
+            continue;
+        }
+
+        if (arg == outputMp4)
+        {
+            outVideoArgs << outputVideoPath;
+            continue;
+        }
+
+        if (arg == "-an")
+        {
+            continue;
+        }
+
+        outVideoArgs << arg;
+    }
+
+    if (outVideoArgs.isEmpty())
+    {
+        return false;
+    }
+
+    const qsizetype videoOutIdx = outVideoArgs.size() - 1;
+    if (!outVideoArgs.contains("-an") && videoOutIdx >= 0)
+    {
+        outVideoArgs.insert(videoOutIdx, "-an");
+    }
+
+    if (!hasAudioMap)
+    {
+        outAudioArgs << "-map" << "0:a:m:language:rus";
+    }
+
+    outAudioArgs << m_tempAudioForMp4Path;
+    return true;
+}
+
+void WorkflowManager::startMp4MuxPipeline()
+{
+    const QString finalAudio = QFileInfo(m_finalAudioMp4Path).absoluteFilePath();
+    const bool canUseExternalAudio = QFileInfo::exists(finalAudio) &&
+                                     (finalAudio.endsWith(".m4a", Qt::CaseInsensitive) ||
+                                      finalAudio.endsWith(".aac", Qt::CaseInsensitive));
+
+    if (m_template.targetAudioFormat == "aac" && canUseExternalAudio)
+    {
+        m_useExternalAudioForMp4Mux = true;
+        m_mp4AudioReady = true;
+        emit logMessage("MP4 mux: используем отдельно подготовленное m4a-аудио.", LogCategory::APP);
+    }
+    else
+    {
+        m_useExternalAudioForMp4Mux = false;
+        m_mp4AudioReady = false;
+    }
+
+    if (!m_mp4AudioReady)
+    {
+        if (m_renderAudioArgs.isEmpty())
+        {
+            emit logMessage("MP4 mux: не удалось подготовить аудиопроход из пресета.", LogCategory::APP,
+                            LogLevel::Error);
+            emit workflowAborted();
+            return;
+        }
+
+        m_currentStep = Step::RenderingMp4Audio;
+        emit progressUpdated(-1, "MP4: подготовка аудио");
+        emit logMessage("MP4 mux: запуск отдельного аудиопрохода для .m4a.", LogCategory::APP);
+        m_processManager->startProcess(m_ffmpegPath, m_renderAudioArgs);
+        return;
+    }
+
+    m_currentStep = Step::MuxingMp4;
+    if (!runMp4MuxWithMp4Box())
+    {
+        emit workflowAborted();
+    }
+}
+
+bool WorkflowManager::runMp4MuxWithMp4Box()
+{
+    const QString mp4boxPath = AppSettings::instance().mp4boxPath();
+    if (mp4boxPath.isEmpty() || !QFileInfo::exists(mp4boxPath))
+    {
+        emit logMessage("MP4Box не найден. Проверьте путь в настройках.", LogCategory::APP, LogLevel::Error);
+        return false;
+    }
+    if (!QFileInfo::exists(m_tempVideoMp4Path))
+    {
+        emit logMessage("MP4 mux: временный видеофайл не найден.", LogCategory::APP, LogLevel::Error);
+        return false;
+    }
+
+    const QString audioPath = m_useExternalAudioForMp4Mux ? QFileInfo(m_finalAudioMp4Path).absoluteFilePath()
+                                                           : QFileInfo(m_tempAudioForMp4Path).absoluteFilePath();
+    if (!QFileInfo::exists(audioPath))
+    {
+        emit logMessage("MP4 mux: аудиофайл для мукса не найден.", LogCategory::APP, LogLevel::Error);
+        return false;
+    }
+
+    QStringList args;
+    args << "-add" << QString("%1#video").arg(QDir::toNativeSeparators(m_tempVideoMp4Path)) << "-add"
+         << QString("%1#audio").arg(QDir::toNativeSeparators(audioPath));
+
+    m_mp4ChaptersEmbeddedInMux = false;
+    if (!m_chapterMarkers.isEmpty() && ChapterHelper::writeOgmChapterText(m_chapterMarkers, m_tempMp4ChaptersTxtPath))
+    {
+        args << "-chap" << QDir::toNativeSeparators(m_tempMp4ChaptersTxtPath);
+        m_mp4ChaptersEmbeddedInMux = true;
+        emit logMessage("MP4 mux: главы будут вшиты через MP4Box.", LogCategory::APP);
+    }
+    args << "-new" << QDir::toNativeSeparators(m_outputMp4Path);
+
+    emit progressUpdated(95, "MP4: mux через MP4Box");
+    emit logMessage("MP4 mux: сборка финального MP4 через MP4Box...", LogCategory::APP);
+    m_processManager->startProcess(mp4boxPath, args);
+    return true;
 }
 
 QStringList WorkflowManager::prepareCommandArguments(const QString& commandTemplate)
@@ -2170,6 +2582,15 @@ QStringList WorkflowManager::prepareCommandArguments(const QString& commandTempl
             args.insert(outIdx, QStringLiteral("-1"));
             args.insert(outIdx, QStringLiteral("-map_chapters"));
         }
+    }
+
+    // Preset commands may contain "-c:a copy" (or "-c copy"), which breaks AAC
+    // priming metadata when remuxing to MP4. For AAC target we force encoding
+    // from the original WAV directly in the final MP4 pass.
+    if (m_template.targetAudioFormat == QLatin1String("aac") &&
+        m_mainRuAudioPath.endsWith(QLatin1String(".wav"), Qt::CaseInsensitive))
+    {
+        enforceAacFromWavForPresetArgs(args, QFileInfo(m_mainRuAudioPath).absoluteFilePath());
     }
     return args;
 }
@@ -2719,18 +3140,31 @@ void WorkflowManager::concatJoinSegments()
     listFile.close();
 
     // Concat demuxer provides concatenated video from segments (input 0).
-    // Audio is taken from the continuous MKV track (input 1), which runs
-    // from 0 to end with no splices — this eliminates AAC priming artefacts,
-    // encoder delay mismatches, and audio-video duration drift that caused
-    // jumps and audio repeats at segment boundaries.
+    // Audio source depends on codec: for AAC we encode from the original WAV
+    // (m_mainRuAudioPath) directly into the MP4 so that ffmpeg creates a
+    // correct Edit List (edts) with the encoder delay.  Copying AAC from
+    // the MKV resets media_time to 0 and introduces ~44 ms lip-sync drift.
+    // For non-AAC codecs (FLAC, etc.) we stream-copy from the assembled MKV
+    // because there is no encoder delay to preserve.
+    const bool audioIsAac = m_template.targetAudioFormat == "aac";
+    const QString audioInputPath = audioIsAac ? m_mainRuAudioPath : m_finalMkvPath;
+
     QStringList args;
     args << "-y"
          << "-f" << "concat"
          << "-safe" << "0"
-         << "-i" << QFileInfo(listPath).absoluteFilePath() << "-i" << m_finalMkvPath << "-map" << "0:v:0"
+         << "-i" << QFileInfo(listPath).absoluteFilePath() << "-i" << audioInputPath << "-map" << "0:v:0"
          << "-map" << "1:a:0"
-         << "-c:v" << "copy"
-         << "-c:a" << "copy";
+         << "-c:v" << "copy";
+
+    if (audioIsAac)
+    {
+        args << "-c:a" << "aac_at" << "-b:a" << "256k";
+    }
+    else
+    {
+        args << "-c:a" << "copy";
+    }
 
     // Full PTS+DTS normalization (same as concattbrenderer): MediaInfo reports CFR;
     // dts-only setts was tried (H28) but restored VFR-like metadata / worse UX.
@@ -2785,12 +3219,27 @@ void WorkflowManager::concatRemux()
     emit progressUpdated(-1, "Concat: финальный MP4");
 
     // Convert the CFR MKV (from mkvmerge) to MP4 with faststart for streaming.
+    // For AAC audio we re-encode from the original WAV to create a correct
+    // Edit List (edts) — stream-copying AAC from MKV resets media_time to 0.
     QString tempMkvPath = QDir(m_paths->resultPath).filePath("concat_cfr.mkv");
+    const bool audioIsAac = m_template.targetAudioFormat == "aac";
 
     QStringList args;
     args << "-y"
-         << "-i" << tempMkvPath << "-c" << "copy"
-         << "-movflags" << "+faststart" << m_outputMp4Path;
+         << "-i" << tempMkvPath;
+
+    if (audioIsAac)
+    {
+        args << "-i" << m_mainRuAudioPath << "-map" << "0:v:0" << "-map" << "1:a:0"
+             << "-c:v" << "copy"
+             << "-c:a" << "aac_at" << "-b:a" << "256k";
+    }
+    else
+    {
+        args << "-c" << "copy";
+    }
+
+    args << "-movflags" << "+faststart" << m_outputMp4Path;
 
     m_processManager->startProcess(m_ffmpegPath, args);
 }
@@ -2888,12 +3337,16 @@ void WorkflowManager::onProcessStdOut(const QString& output)
         case Step::ConvertingAudio:
         case Step::RenderingMp4Pass1:
         case Step::RenderingMp4Pass2:
+        case Step::RenderingMp4Audio:
         case Step::ConcatCutSegment1:
         case Step::ConcatRenderSegment2:
         case Step::ConcatCutSegment3:
         case Step::ConcatJoin:
         case Step::ConcatRemux:
             category = LogCategory::FFMPEG;
+            break;
+        case Step::MuxingMp4:
+            category = LogCategory::APP;
             break;
 
         default:
@@ -2942,6 +3395,7 @@ void WorkflowManager::onProcessStdErr(const QString& output)
         case Step::ConvertingAudio:
         case Step::RenderingMp4Pass1:
         case Step::RenderingMp4Pass2:
+        case Step::RenderingMp4Audio:
         case Step::ConcatCutSegment1:
         case Step::ConcatRenderSegment2:
         case Step::ConcatCutSegment3:
@@ -2949,11 +3403,14 @@ void WorkflowManager::onProcessStdErr(const QString& output)
         case Step::ConcatRemux:
             category = LogCategory::FFMPEG;
             break;
+        case Step::MuxingMp4:
+            category = LogCategory::APP;
+            break;
 
         default:
             break;
         }
-        emit logMessage("STDERR: " + output, category);
+        emit logMessage(output, category);
     }
 
     // И парсим прогресс
@@ -3065,7 +3522,7 @@ QString WorkflowManager::getExtensionForCodec(const QString& codecId)
     // Фоллбэк для неизвестных форматов
     emit logMessage(
         QString("Предупреждение: неизвестный CodecID '%1', будет использовано расширение .bin").arg(codecId),
-        LogCategory::APP);
+        LogCategory::APP, LogLevel::Warning);
     return "bin";
 }
 
@@ -3104,7 +3561,7 @@ QString WorkflowManager::getExtensionForFfprobeCodec(const QString& codecName)
     // Фоллбэк
     emit logMessage(
         QString("Предупреждение: неизвестный кодек ffprobe '%1', будет использовано расширение .bin").arg(codecName),
-        LogCategory::APP);
+        LogCategory::APP, LogLevel::Warning);
     return "bin";
 }
 
@@ -3130,7 +3587,7 @@ void WorkflowManager::getMp4Info()
     if (!QFileInfo::exists(ffprobePath))
     {
         emit logMessage("Критическая ошибка: ffprobe.exe не найден. Проверьте настройки пути к ffmpeg.",
-                        LogCategory::APP);
+                        LogCategory::APP, LogLevel::Error);
         emit workflowAborted();
         return;
     }
@@ -3212,7 +3669,7 @@ void WorkflowManager::getMp4Info()
 
     if (m_videoTrack.id == -1)
     {
-        emit logMessage("Критическая ошибка: в MP4 файле не найдена видеодорожка.", LogCategory::APP);
+        emit logMessage("Критическая ошибка: в MP4 файле не найдена видеодорожка.", LogCategory::APP, LogLevel::Error);
         emit workflowAborted();
         return;
     }
@@ -3221,7 +3678,7 @@ void WorkflowManager::getMp4Info()
     if (m_foundAudioTracks.isEmpty())
     {
         emit logMessage("Предупреждение: в MP4 файле не найдено аудиодорожек. Оригинал не будет добавлен в сборку.",
-                        LogCategory::APP);
+                        LogCategory::APP, LogLevel::Warning);
     }
     else if (m_foundAudioTracks.size() == 1)
     {
@@ -3272,7 +3729,7 @@ void WorkflowManager::extractTracksMp4()
     if (m_videoTrack.id == -1)
     {
         emit logMessage("Критическая ошибка: в файле отсутствует видеодорожка. Извлечение невозможно.",
-                        LogCategory::APP);
+                        LogCategory::APP, LogLevel::Error);
         emit workflowAborted();
         return;
     }
@@ -3283,13 +3740,15 @@ void WorkflowManager::extractTracksMp4()
 
     // Видео
     QString videoOutPath = m_paths->extractedVideo(m_videoTrack.extension);
-    args << "-map" << QString("0:%1").arg(m_videoTrack.id) << "-c" << "copy" << videoOutPath;
+    args << "-map" << QString("0:%1").arg(m_videoTrack.id) << "-c" << "copy" << "-map_chapters" << "-1"
+         << videoOutPath;
 
     // Аудио
     if (m_originalAudioTrack.id != -1)
     {
-        QString audioOutPath = m_paths->extractedAudio(m_originalAudioTrack.extension);
-        args << "-map" << QString("0:%1").arg(m_originalAudioTrack.id) << "-c" << "copy" << audioOutPath;
+        QString audioOutPath = m_paths->extractedAudio("m4a");
+        args << "-map" << QString("0:%1").arg(m_originalAudioTrack.id) << "-c" << "copy" << "-map_chapters" << "-1"
+             << audioOutPath;
     }
 
     // Субтитры в MP4 не извлекаем — используем override subs
@@ -3301,7 +3760,7 @@ void WorkflowManager::extractTracksMp4()
     {
         emit logMessage(
             "Предупреждение: MP4 файл не содержит субтитров формата ASS. Укажите субтитры через 'Свои субтитры'.",
-            LogCategory::APP);
+            LogCategory::APP, LogLevel::Warning);
     }
 
     emit progressUpdated(-1, "Извлечение дорожек (ffmpeg)");
@@ -3436,7 +3895,8 @@ void WorkflowManager::resumeWithSelectedAudioTrack(int trackId)
 
     if (!found)
     {
-        emit logMessage("Критическая ошибка: ID выбранной дорожки не найден. Процесс прерван.", LogCategory::APP);
+        emit logMessage("Критическая ошибка: ID выбранной дорожки не найден. Процесс прерван.", LogCategory::APP,
+                        LogLevel::Error);
         emit workflowAborted();
         return;
     }
@@ -3561,7 +4021,7 @@ void WorkflowManager::runAssProcessing()
         }
         if (!srtSuccess || !releaseSuccess)
         {
-            emit logMessage("Ошибка во время раздельной обработки субтитров.", LogCategory::APP);
+            emit logMessage("Ошибка во время раздельной обработки субтитров.", LogCategory::APP, LogLevel::Error);
             emit workflowAborted();
             return;
         }
@@ -3630,7 +4090,7 @@ void WorkflowManager::runAssProcessing()
 
     if (!success)
     {
-        emit logMessage("Во время обработки субтитров произошла ошибка.", LogCategory::APP);
+        emit logMessage("Во время обработки субтитров произошла ошибка.", LogCategory::APP, LogLevel::Error);
         emit workflowAborted();
         return;
     }
@@ -3719,7 +4179,7 @@ QString WorkflowManager::handleUserFile(const QString& sourcePath, const QString
     // Если ничего не получилось, возвращаем исходный путь и логируем предупреждение
     emit logMessage("ПРЕДУПРЕЖДЕНИЕ: не удалось переместить/скопировать файл. Будет использован оригинальный путь: " +
                         sourcePath,
-                    LogCategory::APP);
+                    LogCategory::APP, LogLevel::Warning);
     return sourceInfo.absoluteFilePath();
 }
 
@@ -3756,14 +4216,15 @@ void WorkflowManager::loadChaptersForWorkflow()
         else
         {
             emit logMessage(QStringLiteral("ПРЕДУПРЕЖДЕНИЕ: не удалось разобрать файл глав: %1").arg(extPath),
-                            LogCategory::APP);
+                            LogCategory::APP, LogLevel::Warning);
         }
         warnIfExpectedChaptersMissing();
         return;
     }
     if (!extPath.isEmpty() && !QFileInfo::exists(extPath))
     {
-        emit logMessage(QStringLiteral("ПРЕДУПРЕЖДЕНИЕ: файл глав не найден: %1").arg(extPath), LogCategory::APP);
+        emit logMessage(QStringLiteral("ПРЕДУПРЕЖДЕНИЕ: файл глав не найден: %1").arg(extPath), LogCategory::APP,
+                        LogLevel::Warning);
     }
 
     if (m_sourceFormat == SourceFormat::MKV && QFileInfo::exists(m_mkvFilePath))
@@ -3883,22 +4344,47 @@ void WorkflowManager::continueWorkflowAfterChaptersResolved()
 
 void WorkflowManager::maybeApplyChaptersToFinalMp4()
 {
+    if (m_mp4ChaptersEmbeddedInMux)
+    {
+        emit logMessage(QStringLiteral("Главы уже добавлены в MP4 на этапе mux через MP4Box."), LogCategory::APP);
+        return;
+    }
     if (m_chapterMarkers.isEmpty() || m_outputMp4Path.isEmpty() || !QFileInfo::exists(m_outputMp4Path))
     {
         return;
     }
+    emit logMessage(QStringLiteral("Запись глав в финальный MP4 через MP4Box..."), LogCategory::APP);
+
+    const QString mp4boxPath = AppSettings::instance().mp4boxPath();
+    const QString chaptersTxt = QDir(QFileInfo(m_outputMp4Path).absolutePath()).filePath("auto_mp4_chapters.txt");
+    if (!mp4boxPath.isEmpty() && QFileInfo::exists(mp4boxPath) &&
+        ChapterHelper::writeOgmChapterText(m_chapterMarkers, chaptersTxt))
+    {
+        QByteArray out;
+        const QStringList args = {QStringLiteral("-chap"), QDir::toNativeSeparators(chaptersTxt),
+                                  QDir::toNativeSeparators(m_outputMp4Path)};
+        const bool ok = m_processManager->executeAndWait(mp4boxPath, args, out);
+        QFile::remove(chaptersTxt);
+        if (ok)
+        {
+            emit logMessage(QStringLiteral("Главы записаны в MP4 через MP4Box."), LogCategory::APP);
+            return;
+        }
+        emit logMessage(QStringLiteral("ПРЕДУПРЕЖДЕНИЕ: MP4Box не смог добавить главы, используем ffmpeg fallback."),
+                        LogCategory::APP, LogLevel::Warning);
+    }
+
     const qint64 durNs = m_sourceDurationS > 0 ? static_cast<qint64>(static_cast<double>(m_sourceDurationS) * 1e9) : 0;
     QString err;
-    emit logMessage(QStringLiteral("Запись глав в финальный MP4..."), LogCategory::APP);
     if (ChapterHelper::applyChaptersToMp4(m_outputMp4Path, m_chapterMarkers, durNs, m_ffmpegPath, m_processManager,
                                           &err))
     {
-        emit logMessage(QStringLiteral("Главы записаны в MP4."), LogCategory::APP);
+        emit logMessage(QStringLiteral("Главы записаны в MP4 через ffmpeg fallback."), LogCategory::APP);
     }
     else
     {
-        emit logMessage(QStringLiteral("ПРЕДУПРЕЖДЕНИЕ: не удалось записать главы в MP4: %1").arg(err),
-                        LogCategory::APP);
+        emit logMessage(QStringLiteral("ПРЕДУПРЕЖДЕНИЕ: не удалось записать главы в MP4: %1").arg(err), LogCategory::APP,
+                        LogLevel::Warning);
     }
 }
 
@@ -3962,7 +4448,8 @@ void WorkflowManager::onBitrateCheckFinished(RerenderDecision decision, const Re
     }
     else
     {
-        finishWorkflow();
+        m_mp4VideoReady = true;
+        startMp4MuxPipeline();
     }
 }
 

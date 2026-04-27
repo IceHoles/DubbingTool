@@ -104,7 +104,7 @@ public:
     QString findSystemFont(const AssStyleInfo& style);
 
 signals:
-    void logMessage(const QString& message, LogCategory category);
+    void logMessage(const QString& message, LogCategory category, LogLevel level = LogLevel::Info);
     void finished(const FontFinderResult& result);
 
 private:

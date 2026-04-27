@@ -213,8 +213,8 @@ void MissingFilesDialog::setViewfinderEnabled(bool enabled)
 
 void MissingFilesDialog::on_browseAudioButton_clicked()
 {
-    QString filePath =
-        QFileDialog::getOpenFileName(this, "Выберите аудиофайл", "", "Аудиофайлы (*.wav *.flac *.aac *.eac3)");
+    QString filePath = QFileDialog::getOpenFileName(this, "Выберите аудиофайл", "",
+                                                    "Аудиофайлы (*.wav *.flac *.aac *.eac3 *.m4a *.mka)");
     if (!filePath.isEmpty())
     {
         ui->audioPathEdit->setText(filePath);

@@ -18,7 +18,7 @@ qsizetype findSectionHeaderStart(const QString& postText, const QStringList& anc
     for (const QString& anchor : anchors)
     {
         const QString escaped = QRegularExpression::escape(anchor);
-        const QRegularExpression rx(QString("(?im)^[^\\n]*%1[^\\n]*:").arg(escaped));
+        const QRegularExpression rx(QString("(?im)^[^\\n]*\\b%1\\b[^\\n]*:").arg(escaped));
         const QRegularExpressionMatch match = rx.match(postText);
         if (match.hasMatch())
         {
@@ -34,7 +34,7 @@ qsizetype findNextSectionHeaderStart(const QString& postText, qsizetype fromPos,
     for (const QString& anchor : allAnchors)
     {
         const QString escaped = QRegularExpression::escape(anchor);
-        const QRegularExpression rx(QString("(?im)^[^\\n]*%1[^\\n]*:").arg(escaped));
+        const QRegularExpression rx(QString("(?im)^[^\\n]*\\b%1\\b[^\\n]*:").arg(escaped));
         const QRegularExpressionMatch match = rx.match(postText, fromPos);
         if (match.hasMatch())
         {
@@ -276,12 +276,14 @@ PostParseResult PostGenerator::parsePostToFields(const QString& postTextRaw, con
                                     "звукорежиссер эпизода",
                                     "звукорежиссёр записи",
                                     "звукорежиссер записи",
+                                    "редактор перевода",
                                     "перевод",
                                     "разметка",
                                     "тайминг",
                                     "локализация надписей",
                                     "локализация видеоряда",
-                                    "сборка релиза"};
+                                    "сборка релиза",
+                                    "постер"};
 
     const QString castValue =
         extractSectionValue(postText, {"роли дублировали", "роли озвучивали", "озвучивали роли"}, allAnchors);
@@ -322,13 +324,18 @@ PostParseResult PostGenerator::parsePostToFields(const QString& postTextRaw, con
         replaceFirstIfFound(templateText, recordingEngineerValue, "%RECORDING_ENGINEER%");
     }
 
+    const QString translationEditorValue = extractSectionValue(postText, {"редактор перевода"}, allAnchors);
+    if (!translationEditorValue.isEmpty())
+    {
+        result.fields.insert("%TRANSLATION_EDITOR%", translationEditorValue);
+        replaceFirstIfFound(templateText, translationEditorValue, "%TRANSLATION_EDITOR%");
+    }
+
     const QString subAuthorValue = extractSectionValue(postText, {"перевод"}, allAnchors);
     if (!subAuthorValue.isEmpty())
     {
         result.fields.insert("%SUB_AUTHOR%", subAuthorValue);
-        result.fields.insert("%TRANSLATION_EDITOR%", subAuthorValue);
         replaceFirstIfFound(templateText, subAuthorValue, "%SUB_AUTHOR%");
-        replaceFirstIfFound(templateText, subAuthorValue, "%TRANSLATION_EDITOR%");
     }
 
     const QString timingValue = extractSectionValue(postText, {"разметка", "тайминг"}, allAnchors);

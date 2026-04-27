@@ -31,7 +31,7 @@ public:
     void start();
 
 signals:
-    void logMessage(const QString&, LogCategory);
+    void logMessage(const QString&, LogCategory, LogLevel = LogLevel::Info);
     void progressUpdated(int percentage, const QString& stageName);
     void finished();
 

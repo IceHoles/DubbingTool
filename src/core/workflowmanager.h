@@ -190,7 +190,7 @@ public slots:
     void resumeAfterSubEdit();
 
 signals:
-    void logMessage(const QString& message, LogCategory category = LogCategory::APP);
+    void logMessage(const QString& message, LogCategory category = LogCategory::APP, LogLevel level = LogLevel::Info);
     void postsReady(const ReleaseTemplate& t, const EpisodeData& data);
     void mkvFileReady(const QString& mkvPath);
     void filesReady(const QString& mkvPath, const QString& mp4Path);
@@ -241,6 +241,8 @@ private:
         AssemblingMkv,
         RenderingMp4Pass1,
         RenderingMp4Pass2,
+        RenderingMp4Audio,
+        MuxingMp4,
         ConcatFindKeyframe,
         ConcatCutSegment1,
         ConcatRenderSegment2,
@@ -287,6 +289,10 @@ private:
     void assembleMkv(const QString& m_finalAudioPath);
     void renderMp4();
     void runRenderPass(Step pass);
+    bool prepareSplitRenderArgs(const QString& commandTemplate, const QString& outputVideoPath, QStringList& outVideoArgs,
+                                QStringList& outAudioArgs);
+    bool runMp4MuxWithMp4Box();
+    void startMp4MuxPipeline();
     void renderMp4Concat();
     void concatFindKeyframe();
     void concatCutSegment1();
@@ -338,9 +344,13 @@ private:
     QString m_mainRuAudioPath;     // Путь к основному аудио (wav, aac, flac ...), указанному пользователем
     QString m_wavForSrtMasterPath; // Путь к .wav файлу, запрошенному специально для мастер-копии
     QString m_finalAudioPath;
+    QString m_finalAudioMp4Path;
     QString m_ffmpegPath;
     QString m_finalMkvPath;
     QString m_outputMp4Path;
+    QString m_tempVideoMp4Path;
+    QString m_tempAudioForMp4Path;
+    QString m_tempMp4ChaptersTxtPath;
     QString m_customRenderArgs;
     QString m_parsedEndingTime;
     QString m_overrideSubsPath;
@@ -366,6 +376,13 @@ private:
     bool m_didLaunchNugen = false;
     bool m_wasNormalizationPerformed = false;
     bool m_isSrtMasterDecoupled = false;
+    bool m_useExternalAudioForMp4Mux = false;
+    bool m_mp4ChaptersEmbeddedInMux = false;
+    bool m_mp4VideoReady = false;
+    bool m_mp4AudioReady = false;
+    QStringList m_renderAudioArgs;
+    bool m_audioConversionNeedsSecondPass = false;
+    QString m_audioConversionCurrentOutputPath;
 
     struct TrackInfo
     {

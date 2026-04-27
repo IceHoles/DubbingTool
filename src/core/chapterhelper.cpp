@@ -577,6 +577,39 @@ bool ChapterHelper::writeFfmetadata(const QList<ChapterMarker>& chapters, qint64
     return true;
 }
 
+bool ChapterHelper::writeOgmChapterText(const QList<ChapterMarker>& chapters, const QString& outPath)
+{
+    if (chapters.isEmpty())
+        return false;
+    QFile f(outPath);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Text))
+        return false;
+
+    QTextStream ts(&f);
+    ts.setEncoding(QStringConverter::Utf8);
+
+    for (int i = 0; i < chapters.size(); ++i)
+    {
+        const ChapterMarker& ch = chapters.at(i);
+        qint64 totalMs = ch.startNs / 1000000LL;
+        qint64 ms = totalMs % 1000;
+        qint64 s = (totalMs / 1000) % 60;
+        qint64 m = (totalMs / 60000) % 60;
+        qint64 h = (totalMs / 3600000);
+
+        QString timeStr = QString("%1:%2:%3.%4")
+                              .arg(h, 2, 10, QLatin1Char('0'))
+                              .arg(m, 2, 10, QLatin1Char('0'))
+                              .arg(s, 2, 10, QLatin1Char('0'))
+                              .arg(ms, 3, 10, QLatin1Char('0'));
+
+        QString idx = QString::number(i + 1).rightJustified(2, QLatin1Char('0'));
+        ts << "CHAPTER" << idx << "=" << timeStr << "\n";
+        ts << "CHAPTER" << idx << "NAME=" << ch.title << "\n";
+    }
+    return true;
+}
+
 bool ChapterHelper::applyChaptersToMp4(const QString& mp4Path, const QList<ChapterMarker>& chapters, qint64 durationNs,
                                        const QString& ffmpegPath, ProcessManager* proc, QString* errorMessage)
 {

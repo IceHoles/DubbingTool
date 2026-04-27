@@ -19,6 +19,7 @@
 #include <QFile>
 #include <QList>
 #include <QMainWindow>
+#include <QDateTime>
 #include <QMap>
 #include <QPointer>
 #include <QVariantMap>
@@ -48,7 +49,7 @@ public:
     bool isNormalizationEnabled() const;
 
 public slots:
-    void logMessage(const QString& message, LogCategory category = LogCategory::APP);
+    void logMessage(const QString& message, LogCategory category = LogCategory::APP, LogLevel level = LogLevel::Info);
     void onMultipleTorrentsFound(const QList<TorrentInfo>& candidates);
     void onRequestTemplateData(const QString& templateName);
     void onWorkflowAborted();
@@ -114,6 +115,9 @@ private:
 
     QList<ProcessManager*> m_activeProcessManagers;
     QPointer<QObject> m_currentWorker;
+
+    QDateTime m_logLastProgressTime;
+    int m_logLastProgressBlockNumber = -1;
 
     void setUiEnabled(bool enabled);
     void switchToCancelMode();

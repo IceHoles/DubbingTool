@@ -48,6 +48,9 @@ bool writeMatroskaChapterXml(const QList<ChapterMarker>& chapters, const QString
 /// FFmpeg ffmetadata format; duration used for last chapter end.
 bool writeFfmetadata(const QList<ChapterMarker>& chapters, qint64 durationNs, const QString& outPath);
 
+/// Write OGM-style chapter text (suitable for MP4Box)
+bool writeOgmChapterText(const QList<ChapterMarker>& chapters, const QString& outPath);
+
 /// Remux MP4 with chapters from ffmetadata (stream copy). Returns false on error.
 bool applyChaptersToMp4(const QString& mp4Path, const QList<ChapterMarker>& chapters, qint64 durationNs,
                         const QString& ffmpegPath, ProcessManager* proc, QString* errorMessage = nullptr);

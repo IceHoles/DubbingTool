@@ -26,7 +26,7 @@ public slots:
     void cancelOperation();
 
 signals:
-    void logMessage(const QString&, LogCategory);
+    void logMessage(const QString&, LogCategory, LogLevel = LogLevel::Info);
     void progressUpdated(int percentage, const QString& stageName = "");
     /// Emitted when the worker stops. \a success is true only after MKV was built successfully.
     void finished(bool success);

@@ -1,4 +1,4 @@
-#include "assprocessor.h"
+﻿#include "assprocessor.h"
 
 #include "appsettings.h"
 
@@ -217,7 +217,7 @@ bool AssProcessor::processExistingFile(const QString& inputPath, const QString& 
     QFile inputFile(inputPath);
     if (!inputFile.open(QIODevice::ReadOnly))
     {
-        emit logMessage("Ошибка: не удалось открыть для чтения файл " + inputPath, LogCategory::APP);
+        emit logMessage("Ошибка: не удалось открыть для чтения файл " + inputPath, LogCategory::APP, LogLevel::Error);
         return false;
     }
 
@@ -239,7 +239,7 @@ bool AssProcessor::processExistingFile(const QString& inputPath, const QString& 
     if (playResX == 0)
     {
         emit logMessage("Предупреждение: не удалось определить PlayResX. Будет использован стиль по умолчанию.",
-                        LogCategory::APP);
+                        LogCategory::APP, LogLevel::Warning);
     }
     else
     {
@@ -257,7 +257,7 @@ bool AssProcessor::processExistingFile(const QString& inputPath, const QString& 
     }
     if (eventsIndex == -1)
     {
-        emit logMessage("Критическая ошибка: секция [Events] не найдена в файле субтитров.", LogCategory::APP);
+        emit logMessage("Критическая ошибка: секция [Events] не найдена в файле субтитров.", LogCategory::APP, LogLevel::Error);
         return false;
     }
     // +2 чтобы захватить и [Events] и строку Format:
@@ -306,14 +306,14 @@ bool AssProcessor::processExistingFile(const QString& inputPath, const QString& 
 
     if (!writeAssFile(outputPathBase + "_full.ass", headers + fullSubsEvents + tbLines))
     {
-        emit logMessage("Ошибка записи в файл: " + outputPathBase + "_full.ass", LogCategory::APP);
+        emit logMessage("Ошибка записи в файл: " + outputPathBase + "_full.ass", LogCategory::APP, LogLevel::Error);
         return false;
     }
     emit logMessage("Создан файл с полными субтитрами: " + outputPathBase + "_full.ass", LogCategory::APP);
 
     if (!writeAssFile(outputPathBase + "_signs.ass", headers + signsOnlyEvents + tbLines))
     {
-        emit logMessage("Ошибка записи в файл: " + outputPathBase + "_signs.ass", LogCategory::APP);
+        emit logMessage("Ошибка записи в файл: " + outputPathBase + "_signs.ass", LogCategory::APP, LogLevel::Error);
         return false;
     }
     emit logMessage("Создан файл только с надписями: " + outputPathBase + "_signs.ass", LogCategory::APP);
@@ -578,7 +578,7 @@ QStringList AssProcessor::generateTb(const ReleaseTemplate& t, const QString& st
     if (startTime.isEmpty())
     {
         emit logMessage("Предупреждение: время начала ТБ не было определено. ТБ не будет сгенерирован.",
-                        LogCategory::APP);
+                        LogCategory::APP, LogLevel::Warning);
         return tbLines;
     }
 
@@ -587,7 +587,7 @@ QStringList AssProcessor::generateTb(const ReleaseTemplate& t, const QString& st
     if (!currentTime.isValid())
     {
         emit logMessage("Ошибка: неверный формат времени для ТБ: '" + startTime + "'. ТБ не будет сгенерирован.",
-                        LogCategory::APP);
+                        LogCategory::APP, LogLevel::Error);
         return tbLines;
     }
 
@@ -749,7 +749,7 @@ QStringList AssProcessor::generateTb(const ReleaseTemplate& t, const QString& st
     }
     if (!t.translationEditor.isEmpty())
     {
-        authorsBlock << QString("Редактура перевода: %1").arg(t.translationEditor);
+        authorsBlock << QString("Редактор перевода: %1").arg(t.translationEditor);
     }
     if (!t.subAuthor.isEmpty())
     {
@@ -776,7 +776,7 @@ bool AssProcessor::addTbToFile(const QString& inputPath, const QString& outputPa
     QFile inputFile(inputPath);
     if (!inputFile.open(QIODevice::ReadOnly))
     {
-        emit logMessage("Ошибка: не удалось открыть для чтения файл " + inputPath, LogCategory::APP);
+        emit logMessage("Ошибка: не удалось открыть для чтения файл " + inputPath, LogCategory::APP, LogLevel::Error);
         return false;
     }
     QTextStream in(&inputFile);
@@ -818,7 +818,7 @@ bool AssProcessor::addTbToFile(const QString& inputPath, const QString& outputPa
     }
     if (!writeAssFile(outputPath, headers + events + tbLines))
     {
-        emit logMessage("Ошибка записи в файл: " + outputPath, LogCategory::APP);
+        emit logMessage("Ошибка записи в файл: " + outputPath, LogCategory::APP, LogLevel::Error);
         return false;
     }
     emit logMessage("Создан файл только с надписями: " + outputPath, LogCategory::APP);
@@ -932,7 +932,7 @@ bool AssProcessor::processFromTwoSources(const QString& subsInputPath, const QSt
         // Если по какой-то причине секция стилей не найдена, это может быть проблемой,
         // но мы можем попробовать добавить ее целиком. Однако лучше просто выдать предупреждение.
         emit logMessage("Предупреждение: не удалось найти секцию [V4+ Styles] для добавления стиля ТБ.",
-                        LogCategory::APP);
+                        LogCategory::APP, LogLevel::Warning);
     }
 
     // 4. Записываем файлы
@@ -1173,7 +1173,7 @@ bool AssProcessor::applySubstitutions(const QString& filePath, const QMap<QStrin
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly))
     {
-        emit logMessage("Ошибка: не удалось открыть файл для замен: " + filePath, LogCategory::APP);
+        emit logMessage("Ошибка: не удалось открыть файл для замен: " + filePath, LogCategory::APP, LogLevel::Error);
         return false;
     }
 

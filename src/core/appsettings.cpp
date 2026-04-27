@@ -5,6 +5,8 @@
 #include <QFileInfo>
 #include <QStandardPaths>
 
+#include <qprocess.h>
+
 static QString findExecutablePath(const QString& exeName)
 {
     // 1. Ищем в tools/ рядом с exe
@@ -69,6 +71,7 @@ void AppSettings::load()
     m_mkvextractPath = loadToolPath(settings, "paths/mkvextract", "mkvextract.exe");
     m_ffmpegPath = loadToolPath(settings, "paths/ffmpeg", "ffmpeg.exe");
     m_qbittorrentPath = loadToolPath(settings, "paths/qbittorrent", "qbittorrent.exe");
+    m_mp4boxPath = loadToolPath(settings, "paths/mp4box", "mp4box.exe");
     m_nugenAmbPath = settings.value("paths/nugenAmb", "").toString();
     m_deleteTempFiles = settings.value("general/deleteTempFiles", true).toBool();
     m_userFileAction = static_cast<UserFileAction>(
@@ -359,6 +362,14 @@ void AppSettings::setNugenAmbPath(const QString& path)
 {
     m_nugenAmbPath = path;
 }
+QString AppSettings::mp4boxPath() const
+{
+    return m_mp4boxPath;
+}
+void AppSettings::setMp4boxPath(const QString& path)
+{
+    m_mp4boxPath = path;
+}
 bool AppSettings::deleteTempFiles() const
 {
     return m_deleteTempFiles;
@@ -419,10 +430,30 @@ void AppSettings::setRenderPresets(const QList<RenderPreset>& presets)
 {
     m_renderPresets = presets;
 }
+bool AppSettings::hasAacAtCodec() const
+{
+    if (!m_aacAtCodecChecked)
+    {
+        m_aacAtCodecChecked = true;
+        if (QFileInfo::exists(m_ffmpegPath))
+        {
+            QProcess process;
+            process.start(m_ffmpegPath, {"-encoders"});
+            if (process.waitForFinished(5000))
+            {
+                QString output = process.readAllStandardOutput();
+                m_hasAacAtCodec = output.contains("aac_at");
+            }
+        }
+    }
+    return m_hasAacAtCodec;
+}
+
 bool AppSettings::isSetupCompleted() const
 {
     return m_setupCompleted;
 }
+
 void AppSettings::setSetupCompleted(bool completed)
 {
     m_setupCompleted = completed;

@@ -1,4 +1,4 @@
-#include "fontfinder.h"
+﻿#include "fontfinder.h"
 
 #include <QDir>
 #include <QFile>
@@ -65,7 +65,7 @@ void FontFinder::findFontsInSubs(const QStringList& subFilesToCheck)
 
             if (m_dwriteFactory == nullptr || m_fontCollection == nullptr)
             {
-                emit logMessage("Ошибка: не удалось инициализировать DirectWrite", LogCategory::APP);
+                emit logMessage("Ошибка: не удалось инициализировать DirectWrite", LogCategory::APP, LogLevel::Error);
                 emit finished(result);
                 return;
             }
@@ -154,7 +154,7 @@ QSet<AssStyleInfo> FontFinder::parseAssFile(const QString& filePath)
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly))
     {
-        emit logMessage("Ошибка: не удалось открыть файл " + filePath, LogCategory::APP);
+        emit logMessage("Ошибка: не удалось открыть файл " + filePath, LogCategory::APP, LogLevel::Error);
         return styles;
     }
 
