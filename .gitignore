@@ -51,6 +51,13 @@ qrc_*.cpp
 *.log
 debug.log
 
+# Local / one-off tooling (not part of the app; keep untracked if present on disk)
+/build_output.txt
+/check_logs.py
+/update_logs.ps1
+/update_logs.py
+/update_logs2.ps1
+
 # Bundled tools (ffmpeg, mkvtoolnix, etc.)
 tools/
 

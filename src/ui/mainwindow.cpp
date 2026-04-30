@@ -29,12 +29,12 @@
 #include <QRegularExpression>
 #include <QScrollBar>
 #include <QSettings>
-#include <QSyntaxHighlighter>
 #include <QStandardPaths>
-#include <QThread>
+#include <QSyntaxHighlighter>
 #include <QTextBlock>
 #include <QTextCharFormat>
 #include <QTextCursor>
+#include <QThread>
 
 static QString logCategoryToString(LogCategory category)
 {
@@ -96,7 +96,8 @@ protected:
             {
                 fmt.setBackground(bg);
             }
-            setFormat(0, text.length(), fmt);
+            // QSyntaxHighlighter::setFormat takes int length; QString::size() is qsizetype.
+            setFormat(0, static_cast<int>(text.size()), fmt);
         };
 
         if (level == QStringLiteral("ERROR") || text.contains(QStringLiteral("[ERROR]")))
@@ -315,18 +316,18 @@ void MainWindow::logMessage(const QString& message, LogCategory category, LogLev
         bool isProgress = false;
         if (category == LogCategory::FFMPEG)
         {
-            if (payload.startsWith(QStringLiteral("frame=")) || payload.startsWith(QStringLiteral("size=")))
-            {
-                isProgress = true;
-            }
-            else if (payload.contains(QStringLiteral("time=")) && payload.contains(QStringLiteral("bitrate=")))
-            {
-                isProgress = true;
-            }
+            const bool frameOrSizeProgress =
+                payload.startsWith(QStringLiteral("frame=")) || payload.startsWith(QStringLiteral("size="));
+            const bool timeAndBitrateProgress =
+                payload.contains(QStringLiteral("time=")) && payload.contains(QStringLiteral("bitrate="));
+            isProgress = frameOrSizeProgress || timeAndBitrateProgress;
         }
         else if (category == LogCategory::MKVTOOLNIX || category == LogCategory::APP)
         {
-            if (payload.startsWith(QStringLiteral("Progress: ")) || payload.contains(QStringLiteral("ISO File Writing:")))
+            if (payload.startsWith(QStringLiteral("Progress: ")) ||
+                payload.contains(QStringLiteral("ISO File Writing:")) ||
+                payload.contains(QStringLiteral("Importing ISO File:")) ||
+                payload.contains(QStringLiteral("ISO File Reading:")))
             {
                 isProgress = true;
             }
@@ -421,7 +422,8 @@ void MainWindow::loadTemplates()
         QFile file(fileInfo.absoluteFilePath());
         if (!file.open(QIODevice::ReadOnly))
         {
-            logMessage("Ошибка: не удалось открыть файл шаблона " + fileInfo.fileName(), LogCategory::APP, LogLevel::Error);
+            logMessage("Ошибка: не удалось открыть файл шаблона " + fileInfo.fileName(), LogCategory::APP,
+                       LogLevel::Error);
             continue;
         }
 

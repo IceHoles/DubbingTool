@@ -106,7 +106,8 @@ bool ProcessManager::executeAndWait(const QString& program, const QStringList& a
 
     output = syncProcess.readAllStandardOutput();
     QString outStr = QString::fromUtf8(output);
-    emit processOutput("Процесс успешно завершен. Получено " + QString::number(output.size()) + " байт данных:\n" + outStr.trimmed());
+    emit processOutput("Процесс успешно завершен. Получено " + QString::number(output.size()) + " байт данных:\n" +
+                       outStr.trimmed());
     m_workingDir.clear();
     return true;
 }

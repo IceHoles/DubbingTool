@@ -257,7 +257,8 @@ bool AssProcessor::processExistingFile(const QString& inputPath, const QString& 
     }
     if (eventsIndex == -1)
     {
-        emit logMessage("Критическая ошибка: секция [Events] не найдена в файле субтитров.", LogCategory::APP, LogLevel::Error);
+        emit logMessage("Критическая ошибка: секция [Events] не найдена в файле субтитров.", LogCategory::APP,
+                        LogLevel::Error);
         return false;
     }
     // +2 чтобы захватить и [Events] и строку Format:
