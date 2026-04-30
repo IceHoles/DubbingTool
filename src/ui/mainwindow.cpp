@@ -29,12 +29,12 @@
 #include <QRegularExpression>
 #include <QScrollBar>
 #include <QSettings>
-#include <QSyntaxHighlighter>
 #include <QStandardPaths>
-#include <QThread>
+#include <QSyntaxHighlighter>
 #include <QTextBlock>
 #include <QTextCharFormat>
 #include <QTextCursor>
+#include <QThread>
 
 static QString logCategoryToString(LogCategory category)
 {
@@ -326,7 +326,8 @@ void MainWindow::logMessage(const QString& message, LogCategory category, LogLev
         }
         else if (category == LogCategory::MKVTOOLNIX || category == LogCategory::APP)
         {
-            if (payload.startsWith(QStringLiteral("Progress: ")) || payload.contains(QStringLiteral("ISO File Writing:")) ||
+            if (payload.startsWith(QStringLiteral("Progress: ")) ||
+                payload.contains(QStringLiteral("ISO File Writing:")) ||
                 payload.contains(QStringLiteral("Importing ISO File:")) ||
                 payload.contains(QStringLiteral("ISO File Reading:")))
             {
@@ -423,7 +424,8 @@ void MainWindow::loadTemplates()
         QFile file(fileInfo.absoluteFilePath());
         if (!file.open(QIODevice::ReadOnly))
         {
-            logMessage("Ошибка: не удалось открыть файл шаблона " + fileInfo.fileName(), LogCategory::APP, LogLevel::Error);
+            logMessage("Ошибка: не удалось открыть файл шаблона " + fileInfo.fileName(), LogCategory::APP,
+                       LogLevel::Error);
             continue;
         }
 

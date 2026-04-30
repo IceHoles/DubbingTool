@@ -289,8 +289,8 @@ private:
     void assembleMkv(const QString& m_finalAudioPath);
     void renderMp4();
     void runRenderPass(Step pass);
-    bool prepareSplitRenderArgs(const QString& commandTemplate, const QString& outputVideoPath, QStringList& outVideoArgs,
-                                QStringList& outAudioArgs);
+    bool prepareSplitRenderArgs(const QString& commandTemplate, const QString& outputVideoPath,
+                                QStringList& outVideoArgs, QStringList& outAudioArgs);
     bool runMp4MuxWithMp4Box();
     void startMp4MuxPipeline();
     void renderMp4Concat();

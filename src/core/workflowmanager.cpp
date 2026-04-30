@@ -1680,7 +1680,8 @@ void WorkflowManager::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
         {
             m_audioConversionNeedsSecondPass = false;
             m_audioConversionCurrentOutputPath = m_finalAudioMp4Path;
-            emit logMessage("Конвертация аудио для MKV завершена. Запуск отдельной конвертации для MP4...", LogCategory::APP);
+            emit logMessage("Конвертация аудио для MKV завершена. Запуск отдельной конвертации для MP4...",
+                            LogCategory::APP);
 
             QStringList args;
             args << "-y" << "-i" << m_mainRuAudioPath;
@@ -2051,7 +2052,8 @@ void WorkflowManager::convertAudioIfNeeded()
 
     const bool isAac = (targetFormat == "aac");
 
-    auto alreadyInTargetFormat = [&](const QString& path) {
+    auto alreadyInTargetFormat = [&](const QString& path)
+    {
         if (isAac)
             return path.endsWith(".mka", Qt::CaseInsensitive);
         return path.endsWith("." + targetFormat, Qt::CaseInsensitive);
@@ -2463,9 +2465,9 @@ bool WorkflowManager::prepareSplitRenderArgs(const QString& commandTemplate, con
 void WorkflowManager::startMp4MuxPipeline()
 {
     const QString finalAudio = QFileInfo(m_finalAudioMp4Path).absoluteFilePath();
-    const bool canUseExternalAudio = QFileInfo::exists(finalAudio) &&
-                                     (finalAudio.endsWith(".m4a", Qt::CaseInsensitive) ||
-                                      finalAudio.endsWith(".aac", Qt::CaseInsensitive));
+    const bool canUseExternalAudio =
+        QFileInfo::exists(finalAudio) &&
+        (finalAudio.endsWith(".m4a", Qt::CaseInsensitive) || finalAudio.endsWith(".aac", Qt::CaseInsensitive));
 
     if (m_template.targetAudioFormat == "aac" && canUseExternalAudio)
     {
@@ -2518,7 +2520,7 @@ bool WorkflowManager::runMp4MuxWithMp4Box()
     }
 
     const QString audioPath = m_useExternalAudioForMp4Mux ? QFileInfo(m_finalAudioMp4Path).absoluteFilePath()
-                                                           : QFileInfo(m_tempAudioForMp4Path).absoluteFilePath();
+                                                          : QFileInfo(m_tempAudioForMp4Path).absoluteFilePath();
     if (!QFileInfo::exists(audioPath))
     {
         emit logMessage("MP4 mux: аудиофайл для мукса не найден.", LogCategory::APP, LogLevel::Error);
@@ -3740,8 +3742,7 @@ void WorkflowManager::extractTracksMp4()
 
     // Видео
     QString videoOutPath = m_paths->extractedVideo(m_videoTrack.extension);
-    args << "-map" << QString("0:%1").arg(m_videoTrack.id) << "-c" << "copy" << "-map_chapters" << "-1"
-         << videoOutPath;
+    args << "-map" << QString("0:%1").arg(m_videoTrack.id) << "-c" << "copy" << "-map_chapters" << "-1" << videoOutPath;
 
     // Аудио
     if (m_originalAudioTrack.id != -1)
@@ -4383,8 +4384,8 @@ void WorkflowManager::maybeApplyChaptersToFinalMp4()
     }
     else
     {
-        emit logMessage(QStringLiteral("ПРЕДУПРЕЖДЕНИЕ: не удалось записать главы в MP4: %1").arg(err), LogCategory::APP,
-                        LogLevel::Warning);
+        emit logMessage(QStringLiteral("ПРЕДУПРЕЖДЕНИЕ: не удалось записать главы в MP4: %1").arg(err),
+                        LogCategory::APP, LogLevel::Warning);
     }
 }
 

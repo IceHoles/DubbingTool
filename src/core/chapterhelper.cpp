@@ -92,7 +92,7 @@ qint64 parseMatroskaTimeToNs(const QString& text)
         return -1;
     }
 
-    int fracSeparator = secToken.indexOf(QLatin1Char('.'));
+    auto fracSeparator = secToken.indexOf(QLatin1Char('.'));
     if (fracSeparator < 0)
     {
         fracSeparator = secToken.indexOf(QLatin1Char(','));

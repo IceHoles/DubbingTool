@@ -421,7 +421,7 @@ void ManualRenderer::runStep()
     }
 
     emit progressUpdated(m_currentState == RenderState::MuxMP4Box ? 95 : -1, stepName);
-    
+
     m_processManager->startProcess(program, args);
 }
 
@@ -742,7 +742,7 @@ void ManualRenderer::applyChaptersIfNeeded()
     }
     else
     {
-        emit logMessage(QStringLiteral("ПРЕДУПРЕЖДЕНИЕ: не удалось записать главы в MP4: %1").arg(err), LogCategory::APP,
-                        LogLevel::Warning);
+        emit logMessage(QStringLiteral("ПРЕДУПРЕЖДЕНИЕ: не удалось записать главы в MP4: %1").arg(err),
+                        LogCategory::APP, LogLevel::Warning);
     }
 }

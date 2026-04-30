@@ -1,10 +1,10 @@
 #ifndef PROCESSMANAGER_H
 #define PROCESSMANAGER_H
 
+#include <QHash>
 #include <QList>
 #include <QObject>
 #include <QProcess>
-#include <QHash>
 
 class ProcessManager : public QObject
 {

@@ -80,7 +80,8 @@ void ManualAssembler::normalizeAudio()
 
     if (!QFile::copy(originalAudioPath, tempInputPath))
     {
-        emit logMessage("ОШИБКА: Не удалось переименовать аудиофайл. Нормализация отменена.", LogCategory::APP, LogLevel::Error);
+        emit logMessage("ОШИБКА: Не удалось переименовать аудиофайл. Нормализация отменена.", LogCategory::APP,
+                        LogLevel::Error);
         if (m_params["convertAudio"].toBool())
         {
             convertAudio();
@@ -131,7 +132,8 @@ void ManualAssembler::convertAudio()
     QString targetFormat = m_params.value("convertAudioFormat", "aac").toString();
     const bool isAac = (targetFormat == "aac");
 
-    auto alreadyInTargetFormat = [&](const QString& path) {
+    auto alreadyInTargetFormat = [&](const QString& path)
+    {
         if (isAac)
             return path.endsWith(".mka", Qt::CaseInsensitive);
         return path.endsWith("." + targetFormat, Qt::CaseInsensitive);
@@ -373,7 +375,8 @@ void ManualAssembler::assemble()
 
     if (fullOutputPath.isEmpty())
     {
-        emit logMessage("Критическая ошибка: не удалось определить путь для сохранения файла.", LogCategory::APP, LogLevel::Error);
+        emit logMessage("Критическая ошибка: не удалось определить путь для сохранения файла.", LogCategory::APP,
+                        LogLevel::Error);
         emit finished(false);
         return;
     }
@@ -384,7 +387,8 @@ void ManualAssembler::assemble()
     const QString chaptersMux = resolveChaptersPathForMkvMerge();
     const bool explicitChaptersProvided = (!chaptersMux.isEmpty() && QFileInfo::exists(chaptersMux));
 
-    auto addNoChaptersForContainer = [&](const QString& path) {
+    auto addNoChaptersForContainer = [&](const QString& path)
+    {
         if (!explicitChaptersProvided)
         {
             return;
@@ -540,7 +544,8 @@ void ManualAssembler::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
 
     if (exitCode != 0 || exitStatus != QProcess::NormalExit)
     {
-        emit logMessage("Ошибка выполнения дочернего процесса. Рабочий процесс остановлен.", LogCategory::APP, LogLevel::Error);
+        emit logMessage("Ошибка выполнения дочернего процесса. Рабочий процесс остановлен.", LogCategory::APP,
+                        LogLevel::Error);
         emit finished(false);
         return;
     }
