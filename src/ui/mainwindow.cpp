@@ -326,7 +326,9 @@ void MainWindow::logMessage(const QString& message, LogCategory category, LogLev
         }
         else if (category == LogCategory::MKVTOOLNIX || category == LogCategory::APP)
         {
-            if (payload.startsWith(QStringLiteral("Progress: ")) || payload.contains(QStringLiteral("ISO File Writing:")))
+            if (payload.startsWith(QStringLiteral("Progress: ")) || payload.contains(QStringLiteral("ISO File Writing:")) ||
+                payload.contains(QStringLiteral("Importing ISO File:")) ||
+                payload.contains(QStringLiteral("ISO File Reading:")))
             {
                 isProgress = true;
             }
