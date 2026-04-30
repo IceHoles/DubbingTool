@@ -96,7 +96,8 @@ protected:
             {
                 fmt.setBackground(bg);
             }
-            setFormat(0, text.length(), fmt);
+            // QSyntaxHighlighter::setFormat takes int length; QString::size() is qsizetype.
+            setFormat(0, static_cast<int>(text.size()), fmt);
         };
 
         if (level == QStringLiteral("ERROR") || text.contains(QStringLiteral("[ERROR]")))
@@ -315,14 +316,11 @@ void MainWindow::logMessage(const QString& message, LogCategory category, LogLev
         bool isProgress = false;
         if (category == LogCategory::FFMPEG)
         {
-            if (payload.startsWith(QStringLiteral("frame=")) || payload.startsWith(QStringLiteral("size=")))
-            {
-                isProgress = true;
-            }
-            else if (payload.contains(QStringLiteral("time=")) && payload.contains(QStringLiteral("bitrate=")))
-            {
-                isProgress = true;
-            }
+            const bool frameOrSizeProgress =
+                payload.startsWith(QStringLiteral("frame=")) || payload.startsWith(QStringLiteral("size="));
+            const bool timeAndBitrateProgress =
+                payload.contains(QStringLiteral("time=")) && payload.contains(QStringLiteral("bitrate="));
+            isProgress = frameOrSizeProgress || timeAndBitrateProgress;
         }
         else if (category == LogCategory::MKVTOOLNIX || category == LogCategory::APP)
         {
