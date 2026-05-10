@@ -145,33 +145,50 @@
            </widget>
           </item>
           <item row="3" column="0">
-           <widget class="QLabel" name="label_9">
+           <widget class="QLabel" name="mp4boxPathLabel">
             <property name="text">
-             <string>Путь к qbittorrent.exe:</string>
+             <string>Путь к mp4box.exe (GPAC):</string>
             </property>
            </widget>
           </item>
           <item row="3" column="1">
-           <widget class="QLineEdit" name="qbittorrentPathEdit"/>
+           <widget class="QLineEdit" name="mp4boxPathEdit"/>
           </item>
           <item row="3" column="2">
-           <widget class="QPushButton" name="browseQbittorrentButton">
+           <widget class="QPushButton" name="browseMp4boxButton">
             <property name="text">
              <string>Обзор...</string>
             </property>
            </widget>
           </item>
           <item row="4" column="0">
+           <widget class="QLabel" name="label_9">
+            <property name="text">
+             <string>Путь к qbittorrent.exe:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="1">
+           <widget class="QLineEdit" name="qbittorrentPathEdit"/>
+          </item>
+          <item row="4" column="2">
+           <widget class="QPushButton" name="browseQbittorrentButton">
+            <property name="text">
+             <string>Обзор...</string>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="0">
            <widget class="QLabel" name="nugenAmbPathLabel">
             <property name="text">
              <string>Путь к NUGEN Audio AMB.exe:</string>
             </property>
            </widget>
           </item>
-          <item row="4" column="1">
+          <item row="5" column="1">
            <widget class="QLineEdit" name="nugenAmbPathEdit"/>
           </item>
-          <item row="4" column="2">
+          <item row="5" column="2">
            <widget class="QPushButton" name="browseNugenAmbButton">
             <property name="text">
              <string>Обзор...</string>

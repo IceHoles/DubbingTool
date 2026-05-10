@@ -256,6 +256,7 @@ if(BUILD_TESTING)
         src/processing/fontfinder.cpp
         src/processing/assprocessor.cpp
         src/processing/telegramformatter.cpp
+        src/processing/postgenerator.cpp
         src/models/releasetemplate.cpp
     )
 
@@ -267,6 +268,7 @@ if(BUILD_TESTING)
         src/processing/fontfinder.h
         src/processing/assprocessor.h
         src/processing/telegramformatter.h
+        src/processing/postgenerator.h
         src/models/releasetemplate.h
     )
 
@@ -334,6 +336,11 @@ if(BUILD_TESTING)
     set_target_properties(telegramformatter_test PROPERTIES AUTOMOC ON)
     target_link_libraries(telegramformatter_test PRIVATE DubbingToolTestSupport Qt6::Test)
     add_test(NAME TelegramFormatterTest COMMAND telegramformatter_test)
+
+    add_executable(postgenerator_test tests/postgenerator_test.cpp)
+    set_target_properties(postgenerator_test PROPERTIES AUTOMOC ON)
+    target_link_libraries(postgenerator_test PRIVATE DubbingToolTestSupport Qt6::Test)
+    add_test(NAME PostGeneratorTest COMMAND postgenerator_test)
 
     add_executable(manualrenderer_test
         tests/manualrenderer_test.cpp

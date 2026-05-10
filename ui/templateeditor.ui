@@ -646,7 +646,7 @@
             </widget>
            </item>
            <item>
-            <widget class="QPlainTextEdit" name="postVkEdit"/>
+            <widget class="TelegramPasteEdit" name="postVkEdit"/>
            </item>
           </layout>
          </item>
@@ -660,7 +660,7 @@
             </widget>
            </item>
            <item>
-            <widget class="QPlainTextEdit" name="postVkCommentEdit"/>
+            <widget class="TelegramPasteEdit" name="postVkCommentEdit"/>
            </item>
           </layout>
          </item>

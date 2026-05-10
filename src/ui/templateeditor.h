@@ -61,6 +61,7 @@ private:
     void rebuildPostTemplateTree(const QString& filterText);
     void saveCurrentPostTemplateEdits(const QString& key = QString());
     void loadSelectedPostTemplateToEditor();
+    void syncBuiltinPostTemplatesMapFromLegacyEditors();
     QPlainTextEdit* legacyEditorForPostKey(const QString& key) const;
     void applyParsedFieldsToTemplate(const PostParseResult& parseResult);
     static QMap<QString, QString> builtinPostTemplates();

@@ -20,6 +20,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QFrame>
 #include <QIcon>
 #include <QJsonDocument>
@@ -27,6 +28,7 @@
 #include <QMessageBox>
 #include <QProcess>
 #include <QRegularExpression>
+#include <QPushButton>
 #include <QScrollBar>
 #include <QSettings>
 #include <QStandardPaths>
@@ -538,15 +540,13 @@ void MainWindow::on_createTemplateButton_clicked()
     defaultTemplate.postTemplates["vk"] =
         "«%SERIES_TITLE%» в дубляже от ТО Дубляжная\n\n"
         "Серия: %EPISODE_NUMBER%/%TOTAL_EPISODES%\n\n"
-        "🎁Сериал озвучен при поддержке онлайн-кинотеатра TVOЁ, если вы хотите поддержать Дубляжную, то смотрите нашу "
-        "озвучку именно там, ведь TVOЁ дарит скидку нашим подписчикам по промокоду - Dublyazhnaya, где 1 месяц 99 "
-        "рублей вместо 299 руб tvoe.cc/inby\n\n"
         "Роли дублировали:\n%CAST_LIST%\n\n"
         "Режиссёр дубляжа:\n%DIRECTOR%\n\n"
         "Звукорежиссёр:\n%SOUND_ENGINEER%\n\n"
         "Перевод:\n%SUB_AUTHOR%\n\n"
-        "️Разметка:\n%TIMING_AUTHOR%\n\n"
-        "Локализация постера:\nКирилл Хоримиев\n\n"
+        "Локализация видеоряда:\n%VIDEO_LOCALIZATION_AUTHOR%\n\n"
+        "Локализация надписей:\n%SIGNS_AUTHOR%\n\n"
+        "Локализация постера:\n\n"
         "Сборка релиза:\n%RELEASE_BUILDER%\n\n"
         "#Хештег@dublyajnaya";
     defaultTemplate.postTemplates["vk_comment"] =
@@ -698,15 +698,6 @@ void MainWindow::on_startButton_clicked()
         return;
     }
 
-    m_publicationWidget->clearData();
-    m_lastChapterMarkers.clear();
-    m_lastChapterDurationNs = 0;
-    int pubIndex = ui->mainTabWidget->indexOf(m_publicationWidget);
-    if (pubIndex != -1)
-    {
-        ui->mainTabWidget->setTabEnabled(pubIndex, false);
-    }
-
     QString manualMkvPath = ui->mkvPathLineEdit->text();
     if (manualMkvPath.isEmpty() && ui->episodeNumberLineEdit->text().isEmpty())
     {
@@ -720,12 +711,8 @@ void MainWindow::on_startButton_clicked()
         return;
     }
 
-    switchToCancelMode();
-    setUiEnabled(false);
-
-    ReleaseTemplate currentTemplate = m_templates.value(currentName);
     QString episodeNumberStr = ui->episodeNumberLineEdit->text();
-    bool ok;
+    bool ok = false;
     int epNum = episodeNumberStr.toInt(&ok);
     if (!ok && manualMkvPath.isEmpty())
     {
@@ -739,9 +726,21 @@ void MainWindow::on_startButton_clicked()
     QString episodeForPost = episodeNumberStr;
     QString episodeForSearch = QString("%1").arg(epNum, 2, 10, QChar('0'));
 
-    QSettings settings("MyCompany", "DubbingTool");
+    const ReleaseTemplate currentTemplate = m_templates.value(currentName);
 
+    m_publicationWidget->clearData();
+    m_lastChapterMarkers.clear();
+    m_lastChapterDurationNs = 0;
+    int pubIndex = ui->mainTabWidget->indexOf(m_publicationWidget);
+    if (pubIndex != -1)
+    {
+        ui->mainTabWidget->setTabEnabled(pubIndex, false);
+    }
+
+    switchToCancelMode();
     setUiEnabled(false);
+
+    QSettings settings("MyCompany", "DubbingTool");
 
     QThread* thread = new QThread(this);
     WorkflowManager* workflowManager =
@@ -1003,6 +1002,7 @@ void MainWindow::startManualRender()
         logMessage("Другой процесс уже запущен. Дождитесь его завершения.", LogCategory::APP);
         return;
     }
+
     logMessage("Запрос на ручной рендер...", LogCategory::APP);
 
     switchToCancelMode();

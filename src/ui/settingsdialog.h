@@ -23,6 +23,7 @@ private slots:
     void on_browseMkvToolNixButton_clicked();
     void on_browseMkvExtractButton_clicked();
     void on_browseFfmpegButton_clicked();
+    void on_browseMp4boxButton_clicked();
     void on_browseQbittorrentButton_clicked();
     void on_browseNugenAmbButton_clicked();
     void on_browseProjectDirectoryButton_clicked();

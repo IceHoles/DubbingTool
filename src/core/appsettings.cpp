@@ -134,6 +134,7 @@ void AppSettings::save()
     settings.setValue("paths/mkvmerge", m_mkvmergePath);
     settings.setValue("paths/mkvextract", m_mkvextractPath);
     settings.setValue("paths/ffmpeg", m_ffmpegPath);
+    settings.setValue("paths/mp4box", m_mp4boxPath);
     settings.setValue("paths/qbittorrent", m_qbittorrentPath);
     settings.setValue("paths/nugenAmb", m_nugenAmbPath);
     settings.setValue("general/setupCompleted", m_setupCompleted);

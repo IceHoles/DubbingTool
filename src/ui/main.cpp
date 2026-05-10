@@ -12,7 +12,8 @@ int main(int argc, char* argv[])
 
     const auto& settings = AppSettings::instance();
     bool toolsMissing = !QFileInfo::exists(settings.ffmpegPath()) || !QFileInfo::exists(settings.ffprobePath()) ||
-                        !QFileInfo::exists(settings.mkvmergePath()) || !QFileInfo::exists(settings.mkvextractPath());
+                        !QFileInfo::exists(settings.mkvmergePath()) || !QFileInfo::exists(settings.mkvextractPath()) ||
+                        !QFileInfo::exists(settings.mp4boxPath());
 
     if (!settings.isSetupCompleted() || toolsMissing)
     {

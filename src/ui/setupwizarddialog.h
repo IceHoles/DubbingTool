@@ -14,7 +14,7 @@
  * @brief Setup wizard dialog shown on first launch or when required tools are missing.
  *
  * Contains three pages:
- * 1. Tool paths verification (ffmpeg, ffprobe, mkvmerge, mkvextract)
+ * 1. Tool paths verification (ffmpeg, ffprobe, mkvmerge, mkvextract, mp4box; optional NUGEN AMB)
  * 2. qBittorrent Web API configuration
  * 3. Render preset selection
  */

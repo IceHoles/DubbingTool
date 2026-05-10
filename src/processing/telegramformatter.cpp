@@ -188,11 +188,11 @@ QVector<TagRecord> parseTelegramTagsBinary(const QByteArray& tagsData)
         // ИСПРАВЛЕНИЕ: Читаем UTF-16 Big Endian вручную
         QString content;
         content.reserve(size / 2);
-        for (int j = 0; j < (int)size; j += 2)
+        for (int j = 0; j + 1 < static_cast<int>(size); j += 2)
         {
-            // Собираем символ из двух байт: [high][low]
-            uchar high = static_cast<uchar>(tagBytes[j]);
-            uchar low = static_cast<uchar>(tagBytes[j + 1]);
+            // UTF-16 BE pairs; ignore a trailing odd byte (malformed blob)
+            const uchar high = static_cast<uchar>(tagBytes[j]);
+            const uchar low = static_cast<uchar>(tagBytes[j + 1]);
             content.append(QChar((high << 8) | low));
         }
 
@@ -431,7 +431,6 @@ QString TelegramFormatter::fromTelegramClipboardToPseudoMarkdown(const QMimeData
 
     QList<qsizetype> sortedBoundaries = boundaries.values();
     std::sort(sortedBoundaries.begin(), sortedBoundaries.end());
-    // sortedBoundaries is strictly increasing: values come from a set and are sorted.
     struct StyledSegment
     {
         QString text;

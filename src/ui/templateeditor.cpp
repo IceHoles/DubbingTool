@@ -39,6 +39,7 @@
 #include <QStandardPaths>
 #include <QTableWidgetItem>
 #include <QTextBrowser>
+#include <QTextDocument>
 #include <QTextDocumentFragment>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
@@ -115,110 +116,6 @@ static QString normalizeForParsing(QString text)
     text.replace("\r\n", "\n");
     text.replace('\r', '\n');
     return text.trimmed();
-}
-
-static QString parseFieldValue(const PostParseResult& parseResult, const QString& key)
-{
-    return parseResult.fields.value(key).trimmed();
-}
-
-static QString buildVkTemplateFromParseResult(const PostParseResult& parseResult)
-{
-    const QString parsedTemplateText = parseFieldValue(parseResult, "%PARSED_TEMPLATE_TEXT%").toLower();
-    const QString seriesTitle = parseFieldValue(parseResult, "%SERIES_TITLE%");
-    const QString totalEpisodes = parseFieldValue(parseResult, "%TOTAL_EPISODES%");
-    const QString castList = parseFieldValue(parseResult, "%CAST_LIST%");
-    const QString director = parseFieldValue(parseResult, "%DIRECTOR%");
-    const QString soundEngineer = parseFieldValue(parseResult, "%SOUND_ENGINEER%");
-    const QString episodeEngineer = parseFieldValue(parseResult, "%EPISODE_ENGINEER%");
-    const QString recordingEngineer = parseFieldValue(parseResult, "%RECORDING_ENGINEER%");
-    const QString subAuthor = parseFieldValue(parseResult, "%SUB_AUTHOR%");
-    const QString timingAuthor = parseFieldValue(parseResult, "%TIMING_AUTHOR%");
-    const QString signsAuthor = parseFieldValue(parseResult, "%SIGNS_AUTHOR%");
-    const QString releaseBuilder = parseFieldValue(parseResult, "%RELEASE_BUILDER%");
-    const bool isVoiceover = parsedTemplateText.contains("закадр");
-
-    if (seriesTitle.isEmpty() && castList.isEmpty())
-    {
-        return QString();
-    }
-
-    QStringList lines;
-    if (!seriesTitle.isEmpty())
-    {
-        lines << QString("«%1» в %2 от ТО Дубляжная").arg("%SERIES_TITLE%", isVoiceover ? "закадре" : "дубляже");
-        lines << QString();
-    }
-    lines << "Серия: %EPISODE_NUMBER%/%TOTAL_EPISODES%";
-    lines << QString();
-
-    if (!castList.isEmpty())
-    {
-        lines << (isVoiceover ? "Роли озвучивали:" : "Роли дублировали:");
-        lines << "%CAST_LIST%";
-        lines << QString();
-    }
-
-    if (!director.isEmpty())
-    {
-        lines << (isVoiceover ? "Куратор закадра:" : "Режиссёр дубляжа:");
-        lines << "%DIRECTOR%";
-        lines << QString();
-    }
-
-    if (!episodeEngineer.isEmpty() || !recordingEngineer.isEmpty())
-    {
-        if (!episodeEngineer.isEmpty())
-        {
-            lines << "Звукорежиссёр эпизода:";
-            lines << "%EPISODE_ENGINEER%";
-            lines << QString();
-        }
-        if (!recordingEngineer.isEmpty())
-        {
-            lines << "Звукорежиссёр записи:";
-            lines << "%RECORDING_ENGINEER%";
-            lines << QString();
-        }
-    }
-    else if (!soundEngineer.isEmpty())
-    {
-        lines << "Звукорежиссёр:";
-        lines << "%SOUND_ENGINEER%";
-        lines << QString();
-    }
-
-    if (!subAuthor.isEmpty())
-    {
-        lines << "Перевод:";
-        lines << "%SUB_AUTHOR%";
-        lines << QString();
-    }
-
-    if (!timingAuthor.isEmpty())
-    {
-        lines << "Разметка:";
-        lines << "%TIMING_AUTHOR%";
-        lines << QString();
-    }
-
-    if (!signsAuthor.isEmpty())
-    {
-        lines << "Локализация надписей:";
-        lines << "%SIGNS_AUTHOR%";
-        lines << QString();
-    }
-
-    if (!releaseBuilder.isEmpty())
-    {
-        lines << "Сборка релиза:";
-        lines << "%RELEASE_BUILDER%";
-        lines << QString();
-    }
-
-    lines << "#Хештег@dublyajnaya";
-    Q_UNUSED(totalEpisodes);
-    return lines.join('\n').trimmed();
 }
 
 static QString normalizeCastToken(QString value)
@@ -518,6 +415,7 @@ void TemplateEditor::setTemplate(const ReleaseTemplate& t)
 
 ReleaseTemplate TemplateEditor::getTemplate()
 {
+    syncBuiltinPostTemplatesMapFromLegacyEditors();
     saveCurrentPostTemplateEdits();
     ReleaseTemplate t;
 
@@ -723,6 +621,8 @@ void TemplateEditor::onOpenPostTemplateCatalogClicked()
         return;
     }
 
+    syncBuiltinPostTemplatesMapFromLegacyEditors();
+
     m_postTemplateDialog = new QDialog(this);
     m_postTemplateDialog->setAttribute(Qt::WA_DeleteOnClose);
     m_postTemplateDialog->setWindowTitle("Каталог шаблонов постов");
@@ -880,6 +780,15 @@ void TemplateEditor::loadPostTemplateCatalogFromDisk(const ReleaseTemplate& t)
     }
 
     syncPostTemplateEditorsFromTemplate();
+
+    QMap<QString, QString> mergedBuiltinBodies = t.postTemplates;
+    ensureBuiltinLegacyPostTemplates(mergedBuiltinBodies);
+    static const QStringList kBuiltinPostKeys = {"tg_mp4", "tg_mkv", "vk", "vk_comment"};
+    for (const QString& builtinKey : kBuiltinPostKeys)
+    {
+        m_postTemplates.insert(builtinKey, mergedBuiltinBodies.value(builtinKey));
+    }
+
     savePostTemplateCatalogToDisk();
 }
 
@@ -925,10 +834,11 @@ void TemplateEditor::savePostTemplateCatalogToDisk() const
 void TemplateEditor::syncPostTemplateCatalogToTemplate(ReleaseTemplate& t) const
 {
     t.postTemplates.clear();
-    t.postTemplates.insert("tg_mp4", ui->postTgMp4Edit->toPlainText());
-    t.postTemplates.insert("tg_mkv", ui->postTgMkvEdit->toPlainText());
-    t.postTemplates.insert("vk", ui->postVkEdit->toPlainText());
-    t.postTemplates.insert("vk_comment", ui->postVkCommentEdit->toPlainText());
+    static const QStringList kBuiltinPostKeys = {"tg_mp4", "tg_mkv", "vk", "vk_comment"};
+    for (const QString& builtinKey : kBuiltinPostKeys)
+    {
+        t.postTemplates.insert(builtinKey, m_postTemplates.value(builtinKey));
+    }
     ensureBuiltinLegacyPostTemplates(t.postTemplates);
 
     QMap<QString, QString> sanitized = m_postTemplates;
@@ -1149,15 +1059,13 @@ QMap<QString, QString> TemplateEditor::builtinPostTemplates()
     result["vk"] =
         "«%SERIES_TITLE%» в дубляже от ТО Дубляжная\n\n"
         "Серия: %EPISODE_NUMBER%/%TOTAL_EPISODES%\n\n"
-        "🎁Сериал озвучен при поддержке онлайн-кинотеатра TVOЁ, если вы хотите поддержать Дубляжную, то смотрите нашу "
-        "озвучку именно там, ведь TVOЁ дарит скидку нашим подписчикам по промокоду - Dublyazhnaya, где 1 месяц 99 "
-        "рублей вместо 299 руб tvoe.cc/inby\n\n"
         "Роли дублировали:\n%CAST_LIST%\n\n"
         "Режиссёр дубляжа:\n%DIRECTOR%\n\n"
         "Звукорежиссёр:\n%SOUND_ENGINEER%\n\n"
         "Перевод:\n%SUB_AUTHOR%\n\n"
-        "️Разметка:\n%TIMING_AUTHOR%\n\n"
-        "Локализация постера:\nКирилл Хоримиев\n\n"
+        "Локализация видеоряда:\n%VIDEO_LOCALIZATION_AUTHOR%\n\n"
+        "Локализация надписей:\n%SIGNS_AUTHOR%\n\n"
+        "Локализация постера:\n\n"
         "Сборка релиза:\n%RELEASE_BUILDER%\n\n"
         "#Хештег@dublyajnaya";
     result["vk_comment"] =
@@ -1348,6 +1256,19 @@ QPlainTextEdit* TemplateEditor::legacyEditorForPostKey(const QString& key) const
     return nullptr;
 }
 
+void TemplateEditor::syncBuiltinPostTemplatesMapFromLegacyEditors()
+{
+    static const QStringList kBuiltinPostKeys = {"tg_mp4", "tg_mkv", "vk", "vk_comment"};
+    for (const QString& builtinKey : kBuiltinPostKeys)
+    {
+        QPlainTextEdit* editor = legacyEditorForPostKey(builtinKey);
+        if (editor != nullptr)
+        {
+            m_postTemplates.insert(builtinKey, editor->toPlainText());
+        }
+    }
+}
+
 void TemplateEditor::onPostTemplateSelectionChanged()
 {
     const QString newKey = selectedPostTemplateKey();
@@ -1483,6 +1404,15 @@ void TemplateEditor::onPostTemplateBodyEdited()
         return;
     }
     m_postTemplates.insert(key, m_postTemplateBodyEdit->toPlainText());
+    if (isRequiredBuiltinPostKey(key))
+    {
+        QPlainTextEdit* legacy = legacyEditorForPostKey(key);
+        if (legacy != nullptr)
+        {
+            const QSignalBlocker blocker(legacy);
+            legacy->setPlainText(m_postTemplates.value(key));
+        }
+    }
 }
 
 void TemplateEditor::onPostTemplateSaveClicked()
@@ -1490,6 +1420,99 @@ void TemplateEditor::onPostTemplateSaveClicked()
     saveCurrentPostTemplateEdits();
     savePostTemplateCatalogToDisk();
     QMessageBox::information(this, "Каталог сохранен", "Шаблон сохранен в отдельный каталог постов.");
+}
+
+static QString summarizeParsedFieldValuesForUser(const PostParseResult& parseResult)
+{
+    QStringList parts;
+    for (auto it = parseResult.fields.constBegin(); it != parseResult.fields.constEnd(); ++it)
+    {
+        if (it.key() == QStringLiteral("%PARSED_TEMPLATE_TEXT%"))
+        {
+            continue;
+        }
+        const QString v = it.value().trimmed();
+        if (v.isEmpty())
+        {
+            continue;
+        }
+        const QString shown = (v.size() > 120) ? (v.left(120) + QStringLiteral("…")) : v;
+        QString label;
+        if (it.key() == QStringLiteral("%SERIES_TITLE%"))
+        {
+            label = QStringLiteral("Название для поста");
+        }
+        else if (it.key() == QStringLiteral("%EPISODE_NUMBER%"))
+        {
+            label = QStringLiteral("Номер серии");
+        }
+        else if (it.key() == QStringLiteral("%TOTAL_EPISODES%"))
+        {
+            label = QStringLiteral("Всего серий");
+        }
+        else if (it.key() == QStringLiteral("%CAST_LIST%"))
+        {
+            label = QStringLiteral("Роли");
+        }
+        else if (it.key() == QStringLiteral("%DIRECTOR%"))
+        {
+            label = QStringLiteral("Режиссёр дубляжа");
+        }
+        else if (it.key() == QStringLiteral("%SOUND_ENGINEER%"))
+        {
+            label = QStringLiteral("Звукорежиссёр");
+        }
+        else if (it.key() == QStringLiteral("%EPISODE_ENGINEER%"))
+        {
+            label = QStringLiteral("Звукорежиссёр эпизода");
+        }
+        else if (it.key() == QStringLiteral("%RECORDING_ENGINEER%"))
+        {
+            label = QStringLiteral("Звукорежиссёр записи");
+        }
+        else if (it.key() == QStringLiteral("%TRANSLATION_EDITOR%"))
+        {
+            label = QStringLiteral("Редактор перевода");
+        }
+        else if (it.key() == QStringLiteral("%SUB_AUTHOR%"))
+        {
+            label = QStringLiteral("Перевод");
+        }
+        else if (it.key() == QStringLiteral("%TIMING_AUTHOR%"))
+        {
+            label = QStringLiteral("Разметка / тайминг");
+        }
+        else if (it.key() == QStringLiteral("%SIGNS_AUTHOR%"))
+        {
+            label = QStringLiteral("Локализация надписей");
+        }
+        else if (it.key() == QStringLiteral("%VIDEO_LOCALIZATION_AUTHOR%"))
+        {
+            label = QStringLiteral("Локализация видеоряда");
+        }
+        else if (it.key() == QStringLiteral("%RELEASE_BUILDER%"))
+        {
+            label = QStringLiteral("Сборка релиза");
+        }
+        else if (it.key() == QStringLiteral("%LINK_ANIME365%"))
+        {
+            label = QStringLiteral("Ссылка Anime365");
+        }
+        else if (it.key() == QStringLiteral("%LINK_ANILIB%"))
+        {
+            label = QStringLiteral("Ссылка Anilib");
+        }
+        else
+        {
+            label = it.key();
+        }
+        parts << QStringLiteral("%1: %2").arg(label, shown);
+    }
+    if (parts.isEmpty())
+    {
+        return QStringLiteral("Значения для полей шаблона не извлечены (проверьте заголовки блоков в тексте).");
+    }
+    return parts.join(QStringLiteral("\n"));
 }
 
 void TemplateEditor::onParsePostToTemplateClicked()
@@ -1513,6 +1536,12 @@ void TemplateEditor::onParsePostToTemplateClicked()
         {
             postText = mimeData->text();
         }
+        if (postText.trimmed().isEmpty() && mimeData->hasHtml())
+        {
+            QTextDocument htmlDoc;
+            htmlDoc.setHtml(mimeData->html());
+            postText = htmlDoc.toPlainText();
+        }
     }
     postText = normalizeForParsing(postText);
 
@@ -1530,32 +1559,63 @@ void TemplateEditor::onParsePostToTemplateClicked()
         return;
     }
 
-    if (QPlainTextEdit* templateEditor = legacyEditorForPostKey(parseKey))
+    static constexpr int kMinStructurePlaceholdersForApplyBody = 3;
+    const QString parsedTemplateText = parseResult.fields.value("%PARSED_TEMPLATE_TEXT%").trimmed();
+    const bool parsedBodyUsable =
+        parseResult.structurePlaceholdersInParsedTemplate >= kMinStructurePlaceholdersForApplyBody;
+
+    if (parsedBodyUsable)
     {
-        const QString parsedTemplateText = parseResult.fields.value("%PARSED_TEMPLATE_TEXT%").trimmed();
-        if (!parsedTemplateText.isEmpty())
+        if (QPlainTextEdit* templateEditor = legacyEditorForPostKey(parseKey))
         {
-            const QSignalBlocker blocker(templateEditor);
-            templateEditor->setPlainText(parsedTemplateText);
+            if (!parsedTemplateText.isEmpty())
+            {
+                const QSignalBlocker blocker(templateEditor);
+                templateEditor->setPlainText(parsedTemplateText);
+            }
         }
     }
 
     if (sourceType == "telegram")
     {
-        const QString vkTemplate = buildVkTemplateFromParseResult(parseResult);
-        if (!vkTemplate.isEmpty())
+        const QString castList = parseResult.fields.value(QStringLiteral("%CAST_LIST%")).trimmed();
+        const QString seriesTitle = parseResult.fields.value(QStringLiteral("%SERIES_TITLE%")).trimmed();
+        const QString episodeNumber = parseResult.fields.value(QStringLiteral("%EPISODE_NUMBER%")).trimmed();
+        const bool vkAutoSafe = !castList.isEmpty() && !seriesTitle.isEmpty() && !episodeNumber.isEmpty();
+        if (vkAutoSafe)
         {
-            const QSignalBlocker blocker(ui->postVkEdit);
-            ui->postVkEdit->setPlainText(vkTemplate);
+            const QString vkTemplate = PostGenerator::buildVkPostTemplateFromParseResult(parseResult, postText);
+            if (!vkTemplate.isEmpty())
+            {
+                const QSignalBlocker blocker(ui->postVkEdit);
+                ui->postVkEdit->setPlainText(vkTemplate);
+            }
         }
+    }
+
+    syncBuiltinPostTemplatesMapFromLegacyEditors();
+    const QString catalogSelection = selectedPostTemplateKey();
+    if (m_postTemplateBodyEdit != nullptr && isRequiredBuiltinPostKey(catalogSelection))
+    {
+        const QSignalBlocker bodyBlocker(m_postTemplateBodyEdit);
+        m_postTemplateBodyEdit->setPlainText(m_postTemplates.value(catalogSelection));
     }
 
     applyParsedFieldsToTemplate(parseResult);
     const qsizetype extractedFieldsCount =
         parseResult.fields.size() - (parseResult.fields.contains("%PARSED_TEMPLATE_TEXT%") ? 1 : 0);
-    QMessageBox::information(this, "Готово",
-                             QString("Извлечено полей: %1.\nПроверьте вкладки \"Создание ТБ\" и \"Публикация\".")
-                                 .arg(static_cast<int>(qMax(qsizetype(0), extractedFieldsCount))));
+    QString doneMessage =
+        QStringLiteral("Импорт из буфера (записей с данными: %1).\n\n%2\n\nПроверьте вкладки «Создание ТБ» и «Публикация».")
+            .arg(static_cast<int>(qMax(qsizetype(0), extractedFieldsCount)))
+            .arg(summarizeParsedFieldValuesForUser(parseResult));
+    if (!parsedBodyUsable)
+    {
+        doneMessage +=
+            "\n\nТекст шаблона поста в редакторе не заменён: удалось выполнить слишком мало автоматических "
+            "замен блоков (заголовки «Роли…», «Режиссёр…» и т.д.). "
+            "Проверьте формат текста; при необходимости поправьте шаблон вручную.";
+    }
+    QMessageBox::information(this, "Готово", doneMessage);
 }
 
 void TemplateEditor::applyParsedFieldsToTemplate(const PostParseResult& parseResult)
@@ -1567,7 +1627,9 @@ void TemplateEditor::applyParsedFieldsToTemplate(const PostParseResult& parseRes
 
     if (!value("%SERIES_TITLE%").isEmpty())
     {
-        ui->seriesTitleForPostEdit->setText(value("%SERIES_TITLE%"));
+        const QString seriesTitle = value("%SERIES_TITLE%");
+        ui->seriesTitleForPostEdit->setText(seriesTitle);
+        ui->seriesTitleEdit->setText(seriesTitle);
     }
     if (!value("%TOTAL_EPISODES%").isEmpty())
     {
@@ -1602,6 +1664,8 @@ void TemplateEditor::applyParsedFieldsToTemplate(const PostParseResult& parseRes
         ui->timingAuthorEdit->setText(value("%TIMING_AUTHOR%"));
     if (!value("%SIGNS_AUTHOR%").isEmpty())
         ui->signsAuthorEdit->setText(value("%SIGNS_AUTHOR%"));
+    if (!value("%VIDEO_LOCALIZATION_AUTHOR%").isEmpty())
+        ui->videoLocalizationAuthorEdit->setText(value("%VIDEO_LOCALIZATION_AUTHOR%"));
     if (!value("%TRANSLATION_EDITOR%").isEmpty())
         ui->translationEditorEdit->setText(value("%TRANSLATION_EDITOR%"));
     if (!value("%RELEASE_BUILDER%").isEmpty())
@@ -1673,10 +1737,11 @@ void TemplateEditor::on_helpButton_clicked()
     addRow(placeholdersLayout, 9, "%SUB_AUTHOR%", "Автор перевода");
     addRow(placeholdersLayout, 10, "%TIMING_AUTHOR%", "Разметка (тайминг)");
     addRow(placeholdersLayout, 11, "%SIGNS_AUTHOR%", "Локализация надписей");
-    addRow(placeholdersLayout, 12, "%TRANSLATION_EDITOR%", "Редактор перевода");
-    addRow(placeholdersLayout, 13, "%RELEASE_BUILDER%", "Сборка релиза");
-    addRow(placeholdersLayout, 14, "%LINK_ANILIB%", "Ссылка на Anilib (из панели 'Публикация')");
-    addRow(placeholdersLayout, 15, "%LINK_ANIME365%", "Ссылка на Anime365 (из панели 'Публикация')");
+    addRow(placeholdersLayout, 12, "%VIDEO_LOCALIZATION_AUTHOR%", "Локализация видеоряда");
+    addRow(placeholdersLayout, 13, "%TRANSLATION_EDITOR%", "Редактор перевода");
+    addRow(placeholdersLayout, 14, "%RELEASE_BUILDER%", "Сборка релиза");
+    addRow(placeholdersLayout, 15, "%LINK_ANILIB%", "Ссылка на Anilib (из панели 'Публикация')");
+    addRow(placeholdersLayout, 16, "%LINK_ANIME365%", "Ссылка на Anime365 (из панели 'Публикация')");
     placeholdersLayout->setColumnStretch(1, 1);
     mainLayout->addWidget(placeholdersWidget);
 

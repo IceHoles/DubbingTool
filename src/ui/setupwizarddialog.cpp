@@ -66,7 +66,7 @@ void SetupWizardDialog::buildToolsPage()
     title->setFont(titleFont);
     layout->addWidget(title);
 
-    auto* desc = new QLabel("Для работы необходимы FFmpeg и MKVToolNix. "
+    auto* desc = new QLabel("Для работы необходимы FFmpeg, MKVToolNix и MP4Box (GPAC) для сборки MP4. "
                             "Программа автоматически ищет их в папке tools/, рядом с exe и в системном PATH. "
                             "Если инструмент не найден — укажите путь вручную или скачайте по ссылкам ниже.",
                             page);
@@ -80,8 +80,12 @@ void SetupWizardDialog::buildToolsPage()
     auto* mkvtoolnixLink =
         new QLabel("<a href=\"https://mkvtoolnix.download/downloads.html\">Скачать MKVToolNix</a>", page);
     mkvtoolnixLink->setOpenExternalLinks(true);
+    auto* gpacLink = new QLabel("<a href=\"https://gpac.io/downloads/gpac-nightly-builds/\">Скачать GPAC (MP4Box)</a>",
+                                page);
+    gpacLink->setOpenExternalLinks(true);
     linksLayout->addWidget(ffmpegLink);
     linksLayout->addWidget(mkvtoolnixLink);
+    linksLayout->addWidget(gpacLink);
     linksLayout->addStretch();
     layout->addLayout(linksLayout);
 
@@ -101,6 +105,7 @@ void SetupWizardDialog::buildToolsPage()
         {   "ffprobe.exe",    "FFprobe", true},
         {  "mkvmerge.exe",   "MKVmerge", true},
         {"mkvextract.exe", "MKVextract", true},
+        {   "mp4box.exe",     "MP4Box", true},
     };
 
     for (int32_t i = 0; i < kToolDefs.size(); ++i)
@@ -343,8 +348,10 @@ void SetupWizardDialog::detectTools()
     updateToolStatus(2, settings.mkvmergePath());
     // mkvextract
     updateToolStatus(3, settings.mkvextractPath());
+    // mp4box
+    updateToolStatus(4, settings.mp4boxPath());
     // NUGEN Audio AMB (optional)
-    updateToolStatus(4, settings.nugenAmbPath());
+    updateToolStatus(5, settings.nugenAmbPath());
 }
 
 void SetupWizardDialog::updateToolStatus(int32_t toolIndex, const QString& path)
@@ -424,13 +431,14 @@ void SetupWizardDialog::slotNextPage()
     if (current == 0)
     {
         auto& settings = AppSettings::instance();
-        if (m_tools.size() >= 5)
+        if (m_tools.size() >= 6)
         {
             settings.setFfmpegPath(m_tools[0].pathEdit->text());
             // ffprobe (index 1) is auto-detected from ffmpeg path
             settings.setMkvmergePath(m_tools[2].pathEdit->text());
             settings.setMkvextractPath(m_tools[3].pathEdit->text());
-            settings.setNugenAmbPath(m_tools[4].pathEdit->text());
+            settings.setMp4boxPath(m_tools[4].pathEdit->text());
+            settings.setNugenAmbPath(m_tools[5].pathEdit->text());
         }
         settings.setProjectDirectory(m_projectDirectoryEdit->text().trimmed());
         settings.setUserFileAction(static_cast<UserFileAction>(m_userFileActionCombo->currentIndex()));
@@ -488,13 +496,14 @@ void SetupWizardDialog::slotFinish()
     auto& settings = AppSettings::instance();
 
     // Save tool paths and project directory (page 1)
-    if (m_tools.size() >= 5)
+    if (m_tools.size() >= 6)
     {
         settings.setFfmpegPath(m_tools[0].pathEdit->text());
         // ffprobe (index 1) is auto-detected from ffmpeg path
         settings.setMkvmergePath(m_tools[2].pathEdit->text());
         settings.setMkvextractPath(m_tools[3].pathEdit->text());
-        settings.setNugenAmbPath(m_tools[4].pathEdit->text());
+        settings.setMp4boxPath(m_tools[4].pathEdit->text());
+        settings.setNugenAmbPath(m_tools[5].pathEdit->text());
     }
     settings.setProjectDirectory(m_projectDirectoryEdit->text().trimmed());
     settings.setUserFileAction(static_cast<UserFileAction>(m_userFileActionCombo->currentIndex()));

@@ -30,6 +30,7 @@ void SettingsDialog::loadSettings()
     ui->mkvToolNixPathEdit->setText(settings.mkvmergePath());
     ui->mkvExtractPathEdit->setText(settings.mkvextractPath());
     ui->ffmpegPathEdit->setText(settings.ffmpegPath());
+    ui->mp4boxPathEdit->setText(settings.mp4boxPath());
     ui->qbittorrentPathEdit->setText(settings.qbittorrentPath());
     ui->nugenAmbPathEdit->setText(settings.nugenAmbPath());
     ui->deleteTempFilesCheckBox->setChecked(settings.deleteTempFiles());
@@ -85,6 +86,7 @@ void SettingsDialog::accept()
     settings.setMkvmergePath(ui->mkvToolNixPathEdit->text());
     settings.setMkvextractPath(ui->mkvExtractPathEdit->text());
     settings.setFfmpegPath(ui->ffmpegPathEdit->text());
+    settings.setMp4boxPath(ui->mp4boxPathEdit->text());
     settings.setQbittorrentPath(ui->qbittorrentPathEdit->text());
     settings.setNugenAmbPath(ui->nugenAmbPathEdit->text());
     settings.setDeleteTempFiles(ui->deleteTempFilesCheckBox->isChecked());
@@ -158,6 +160,16 @@ void SettingsDialog::on_browseFfmpegButton_clicked()
         ui->ffmpegPathEdit->setText(filePath);
     }
 }
+
+void SettingsDialog::on_browseMp4boxButton_clicked()
+{
+    QString filePath = QFileDialog::getOpenFileName(this, "Выберите mp4box.exe", "", "Исполняемые файлы (*.exe)");
+    if (!filePath.isEmpty())
+    {
+        ui->mp4boxPathEdit->setText(filePath);
+    }
+}
+
 void SettingsDialog::on_browseQbittorrentButton_clicked()
 {
     QString filePath = QFileDialog::getOpenFileName(this, "Выберите qbittorrent.exe", "", "Исполняемые файлы (*.exe)");
