@@ -8,11 +8,14 @@ class QMimeData;
 class TelegramFormatter
 {
 public:
-    // Главная функция, которую будем вызывать снаружи
     static void formatAndCopyToClipboard(const QString& markdownText);
 
-    // Обратное преобразование: из Telegram-буфера обмена (application/x-td-field-*)
-    // в внутренний псевдо-markdown формат.
+    /**
+     * @brief Builds Telegram TD clipboard mime (application/x-td-field-text/tags) from pseudo-markdown.
+     * Caller owns the returned pointer. Used by formatAndCopyToClipboard and unit tests (no real clipboard).
+     */
+    [[nodiscard]] static QMimeData* createTdMimeDataFromMarkdown(const QString& markdownText);
+
     static QString fromTelegramClipboardToPseudoMarkdown(const QMimeData* mimeData);
 };
 

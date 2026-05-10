@@ -1,5 +1,8 @@
 # Build directories
 build/
+build-test/
+build-tests/
+build-mergecheck/
 release/
 debug/
 out/
@@ -57,6 +60,11 @@ debug.log
 /update_logs.ps1
 /update_logs.py
 /update_logs2.ps1
+
+# OpenCppCoverage HTML (regenerate with scripts/CoverageOpenCpp.ps1)
+CoverageReport-*/
+occ_verbose.txt
+tf_out.txt
 
 # Bundled tools (ffmpeg, mkvtoolnix, etc.)
 tools/

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Chapters>
+  <EditionEntry>
+    <EditionUID>100</EditionUID>
+    <ChapterAtom>
+      <ChapterUID>1</ChapterUID>
+      <ChapterTimeStart>0:00:00.000000000</ChapterTimeStart>
+      <ChapterDisplay>
+        <ChapterString>Intro</ChapterString>
+      </ChapterDisplay>
+    </ChapterAtom>
+    <ChapterAtom>
+      <ChapterUID>2</ChapterUID>
+      <ChapterTimeStart>0:01:30.500000000</ChapterTimeStart>
+      <ChapterDisplay>
+        <ChapterString>Main</ChapterString>
+      </ChapterDisplay>
+    </ChapterAtom>
+  </EditionEntry>
+</Chapters>

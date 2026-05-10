@@ -15,6 +15,20 @@ set(CMAKE_AUTOUIC ON)
 # Export compile_commands.json for clangd
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+option(ENABLE_COVERAGE "Compiler instrumentation for coverage (GCC or Clang only; MSVC: scripts/CoverageOpenCpp.ps1)" OFF)
+
+if(ENABLE_COVERAGE)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        add_compile_options(--coverage -fprofile-arcs -ftest-coverage)
+        add_link_options(--coverage)
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
+        add_link_options(-fprofile-instr-generate)
+    else()
+        message(WARNING "ENABLE_COVERAGE applies only to GNU or Clang; with MSVC use OpenCppCoverage (see scripts/CoverageOpenCpp.ps1).")
+    endif()
+endif()
+
 # Tell AUTOUIC where to find .ui files
 set(CMAKE_AUTOUIC_SEARCH_PATHS ${CMAKE_SOURCE_DIR}/ui)
 
@@ -24,6 +38,7 @@ find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network Xml Multimedia Mul
 set(SOURCES_CORE
     src/core/appsettings.cpp
     src/core/chapterhelper.cpp
+    src/core/iprocessrunner.cpp
     src/core/processmanager.cpp
     src/core/workflowmanager.cpp
 )
@@ -65,6 +80,7 @@ set(SOURCES_MODELS
 set(HEADERS_CORE
     src/core/appsettings.h
     src/core/chapterhelper.h
+    src/core/iprocessrunner.h
     src/core/processmanager.h
     src/core/workflowmanager.h
 )
@@ -231,42 +247,51 @@ if(BUILD_TESTING)
     enable_testing()
     find_package(Qt6 REQUIRED COMPONENTS Test)
 
-    # Minimal library for testing FontFinder (no UI dependencies)
-    set(TESTABLE_SOURCES
+    # Static library shared by unit tests: add new production .cpp/.h here when tests need them.
+    set(TEST_SUPPORT_SOURCES
         src/core/appsettings.cpp
+        src/core/chapterhelper.cpp
+        src/core/iprocessrunner.cpp
+        src/core/processmanager.cpp
         src/processing/fontfinder.cpp
         src/processing/assprocessor.cpp
+        src/processing/telegramformatter.cpp
         src/models/releasetemplate.cpp
     )
 
-    set(TESTABLE_HEADERS
+    set(TEST_SUPPORT_HEADERS
         src/core/appsettings.h
+        src/core/chapterhelper.h
+        src/core/iprocessrunner.h
+        src/core/processmanager.h
         src/processing/fontfinder.h
         src/processing/assprocessor.h
+        src/processing/telegramformatter.h
         src/models/releasetemplate.h
     )
 
-    add_library(FontFinderLib STATIC
-        ${TESTABLE_SOURCES}
-        ${TESTABLE_HEADERS}
+    add_library(DubbingToolTestSupport STATIC
+        ${TEST_SUPPORT_SOURCES}
+        ${TEST_SUPPORT_HEADERS}
     )
 
-    set_target_properties(FontFinderLib PROPERTIES AUTOMOC ON)
+    set_target_properties(DubbingToolTestSupport PROPERTIES AUTOMOC ON)
 
-    target_include_directories(FontFinderLib PUBLIC
+    target_include_directories(DubbingToolTestSupport PUBLIC
         ${CMAKE_SOURCE_DIR}/src/core
         ${CMAKE_SOURCE_DIR}/src/processing
         ${CMAKE_SOURCE_DIR}/src/models
     )
 
-    target_link_libraries(FontFinderLib PUBLIC
+    target_link_libraries(DubbingToolTestSupport PUBLIC
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets
+        Qt6::Xml
     )
 
     if(WIN32)
-        target_link_libraries(FontFinderLib PUBLIC
+        target_link_libraries(DubbingToolTestSupport PUBLIC
             dwrite
             gdi32
             user32
@@ -275,30 +300,65 @@ if(BUILD_TESTING)
     endif()
 
     if(MSVC)
-        target_compile_options(FontFinderLib PRIVATE /W3 /utf-8)
+        target_compile_options(DubbingToolTestSupport PRIVATE /W3 /utf-8)
     else()
-        target_compile_options(FontFinderLib PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(DubbingToolTestSupport PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 
-    # FontFinder tests
+    target_compile_definitions(DubbingToolTestSupport PRIVATE DUBBINGTOOL_ENABLE_TEST_HOOKS)
+
+    set(TEST_DATA_SOURCE_DIR ${CMAKE_SOURCE_DIR}/tests/test_data)
+
+    macro(dubbingtool_copy_test_data targetName)
+        add_custom_command(TARGET ${targetName} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                    "${TEST_DATA_SOURCE_DIR}"
+                    "$<TARGET_FILE_DIR:${targetName}>/test_data"
+            COMMENT "Copy tests/test_data for ${targetName}"
+        )
+    endmacro()
+
     add_executable(fontfinder_test tests/fontfinder_test.cpp)
     set_target_properties(fontfinder_test PROPERTIES AUTOMOC ON)
-    target_link_libraries(fontfinder_test PRIVATE
-        FontFinderLib
-        Qt6::Test
-    )
-
-    # Copy test data files to build directory
-    set(TEST_DATA_DIR ${CMAKE_SOURCE_DIR}/tests/test_data)
-    file(GLOB TEST_DATA_FILES "${TEST_DATA_DIR}/*.ass")
-    
-    add_custom_command(TARGET fontfinder_test POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:fontfinder_test>/test_data"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${TEST_DATA_FILES}
-            "$<TARGET_FILE_DIR:fontfinder_test>/test_data/"
-        COMMENT "Copying test data files..."
-    )
-
+    target_link_libraries(fontfinder_test PRIVATE DubbingToolTestSupport Qt6::Test)
+    dubbingtool_copy_test_data(fontfinder_test)
     add_test(NAME FontFinderTest COMMAND fontfinder_test)
+
+    add_executable(chapterhelper_test tests/chapterhelper_test.cpp)
+    set_target_properties(chapterhelper_test PROPERTIES AUTOMOC ON)
+    target_link_libraries(chapterhelper_test PRIVATE DubbingToolTestSupport Qt6::Test)
+    dubbingtool_copy_test_data(chapterhelper_test)
+    add_test(NAME ChapterHelperTest COMMAND chapterhelper_test)
+
+    add_executable(telegramformatter_test tests/telegramformatter_test.cpp)
+    set_target_properties(telegramformatter_test PROPERTIES AUTOMOC ON)
+    target_link_libraries(telegramformatter_test PRIVATE DubbingToolTestSupport Qt6::Test)
+    add_test(NAME TelegramFormatterTest COMMAND telegramformatter_test)
+
+    add_executable(manualrenderer_test
+        tests/manualrenderer_test.cpp
+        tests/fakeprocessrunner.cpp
+        tests/fakeprocessrunner.h
+    )
+    set_target_properties(manualrenderer_test PROPERTIES AUTOMOC ON)
+    target_include_directories(manualrenderer_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/core
+        ${CMAKE_SOURCE_DIR}/tests
+    )
+    target_link_libraries(manualrenderer_test PRIVATE DubbingToolTestSupport Qt6::Test)
+    add_test(NAME ManualRendererTest COMMAND manualrenderer_test)
+
+    add_executable(ffmpeg_smoke_test tests/ffmpeg_smoke_test.cpp)
+    set_target_properties(ffmpeg_smoke_test PROPERTIES AUTOMOC ON)
+    target_link_libraries(ffmpeg_smoke_test PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME FfmpegSmokeTest COMMAND ffmpeg_smoke_test)
+
+    # Qt DLLs are not on PATH by default when running ctest from a developer shell.
+    if(WIN32)
+        get_filename_component(_qt_bin_for_tests "${Qt6_DIR}/../../../bin" ABSOLUTE)
+        set(_ctest_path "${_qt_bin_for_tests};$ENV{PATH}")
+        string(REPLACE ";" "\\;" _ctest_path_esc "${_ctest_path}")
+        set_tests_properties(FontFinderTest ChapterHelperTest TelegramFormatterTest ManualRendererTest FfmpegSmokeTest PROPERTIES
+            ENVIRONMENT "PATH=${_ctest_path_esc}")
+    endif()
 endif()

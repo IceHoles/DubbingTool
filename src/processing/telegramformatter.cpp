@@ -201,6 +201,8 @@ QVector<TagRecord> parseTelegramTagsBinary(const QByteArray& tagsData)
     return tags;
 }
 
+static constexpr qsizetype kMarkdownCodeFencePrefixChars = 3;
+
 QString applyTokensToSegment(const QString& segment, const QStringList& tokens)
 {
     if (segment.isEmpty())
@@ -219,9 +221,17 @@ QString applyTokensToSegment(const QString& segment, const QStringList& tokens)
     QString quoteType; // ">" или ">^"
     QString linkUrl;
     QString emojiSpec; // custom-emoji://...
+    bool hasCodeBlockFence = false;
+    QString codeBlockLangSuffix;
 
     for (const QString& t : tokens)
     {
+        if (t.startsWith(QStringLiteral("```")))
+        {
+            hasCodeBlockFence = true;
+            codeBlockLangSuffix = t.mid(kMarkdownCodeFencePrefixChars);
+            continue;
+        }
         if (t == QStringLiteral("**"))
         {
             hasBold = true;
@@ -261,6 +271,11 @@ QString applyTokensToSegment(const QString& segment, const QStringList& tokens)
     }
 
     QString text = segment;
+
+    if (hasCodeBlockFence)
+    {
+        return QStringLiteral("```") + codeBlockLangSuffix + QStringLiteral("\n") + text + QStringLiteral("\n```");
+    }
 
     // Custom emoji: восстанавливаем наш псевдо-markdown [X](emoji:<id>?<size>)
     if (!emojiSpec.isEmpty())
@@ -317,7 +332,15 @@ QString applyTokensToSegment(const QString& segment, const QStringList& tokens)
 
 } // end anonymous namespace
 
-void TelegramFormatter::formatAndCopyToClipboard(const QString& markdownText)
+#ifdef DUBBINGTOOL_ENABLE_TEST_HOOKS
+void telegramFormatter_test_hook_applyTokensEmpty()
+{
+    // Covers the defensive empty-segment path in applyTokensToSegment (same TU as anonymous namespace).
+    (void)applyTokensToSegment(QString(), QStringList());
+}
+#endif
+
+QMimeData* TelegramFormatter::createTdMimeDataFromMarkdown(const QString& markdownText)
 {
     const QList<QPair<QRegularExpression, QString>> rules = {
         {QRegularExpression("```(\\w*)\\r?\\n?([\\s\\S]*?)\\r?\\n?```"),   "code-block"},
@@ -366,6 +389,12 @@ void TelegramFormatter::formatAndCopyToClipboard(const QString& markdownText)
     mimeData->setData("application/x-td-field-tags", tagsBinary);
     mimeData->setText(cleanText);
 
+    return mimeData;
+}
+
+void TelegramFormatter::formatAndCopyToClipboard(const QString& markdownText)
+{
+    QMimeData* mimeData = createTdMimeDataFromMarkdown(markdownText);
     QGuiApplication::clipboard()->setMimeData(mimeData);
 }
 
@@ -402,6 +431,7 @@ QString TelegramFormatter::fromTelegramClipboardToPseudoMarkdown(const QMimeData
 
     QList<qsizetype> sortedBoundaries = boundaries.values();
     std::sort(sortedBoundaries.begin(), sortedBoundaries.end());
+    // sortedBoundaries is strictly increasing: values come from a set and are sorted.
     struct StyledSegment
     {
         QString text;
@@ -411,10 +441,8 @@ QString TelegramFormatter::fromTelegramClipboardToPseudoMarkdown(const QMimeData
 
     for (int i = 0; i < sortedBoundaries.size() - 1; ++i)
     {
-        qsizetype start = sortedBoundaries[i];
-        qsizetype end = sortedBoundaries[i + 1];
-        if (start >= end)
-            continue;
+        const qsizetype start = sortedBoundaries[i];
+        const qsizetype end = sortedBoundaries[i + 1];
 
         QString segmentText = cleanText.mid(start, end - start);
         QStringList activeTokens;

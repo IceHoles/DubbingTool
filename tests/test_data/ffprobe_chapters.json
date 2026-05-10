@@ -1,0 +1,13 @@
+{
+  "chapters": [
+    {
+      "start_time": "0.000000",
+      "end_time": "90.500000",
+      "tags": { "title": "Intro" }
+    },
+    {
+      "start_time": "90.5",
+      "tags": { "title": "Main" }
+    }
+  ]
+}
