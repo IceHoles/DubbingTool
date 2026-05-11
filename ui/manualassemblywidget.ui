@@ -19,7 +19,7 @@
      <item>
       <widget class="QToolButton" name="modeSwitchButton">
        <property name="toolTip">
-        <string>Переключить режим</string>
+        <string>Режим сборщика: без шаблона / по шаблону.</string>
        </property>
        <property name="text">
         <string>...</string>
@@ -41,6 +41,9 @@
      </item>
      <item>
       <widget class="QComboBox" name="templateComboBox">
+       <property name="toolTip">
+        <string>Шаблон с параметрами дорожек, ТБ и рендера (в режиме «по шаблону»).</string>
+       </property>
        <property name="sizePolicy">
         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
          <horstretch>1</horstretch>
@@ -72,6 +75,9 @@
      <layout class="QGridLayout" name="gridLayout">
       <item row="0" column="0">
        <widget class="QCheckBox" name="includeVideoCheckBox">
+        <property name="toolTip">
+         <string>Включить видеодорожку в выходной MKV (если выключено — видео не мультиплексируется).</string>
+        </property>
         <property name="text">
          <string/>
         </property>
@@ -91,10 +97,17 @@
        </widget>
       </item>
       <item row="0" column="2">
-       <widget class="QLineEdit" name="videoPathEdit"/>
+       <widget class="QLineEdit" name="videoPathEdit">
+        <property name="toolTip">
+         <string>Путь к видеофайлу, который пойдёт в MKV (если дорожка включена).</string>
+        </property>
+       </widget>
       </item>
       <item row="0" column="3">
        <widget class="QPushButton" name="browseVideo">
+        <property name="toolTip">
+         <string>Выбрать видеофайл.</string>
+        </property>
         <property name="text">
          <string>Обзор...</string>
         </property>
@@ -102,6 +115,9 @@
       </item>
       <item row="1" column="0">
        <widget class="QCheckBox" name="includeOriginalAudioCheckBox">
+        <property name="toolTip">
+         <string>Включить оригинальную аудиодорожку в выходной MKV (если выключено — дорожка не мультиплексируется).</string>
+        </property>
         <property name="text">
          <string/>
         </property>
@@ -121,10 +137,17 @@
        </widget>
       </item>
       <item row="1" column="2">
-       <widget class="QLineEdit" name="originalAudioPathEdit"/>
+       <widget class="QLineEdit" name="originalAudioPathEdit">
+        <property name="toolTip">
+         <string>Оригинальная аудиодорожка для мультиплекса (если включена).</string>
+        </property>
+       </widget>
       </item>
       <item row="1" column="3">
        <widget class="QPushButton" name="browseOriginalAudio">
+        <property name="toolTip">
+         <string>Выбрать файл оригинального аудио.</string>
+        </property>
         <property name="text">
          <string>Обзор...</string>
         </property>
@@ -132,6 +155,9 @@
       </item>
       <item row="2" column="0">
        <widget class="QCheckBox" name="includeRussianAudioCheckBox">
+        <property name="toolTip">
+         <string>Включить русскую аудиодорожку в выходной MKV (если выключено — дорожка не мультиплексируется).</string>
+        </property>
         <property name="text">
          <string/>
         </property>
@@ -151,10 +177,17 @@
        </widget>
       </item>
       <item row="2" column="2">
-       <widget class="QLineEdit" name="russianAudioPathEdit"/>
+       <widget class="QLineEdit" name="russianAudioPathEdit">
+        <property name="toolTip">
+         <string>Русская дорожка для MKV; при включённой конвертации может быть перекодирована.</string>
+        </property>
+       </widget>
       </item>
       <item row="2" column="3">
        <widget class="QPushButton" name="browseRussianAudio">
+        <property name="toolTip">
+         <string>Выбрать файл русского аудио.</string>
+        </property>
         <property name="text">
          <string>Обзор...</string>
         </property>
@@ -162,6 +195,9 @@
       </item>
       <item row="3" column="0">
        <widget class="QCheckBox" name="includeSignsCheckBox">
+        <property name="toolTip">
+         <string>Включить дорожку надписей в выходной MKV (если выключено — дорожка не мультиплексируется).</string>
+        </property>
         <property name="text">
          <string/>
         </property>
@@ -181,10 +217,17 @@
        </widget>
       </item>
       <item row="3" column="2">
-       <widget class="QLineEdit" name="signsPathEdit"/>
+       <widget class="QLineEdit" name="signsPathEdit">
+        <property name="toolTip">
+         <string>ASS с надписями (signs) для отдельной дорожки в MKV.</string>
+        </property>
+       </widget>
       </item>
       <item row="3" column="3">
        <widget class="QPushButton" name="browseSigns">
+        <property name="toolTip">
+         <string>Выбрать ASS надписей.</string>
+        </property>
         <property name="text">
          <string>Обзор...</string>
         </property>
@@ -192,6 +235,9 @@
       </item>
       <item row="4" column="0">
        <widget class="QCheckBox" name="includeSubtitlesCheckBox">
+        <property name="toolTip">
+         <string>Включить полные субтитры в выходной MKV (если выключено — дорожка не мультиплексируется).</string>
+        </property>
         <property name="text">
          <string/>
         </property>
@@ -211,10 +257,17 @@
        </widget>
       </item>
       <item row="4" column="2">
-       <widget class="QLineEdit" name="subtitlesPathEdit"/>
+       <widget class="QLineEdit" name="subtitlesPathEdit">
+        <property name="toolTip">
+         <string>ASS с полными субтитрами для дорожки в MKV.</string>
+        </property>
+       </widget>
       </item>
       <item row="4" column="3">
        <widget class="QPushButton" name="browseSubtitles">
+        <property name="toolTip">
+         <string>Выбрать ASS полных субтитров.</string>
+        </property>
         <property name="text">
          <string>Обзор...</string>
         </property>
@@ -224,6 +277,9 @@
        <layout class="QHBoxLayout" name="horizontalLayout_4">
         <item>
          <widget class="QCheckBox" name="normalizeAudioCheckBox">
+          <property name="toolTip">
+           <string>Запуск нормализации через NUGEN AMB для выбранного WAV (путь к AMB в настройках).</string>
+          </property>
           <property name="text">
            <string>Нормализовать WAV</string>
           </property>
@@ -231,6 +287,9 @@
         </item>
         <item>
          <widget class="QCheckBox" name="convertAudioCheckBox">
+          <property name="toolTip">
+           <string>Перекодировать русскую дорожку в выбранный формат (AAC или FLAC) перед сборкой MKV.</string>
+          </property>
           <property name="text">
            <string>Конвертировать аудио</string>
           </property>
@@ -238,6 +297,9 @@
         </item>
         <item>
          <widget class="QComboBox" name="convertAudioFormatComboBox">
+          <property name="toolTip">
+           <string>Целевой формат перекодирования при включённой галочке «Конвертировать аудио».</string>
+          </property>
           <item>
            <property name="text">
             <string>в AAC</string>
@@ -252,6 +314,9 @@
         </item>
         <item>
          <widget class="QCheckBox" name="manualChaptersCustomCheckBox">
+          <property name="toolTip">
+           <string>Подмешать главы из указанного XML вместо только встроенных в видео (если в шаблоне включены главы).</string>
+          </property>
           <property name="text">
            <string>Свой XML глав</string>
           </property>
@@ -259,6 +324,9 @@
         </item>
         <item>
          <widget class="QPushButton" name="chapterTimingsButton">
+          <property name="toolTip">
+           <string>Показать тайминги глав (просмотр), без редактирования в этом окне.</string>
+          </property>
           <property name="text">
            <string>Тайминг глав</string>
           </property>
@@ -303,6 +371,9 @@
          </item>
          <item>
           <widget class="QLineEdit" name="chaptersXmlPathManualAssemblyEdit">
+           <property name="toolTip">
+            <string>XML глав Matroska для подмешивания при включённом «Свой XML глав».</string>
+           </property>
            <property name="placeholderText">
             <string>Путь к Matroska chapters XML</string>
            </property>
@@ -310,6 +381,9 @@
          </item>
          <item>
           <widget class="QPushButton" name="browseChaptersXmlManualAssemblyButton">
+           <property name="toolTip">
+            <string>Выбрать файл XML глав.</string>
+           </property>
            <property name="text">
             <string>Обзор...</string>
            </property>
@@ -483,6 +557,9 @@
          <layout class="QHBoxLayout" name="horizontalLayout">
           <item>
            <widget class="QPushButton" name="analyzeSubsButton">
+            <property name="toolTip">
+             <string>Найти в субтитрах упоминания шрифтов и заполнить список для прикрепления к MKV.</string>
+            </property>
             <property name="text">
              <string>Анализировать</string>
             </property>
@@ -490,6 +567,9 @@
           </item>
           <item>
            <widget class="QPushButton" name="addFontsButton">
+            <property name="toolTip">
+             <string>Добавить TTF/OTF в список вложений MKV вручную.</string>
+            </property>
             <property name="text">
              <string>Добавить вручную...</string>
             </property>
@@ -526,7 +606,11 @@
        </widget>
       </item>
       <item row="0" column="1">
-       <widget class="QLineEdit" name="outputFileNameEdit"/>
+       <widget class="QLineEdit" name="outputFileNameEdit">
+        <property name="toolTip">
+         <string>Имя выходного MKV (без пути; расширение обычно добавляется автоматически).</string>
+        </property>
+       </widget>
       </item>
       <item row="1" column="0">
        <widget class="QLabel" name="label_7">
@@ -539,6 +623,9 @@
        <layout class="QHBoxLayout" name="horizontalLayout_5">
         <item>
          <widget class="QLineEdit" name="workDirEdit">
+          <property name="toolTip">
+           <string>Рабочая папка проекта для сборки; пусто — рядом с видео.</string>
+          </property>
           <property name="placeholderText">
            <string>Можно оставить пустым, будет использована папка с видеофайлом</string>
           </property>
@@ -546,6 +633,9 @@
         </item>
         <item>
          <widget class="QPushButton" name="browseWorkDirButton">
+          <property name="toolTip">
+           <string>Выбрать папку для выходных файлов сборки.</string>
+          </property>
           <property name="text">
            <string>Обзор...</string>
           </property>
@@ -560,6 +650,9 @@
     <layout class="QHBoxLayout" name="horizontalLayout_6">
      <item>
       <widget class="QPushButton" name="assembleButton">
+       <property name="toolTip">
+        <string>Собрать MKV из отмеченных файлов в рабочую папку по параметрам ручной сборки.</string>
+       </property>
        <property name="sizePolicy">
         <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
          <horstretch>0</horstretch>

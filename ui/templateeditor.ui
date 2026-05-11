@@ -35,7 +35,11 @@
         </widget>
        </item>
        <item row="0" column="1">
-        <widget class="QLineEdit" name="templateNameEdit"/>
+        <widget class="QLineEdit" name="templateNameEdit">
+         <property name="toolTip">
+          <string>Внутреннее имя шаблона: отображается в списке шаблонов и используется как имя файла шаблона при сохранении.</string>
+         </property>
+        </widget>
        </item>
        <item row="1" column="0">
         <widget class="QLabel" name="label_2">
@@ -45,7 +49,11 @@
         </widget>
        </item>
        <item row="1" column="1">
-        <widget class="QLineEdit" name="seriesTitleEdit"/>
+        <widget class="QLineEdit" name="seriesTitleEdit">
+         <property name="toolTip">
+          <string>Название сериала для метаданных MKV и титров. В постах плейсхолдер %SERIES_TITLE% берётся из «Название для постов» (вкладка «Публикация»).</string>
+         </property>
+        </widget>
        </item>
        <item row="2" column="0">
         <widget class="QLabel" name="label_3">
@@ -55,7 +63,11 @@
         </widget>
        </item>
        <item row="2" column="1">
-        <widget class="QLineEdit" name="rssUrlEdit"/>
+        <widget class="QLineEdit" name="rssUrlEdit">
+         <property name="toolTip">
+          <string>URL RSS-ленты релизера (если используется сценариями загрузки или учёта релизов).</string>
+         </property>
+        </widget>
        </item>
        <item row="3" column="0">
         <widget class="QLabel" name="label_1">
@@ -66,6 +78,9 @@
        </item>
        <item row="3" column="1">
         <widget class="QLineEdit" name="releaseTagsEdit">
+         <property name="toolTip">
+          <string>Теги для поиска и фильтрации шаблонов; перечисляйте через запятую (например группы релизов).</string>
+         </property>
          <property name="placeholderText">
           <string>например, [Erai-raws], [SubsPlease]</string>
          </property>
@@ -79,7 +94,11 @@
         </widget>
        </item>
        <item row="4" column="1">
-        <widget class="QLineEdit" name="animationStudioEdit"/>
+        <widget class="QLineEdit" name="animationStudioEdit">
+         <property name="toolTip">
+          <string>Студия производства аниме для титров и метаданных релиза.</string>
+         </property>
+        </widget>
        </item>
        <item row="5" column="0">
         <widget class="QLabel" name="label_5">
@@ -89,10 +108,17 @@
         </widget>
        </item>
        <item row="5" column="1">
-        <widget class="QLineEdit" name="subAuthorEdit"/>
+        <widget class="QLineEdit" name="subAuthorEdit">
+         <property name="toolTip">
+          <string>Автор перевода для описания дорожки субтитров и плейсхолдера %SUB_AUTHOR% в постах и ТБ.</string>
+         </property>
+        </widget>
        </item>
        <item row="6" column="0" colspan="2">
         <widget class="QCheckBox" name="useOriginalAudioCheckBox">
+         <property name="toolTip">
+          <string>Если извлечённая оригинальная аудиодорожка (audio_original) не найдена: при включённой галочке сборка MKV прерывается с ошибкой; при выключенной — релиз собирается только с русской дорожкой (и прочими дорожками по шаблону). Если файл оригинала после извлечения есть, он попадает в MKV в любом случае.</string>
+         </property>
          <property name="text">
           <string>Использовать оригинальную аудиодорожку при сборке MKV</string>
          </property>
@@ -110,6 +136,9 @@
        </item>
        <item row="7" column="1">
         <widget class="QLineEdit" name="originalLanguageEdit">
+         <property name="toolTip">
+          <string>Код языка оригинальной аудиодорожки для mkvmerge (ISO 639-1/639-2, например ja, en, ru).</string>
+         </property>
          <property name="text">
           <string>ja</string>
          </property>
@@ -124,6 +153,9 @@
        </item>
        <item row="8" column="1">
         <widget class="QComboBox" name="targetAudioFormatComboBox">
+         <property name="toolTip">
+          <string>Кодек русской дорожки для сборки: AAC или FLAC. При необходимости русская дорожка перекодируется из входного файла.</string>
+         </property>
          <item>
           <property name="text">
            <string>aac</string>
@@ -145,6 +177,9 @@
        </item>
        <item row="9" column="1">
         <widget class="QComboBox" name="voiceoverTypeComboBox">
+         <property name="toolTip">
+          <string>Тип озвучки для метаданных и постов: дубляж или закадровый перевод.</string>
+         </property>
          <item>
           <property name="text">
            <string>Дубляж</string>
@@ -165,12 +200,16 @@
         </widget>
        </item>
        <item row="10" column="1">
-        <widget class="QComboBox" name="renderPresetComboBox"/>
+        <widget class="QComboBox" name="renderPresetComboBox">
+         <property name="toolTip">
+          <string>Пресет ffmpeg для рендера MP4 по умолчанию (список в настройках).</string>
+         </property>
+        </widget>
        </item>
        <item row="11" column="0" colspan="2">
         <widget class="QCheckBox" name="createSrtMasterCheckBox">
          <property name="toolTip">
-          <string>После основной сборки создать дополнительный MKV с несжатым звуком и SRT-субтитрами (без надписей)</string>
+          <string>Перед основной сборкой создать дополнительный MKV с несжатым звуком и SRT-субтитрами (без надписей)</string>
          </property>
          <property name="text">
           <string>Создать дополнительную сборку с SRT (мастер-копия)</string>
@@ -190,7 +229,7 @@
        <item row="13" column="0" colspan="2">
         <widget class="QCheckBox" name="useConcatRenderCheckBox">
          <property name="toolTip">
-          <string>Перекодировать только сегмент с ТБ (титульным блоком), остальное видео копировать без перекодирования. Сохраняет оригинальное качество и значительно ускоряет рендер.</string>
+          <string>Перекодировать только сегмент с ТБ, остальное видео копировать без перекодирования. Сохраняет оригинальное качество и значительно ускоряет рендер.</string>
          </property>
          <property name="text">
           <string>Умный рендер (concat) — перекодировать только ТБ</string>
@@ -199,6 +238,9 @@
        </item>
        <item row="14" column="0" colspan="2">
         <widget class="QCheckBox" name="chaptersEnabledCheckBox">
+         <property name="toolTip">
+          <string>Включает главы в релиз: при отсутствии глав ни во входном файле, ни во внешнем XML пайплайн запросит данные или предупредит. XML серии задаётся на главной вкладке автоматического режима.</string>
+         </property>
          <property name="text">
           <string>Включить главы в релизе (файл XML для серии — на главной странице автоматического режима)</string>
          </property>
@@ -216,6 +258,9 @@
       <layout class="QVBoxLayout" name="verticalLayout_10" stretch="0,0,0,0,0,0,0,0">
        <item>
         <widget class="QCheckBox" name="sourceHasSubtitlesCheckBox">
+         <property name="toolTip">
+          <string>Для MKV: при включении и отсутствии «Своих субтитров» приложение пытается скопировать выбранную дорожку субтитров из файла в рабочую папку. Для MP4 извлечения ASS из контейнера нет — при включённой галочке без внешнего файла будет предупреждение в логе. Снимите галочку, если в исходнике нет нужной дорожки субтитров.</string>
+         </property>
          <property name="text">
           <string>В исходном MKV есть дорожка русских субтитров</string>
          </property>
@@ -226,6 +271,9 @@
        </item>
        <item>
         <widget class="QCheckBox" name="forceSignStyleRequestCheckBox">
+         <property name="toolTip">
+          <string>Перед сборкой показывать диалог выбора стилей надписей даже если в шаблоне уже перечислены стили (удобно, если состав надписей меняется от серии к серии).</string>
+         </property>
          <property name="text">
           <string>Всегда запрашивать стили/актеров для надписей</string>
          </property>
@@ -252,6 +300,9 @@
         <layout class="QHBoxLayout" name="horizontalLayout_3">
          <item>
           <widget class="QPlainTextEdit" name="signStylesEdit">
+           <property name="toolTip">
+            <string>По одному на строку: имена стилей ASS и/или актёры для надписей; эти строки сопоставляются и со стилями, и с актёрами. Используются при диалоге выбора и при обработке дорожки надписей.</string>
+           </property>
            <property name="sizePolicy">
             <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
              <horstretch>3</horstretch>
@@ -268,6 +319,9 @@
          </item>
          <item>
           <widget class="QPushButton" name="selectStylesButton">
+           <property name="toolTip">
+            <string>Открыть диалог выбора стилей из ASS-файла и подставить их в список.</string>
+           </property>
            <property name="text">
             <string>Выбрать из файла...</string>
            </property>
@@ -284,6 +338,9 @@
        </item>
        <item>
         <widget class="QCheckBox" name="pauseForSubEditCheckBox">
+         <property name="toolTip">
+          <string>После автозамен в субтитрах процесс останавливается, чтобы вы могли вручную отредактировать ASS; затем продолжите работу из интерфейса.</string>
+         </property>
          <property name="text">
           <string>Приостанавливать процесс для ручной правки субтитров</string>
          </property>
@@ -297,6 +354,9 @@
          <layout class="QVBoxLayout" name="verticalLayout_9">
           <item>
            <widget class="QTableWidget" name="substitutionsTableWidget">
+            <property name="toolTip">
+             <string>Текстовые замены в субтитрах перед сборкой: в колонке «Найти» — фрагмент, в «Заменить на» — подстановка.</string>
+            </property>
             <property name="alternatingRowColors">
              <bool>true</bool>
             </property>
@@ -367,6 +427,9 @@
       <layout class="QVBoxLayout" name="verticalLayout_2">
        <item>
         <widget class="QCheckBox" name="generateTbCheckBox">
+         <property name="toolTip">
+          <string>Строит титры благодарности по данным шаблона и таймингу эндинга (глава или ручное время). При выключении этапы ТБ в рендере пропускаются.</string>
+         </property>
          <property name="text">
           <string>Генерировать Титры Благодарности (ТБ)</string>
          </property>
@@ -393,6 +456,9 @@
          </item>
          <item row="0" column="1">
           <widget class="QLineEdit" name="endingChapterNameEdit">
+           <property name="toolTip">
+            <string>Имя главы эндинга в исходном MKV: по ней ищется время начала для титров благодарности, если не задано только ручное время.</string>
+           </property>
            <property name="placeholderText">
             <string>например, Ending</string>
            </property>
@@ -409,6 +475,9 @@
           <layout class="QHBoxLayout" name="horizontalLayout_10">
            <item>
             <widget class="QTimeEdit" name="endingStartTimeEdit">
+             <property name="toolTip">
+              <string>Таймкод начала эндинга: при включённой галочке «Вручную» — начало титров благодарности; иначе может использоваться как подсказка.</string>
+             </property>
              <property name="displayFormat">
               <string>H:mm:ss.zzz</string>
              </property>
@@ -416,6 +485,9 @@
            </item>
            <item>
             <widget class="QCheckBox" name="useManualTimeCheckBox">
+             <property name="toolTip">
+              <string>Если включено: время начала титров благодарности берётся из поля «Время начала эндинга» в шаблоне. Если выключено — из автоматически найденного времени (глава эндинга, диалог и т.п.).</string>
+             </property>
              <property name="text">
               <string>Вручную</string>
              </property>
@@ -431,7 +503,11 @@
           </widget>
          </item>
          <item row="2" column="1">
-          <widget class="QComboBox" name="defaultTbStyleComboBox"/>
+          <widget class="QComboBox" name="defaultTbStyleComboBox">
+           <property name="toolTip">
+            <string>Стиль ASS по умолчанию для блока титров благодарности (список стилей задаётся в настройках приложения).</string>
+           </property>
+          </widget>
          </item>
          <item row="3" column="0">
           <widget class="QLabel" name="label_12">
@@ -441,7 +517,11 @@
           </widget>
          </item>
          <item row="3" column="1">
-          <widget class="QLineEdit" name="directorEdit"/>
+          <widget class="QLineEdit" name="directorEdit">
+           <property name="toolTip">
+            <string>Режиссёр дубляжа для титров благодарности и плейсхолдера %DIRECTOR%.</string>
+           </property>
+          </widget>
          </item>
          <item row="4" column="0">
           <widget class="QLabel" name="label_assistant_director">
@@ -451,7 +531,11 @@
           </widget>
          </item>
          <item row="4" column="1">
-          <widget class="QLineEdit" name="assistantDirectorEdit"/>
+          <widget class="QLineEdit" name="assistantDirectorEdit">
+           <property name="toolTip">
+            <string>Помощник режиссёра для строк титров благодарности.</string>
+           </property>
+          </widget>
          </item>
          <item row="5" column="0">
           <widget class="QLabel" name="label_13">
@@ -461,7 +545,11 @@
           </widget>
          </item>
          <item row="5" column="1">
-          <widget class="QLineEdit" name="soundEngineerEdit"/>
+          <widget class="QLineEdit" name="soundEngineerEdit">
+           <property name="toolTip">
+            <string>Звукорежиссёр для титров благодарности и плейсхолдера %SOUND_ENGINEER%.</string>
+           </property>
+          </widget>
          </item>
          <item row="6" column="0">
           <widget class="QLabel" name="label_16">
@@ -471,7 +559,11 @@
           </widget>
          </item>
          <item row="6" column="1">
-          <widget class="QLineEdit" name="songsSoundEngineerEdit"/>
+          <widget class="QLineEdit" name="songsSoundEngineerEdit">
+           <property name="toolTip">
+            <string>Звукорежиссёр песен для титров благодарности и плейсхолдера %SONG_ENGINEER%.</string>
+           </property>
+          </widget>
          </item>
          <item row="7" column="0">
           <widget class="QLabel" name="label_26">
@@ -481,7 +573,11 @@
           </widget>
          </item>
          <item row="7" column="1">
-          <widget class="QLineEdit" name="episodeSoundEngineerEdit"/>
+          <widget class="QLineEdit" name="episodeSoundEngineerEdit">
+           <property name="toolTip">
+            <string>Звукорежиссёр эпизода для титров благодарности и плейсхолдера %EPISODE_ENGINEER%.</string>
+           </property>
+          </widget>
          </item>
          <item row="8" column="0">
           <widget class="QLabel" name="label_27">
@@ -491,7 +587,11 @@
           </widget>
          </item>
          <item row="8" column="1">
-          <widget class="QLineEdit" name="recordingSoundEngineerEdit"/>
+          <widget class="QLineEdit" name="recordingSoundEngineerEdit">
+           <property name="toolTip">
+            <string>Звукорежиссёр записи для титров благодарности и плейсхолдера %RECORDING_ENGINEER%.</string>
+           </property>
+          </widget>
          </item>
          <item row="9" column="0">
           <widget class="QLabel" name="label_video_localization">
@@ -501,7 +601,11 @@
           </widget>
          </item>
          <item row="9" column="1">
-          <widget class="QLineEdit" name="videoLocalizationAuthorEdit"/>
+          <widget class="QLineEdit" name="videoLocalizationAuthorEdit">
+           <property name="toolTip">
+            <string>Автор локализации видеоряда для титров благодарности и плейсхолдера %VIDEO_LOCALIZATION_AUTHOR%.</string>
+           </property>
+          </widget>
          </item>
          <item row="10" column="0">
           <widget class="QLabel" name="label_14">
@@ -511,7 +615,11 @@
           </widget>
          </item>
          <item row="10" column="1">
-          <widget class="QLineEdit" name="timingAuthorEdit"/>
+          <widget class="QLineEdit" name="timingAuthorEdit">
+           <property name="toolTip">
+            <string>Автор разметки/тайминга для титров благодарности и плейсхолдера %TIMING_AUTHOR%.</string>
+           </property>
+          </widget>
          </item>
          <item row="11" column="0">
           <widget class="QLabel" name="label_signs_author">
@@ -521,7 +629,11 @@
           </widget>
          </item>
          <item row="11" column="1">
-          <widget class="QLineEdit" name="signsAuthorEdit"/>
+          <widget class="QLineEdit" name="signsAuthorEdit">
+           <property name="toolTip">
+            <string>Автор локализации надписей для титров благодарности и плейсхолдера %SIGNS_AUTHOR%.</string>
+           </property>
+          </widget>
          </item>
          <item row="12" column="0">
           <widget class="QLabel" name="label_translation_editor">
@@ -531,7 +643,11 @@
           </widget>
          </item>
          <item row="12" column="1">
-          <widget class="QLineEdit" name="translationEditorEdit"/>
+          <widget class="QLineEdit" name="translationEditorEdit">
+           <property name="toolTip">
+            <string>Редактор перевода для титров благодарности и плейсхолдера %TRANSLATION_EDITOR%.</string>
+           </property>
+          </widget>
          </item>
          <item row="13" column="0">
           <widget class="QLabel" name="label_15">
@@ -541,7 +657,11 @@
           </widget>
          </item>
          <item row="13" column="1">
-          <widget class="QLineEdit" name="releaseBuilderEdit"/>
+          <widget class="QLineEdit" name="releaseBuilderEdit">
+           <property name="toolTip">
+            <string>Ответственный за сборку релиза для титров благодарности и плейсхолдера %RELEASE_BUILDER%.</string>
+           </property>
+          </widget>
          </item>
         </layout>
        </item>
@@ -560,7 +680,11 @@
         </widget>
        </item>
        <item>
-        <widget class="QPlainTextEdit" name="castEdit"/>
+        <widget class="QPlainTextEdit" name="castEdit">
+         <property name="toolTip">
+          <string>Список актёров и ролей для титров благодарности и плейсхолдера %CAST_LIST%: через запятую или с новой строки.</string>
+         </property>
+        </widget>
        </item>
       </layout>
      </widget>
@@ -614,7 +738,11 @@
             </widget>
            </item>
            <item>
-            <widget class="TelegramPasteEdit" name="postTgMp4Edit"/>
+            <widget class="TelegramPasteEdit" name="postTgMp4Edit">
+             <property name="toolTip">
+              <string>Текст поста для Telegram (канал, MP4): плейсхолдеры вида %SERIES_TITLE%; форматирование — в справке «?».</string>
+             </property>
+            </widget>
            </item>
           </layout>
          </item>
@@ -628,7 +756,11 @@
             </widget>
            </item>
            <item>
-            <widget class="TelegramPasteEdit" name="postTgMkvEdit"/>
+            <widget class="TelegramPasteEdit" name="postTgMkvEdit">
+             <property name="toolTip">
+              <string>Текст поста для Telegram (архив MKV): те же плейсхолдеры, отдельный шаблон от MP4-поста.</string>
+             </property>
+            </widget>
            </item>
           </layout>
          </item>
@@ -646,7 +778,11 @@
             </widget>
            </item>
            <item>
-            <widget class="TelegramPasteEdit" name="postVkEdit"/>
+            <widget class="TelegramPasteEdit" name="postVkEdit">
+             <property name="toolTip">
+              <string>Основной пост VK: плейсхолдеры и синтаксис ссылок — в справке «?».</string>
+             </property>
+            </widget>
            </item>
           </layout>
          </item>
@@ -660,7 +796,11 @@
             </widget>
            </item>
            <item>
-            <widget class="TelegramPasteEdit" name="postVkCommentEdit"/>
+            <widget class="TelegramPasteEdit" name="postVkCommentEdit">
+             <property name="toolTip">
+              <string>Шаблон комментария под постом VK (короткое сопровождение, ссылки и плейсхолдеры).</string>
+             </property>
+            </widget>
            </item>
           </layout>
          </item>
@@ -681,7 +821,11 @@
         </widget>
        </item>
        <item row="0" column="1">
-        <widget class="QLineEdit" name="seriesTitleForPostEdit"/>
+        <widget class="QLineEdit" name="seriesTitleForPostEdit">
+         <property name="toolTip">
+          <string>Название сериала именно для постов и плейсхолдера %SERIES_TITLE%; если пусто, обычно подставляется название с вкладки «Основные».</string>
+         </property>
+        </widget>
        </item>
        <item row="1" column="0">
         <widget class="QLabel" name="label_21">
@@ -692,6 +836,9 @@
        </item>
        <item row="1" column="1">
         <widget class="QSpinBox" name="totalEpisodesSpinBox">
+         <property name="toolTip">
+          <string>Общее число серий сезона для плейсхолдера %TOTAL_EPISODES% в постах и титрах.</string>
+         </property>
          <property name="maximum">
           <number>999</number>
          </property>
@@ -707,7 +854,11 @@
        <item row="2" column="1">
         <layout class="QHBoxLayout" name="horizontalLayout_11">
          <item>
-          <widget class="QLineEdit" name="posterPathEdit"/>
+          <widget class="QLineEdit" name="posterPathEdit">
+           <property name="toolTip">
+            <string>Путь к файлу постера (изображение) для панели публикации и плейсхолдеров; выбор файла — кнопкой «Обзор».</string>
+           </property>
+          </widget>
          </item>
          <item>
           <widget class="QPushButton" name="browsePosterButton">
@@ -728,6 +879,9 @@
        </item>
        <item row="3" column="1">
         <widget class="QPlainTextEdit" name="uploadUrlsEdit">
+         <property name="toolTip">
+          <string>URL страниц загрузки на трекеры (Anilib, Anime365 и т.д.): по одному на строку; подставляются в посты и кнопку «Открыть ссылки» на вкладке публикации.</string>
+         </property>
          <property name="placeholderText">
           <string>https://anilib.me/upload...
 https://anime-365.ru/upload...</string>

@@ -13,11 +13,17 @@
      </item>
      <item>
       <widget class="QLineEdit" name="inputPathEdit">
+       <property name="toolTip">
+        <string>Путь к MKV или MP4 для просмотра дорожек и извлечения.</string>
+       </property>
        <property name="placeholderText"><string>Путь к MKV или MP4...</string></property>
       </widget>
      </item>
      <item>
       <widget class="QPushButton" name="browseButton">
+       <property name="toolTip">
+        <string>Выбрать исходный контейнер.</string>
+       </property>
        <property name="text"><string>Обзор...</string></property>
       </widget>
      </item>
@@ -41,6 +47,9 @@
     <layout class="QHBoxLayout" name="optionsLayout">
      <item>
       <widget class="QCheckBox" name="extractFontsCheckBox">
+       <property name="toolTip">
+        <string>Вложенные шрифты из контейнера сохранить в рабочую папку вместе с дорожками.</string>
+       </property>
        <property name="text"><string>Извлечь шрифты (вложения)</string></property>
        <property name="checked"><bool>true</bool></property>
       </widget>
@@ -56,6 +65,9 @@
    <!-- Кнопка запуска -->
    <item>
     <widget class="QPushButton" name="extractButton">
+     <property name="toolTip">
+      <string>Извлечь отмеченные дорожки из выбранного контейнера в рабочую папку (видео, аудио, субтитры, шрифты по галочкам).</string>
+     </property>
      <property name="minimumSize"><size><width>0</width><height>40</height></size></property>
      <property name="text"><string>НАЧАТЬ РАЗБОР</string></property>
     </widget>

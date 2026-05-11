@@ -27,10 +27,17 @@
       <item row="0" column="1">
        <layout class="QHBoxLayout" name="horizontalLayout">
         <item>
-         <widget class="QLineEdit" name="inputMkvPathEdit"/>
+         <widget class="QLineEdit" name="inputMkvPathEdit">
+          <property name="toolTip">
+           <string>Собранный MKV, который будет отдан в ffmpeg по выбранному пресету.</string>
+          </property>
+         </widget>
         </item>
         <item>
          <widget class="QPushButton" name="browseInputButton">
+          <property name="toolTip">
+           <string>Выбрать входной MKV для рендера.</string>
+          </property>
           <property name="text">
            <string>Обзор...</string>
           </property>
@@ -48,10 +55,17 @@
       <item row="1" column="1">
        <layout class="QHBoxLayout" name="horizontalLayout_2">
         <item>
-         <widget class="QLineEdit" name="outputMp4PathEdit"/>
+         <widget class="QLineEdit" name="outputMp4PathEdit">
+          <property name="toolTip">
+           <string>Куда сохранить итоговый MP4 (папка создаётся при необходимости).</string>
+          </property>
+         </widget>
         </item>
         <item>
          <widget class="QPushButton" name="browseOutputButton">
+          <property name="toolTip">
+           <string>Выбрать путь и имя выходного MP4.</string>
+          </property>
           <property name="text">
            <string>Обзор...</string>
           </property>
@@ -70,6 +84,9 @@
      <layout class="QVBoxLayout" name="verticalLayout_chapters_manual_outer">
       <item>
        <widget class="QCheckBox" name="transferEmbeddedChaptersCheckBox">
+        <property name="toolTip">
+         <string>Если внешний XML глав не указан: при включённой галочке встроенные главы из входного MKV переносятся в выходной; при выключенной — не переносятся.</string>
+        </property>
         <property name="text">
          <string>Переносить встроенные главы из MKV, если файл не указан</string>
         </property>
@@ -89,6 +106,9 @@
         </item>
         <item>
          <widget class="QLineEdit" name="chaptersExternalPathManualEdit">
+          <property name="toolTip">
+           <string>Внешний XML глав для ручного рендера (необязательно; см. галочку переноса встроенных глав).</string>
+          </property>
           <property name="placeholderText">
            <string>Необязательно; при отключённой галочке встроенные главы не переносятся</string>
           </property>
@@ -96,6 +116,9 @@
         </item>
         <item>
          <widget class="QPushButton" name="browseChaptersManualButton">
+          <property name="toolTip">
+           <string>Выбрать XML глав для этого рендера.</string>
+          </property>
           <property name="text">
            <string>Обзор...</string>
           </property>
@@ -103,6 +126,9 @@
         </item>
         <item>
          <widget class="QPushButton" name="chapterTimingsButton">
+          <property name="toolTip">
+           <string>Показать тайминги глав (просмотр), без редактирования в этом окне.</string>
+          </property>
           <property name="text">
            <string>Тайминг глав</string>
           </property>
@@ -129,12 +155,19 @@
         </widget>
        </item>
        <item>
-        <widget class="QComboBox" name="renderPresetComboBox"/>
+        <widget class="QComboBox" name="renderPresetComboBox">
+         <property name="toolTip">
+          <string>Пресет командной строки ffmpeg (задаётся в настройках приложения).</string>
+         </property>
+        </widget>
        </item>
       </layout>
      </item>
      <item>
       <widget class="QCheckBox" name="concatTbCheckBox">
+       <property name="toolTip">
+        <string>Перекодировать только фрагмент с титрами благодарности, остальное видео склеить без перекодирования (concat).</string>
+       </property>
        <property name="text">
         <string>Умный рендер (concat) — перекодировать только ТБ</string>
        </property>
@@ -155,6 +188,9 @@
      </item>
      <item>
       <widget class="QCheckBox" name="hardsubCheckBox">
+       <property name="toolTip">
+        <string>Встроить выбранные субтитры в картинку видео при рендере.</string>
+       </property>
        <property name="text">
         <string>Встроить субтитры в видео (Hardsub)</string>
        </property>
@@ -171,6 +207,9 @@
        <layout class="QFormLayout" name="formLayout_2">
         <item row="0" column="0">
          <widget class="QRadioButton" name="internalSubsRadio">
+          <property name="toolTip">
+           <string>Взять субтитры для хардсаба из дорожки внутри входного MKV.</string>
+          </property>
           <property name="text">
            <string>Использовать дорожку из MKV:</string>
           </property>
@@ -180,10 +219,17 @@
          </widget>
         </item>
         <item row="0" column="1">
-         <widget class="QComboBox" name="subtitleTrackComboBox"/>
+         <widget class="QComboBox" name="subtitleTrackComboBox">
+          <property name="toolTip">
+           <string>Какую дорожку субтитров из MKV прожечь в кадр.</string>
+          </property>
+         </widget>
         </item>
         <item row="1" column="0">
          <widget class="QRadioButton" name="externalSubsRadio">
+          <property name="toolTip">
+           <string>Использовать готовый ASS на диске вместо дорожки из MKV.</string>
+          </property>
           <property name="text">
            <string>Использовать внешний .ass файл:</string>
           </property>
@@ -192,10 +238,17 @@
         <item row="1" column="1">
          <layout class="QHBoxLayout" name="horizontalLayout_4">
           <item>
-           <widget class="QLineEdit" name="externalSubsPathEdit"/>
+           <widget class="QLineEdit" name="externalSubsPathEdit">
+            <property name="toolTip">
+             <string>Путь к ASS для хардсаба (если выбран внешний файл).</string>
+            </property>
+           </widget>
           </item>
           <item>
            <widget class="QPushButton" name="browseExternalSubsButton">
+            <property name="toolTip">
+             <string>Выбрать внешний ASS для хардсаба.</string>
+            </property>
             <property name="text">
              <string>Обзор...</string>
             </property>
@@ -224,6 +277,9 @@
    </item>
    <item>
     <widget class="QPushButton" name="renderButton">
+     <property name="toolTip">
+      <string>Запустить рендер MP4 по параметрам на этой вкладке (входной MKV, выходной путь, галочки ниже).</string>
+     </property>
      <property name="minimumSize">
       <size>
        <width>0</width>

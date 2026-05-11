@@ -209,6 +209,9 @@
             <property name="text">
              <string>Удалять временные видео- и аудиофайлы после сборки</string>
             </property>
+            <property name="toolTip">
+             <string>После успешной сборки MKV из папки Sources удаляются только извлечённые из исходного контейнера видео (video с расширением дорожки) и оригинальная аудиодорожка (audio_original.m4a для MP4 или .mka для MKV). Не удаляются: конвертированная русская дорожка (russian_audio…), субтитры, XML глав, извлечённые шрифты и прочие служебные файлы. Временные файлы concat-рендера в Result удаляются отдельно по завершении этого этапа.</string>
+            </property>
            </widget>
           </item>
           <item row="1" column="0">
@@ -220,6 +223,9 @@
           </item>
           <item row="1" column="1" colspan="2">
            <widget class="QComboBox" name="userFileActionComboBox">
+            <property name="toolTip">
+             <string>Как обрабатывать пути к файлам, выбранным вручную (видео, аудио, субтитры): переместить или скопировать в папку проекта, либо оставить исходные пути без копирования.</string>
+            </property>
             <item>
              <property name="text">
               <string>Перемещать в папку проекта</string>
@@ -246,6 +252,9 @@
           </item>
           <item row="2" column="1">
            <widget class="QLineEdit" name="projectDirectoryEdit">
+            <property name="toolTip">
+             <string>Корневая папка, в которой создаются каталоги проектов (имя серии и т.п.). Пустое значение — папка downloads рядом с исполняемым файлом.</string>
+            </property>
             <property name="placeholderText">
              <string>downloads (по умолчанию)</string>
             </property>
@@ -253,6 +262,9 @@
           </item>
           <item row="2" column="2">
            <widget class="QPushButton" name="browseProjectDirectoryButton">
+            <property name="toolTip">
+             <string>Выбрать корневую папку для каталогов проектов.</string>
+            </property>
             <property name="text">
              <string>Обзор...</string>
             </property>
@@ -504,6 +516,9 @@
           </item>
           <item>
            <widget class="QCheckBox" name="logDebugCheckBox">
+            <property name="toolTip">
+             <string>Включить подробные отладочные сообщения в лог (может быть шумно; полезно при разборе сбоев).</string>
+            </property>
             <property name="text">
              <string>DEBUG (детальная отладочная информация)</string>
             </property>

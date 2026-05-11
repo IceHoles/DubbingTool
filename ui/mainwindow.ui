@@ -38,6 +38,9 @@
             </item>
             <item>
              <widget class="QComboBox" name="templateComboBox">
+              <property name="toolTip">
+               <string>Активный шаблон релиза: параметры сборки MKV, субтитров, ТБ, рендера и постов.</string>
+              </property>
               <property name="sizePolicy">
                <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
                 <horstretch>1</horstretch>
@@ -48,6 +51,9 @@
             </item>
             <item>
              <widget class="QPushButton" name="createTemplateButton">
+              <property name="toolTip">
+               <string>Создать новый шаблон с нуля в редакторе.</string>
+              </property>
               <property name="text">
                <string>Создать</string>
               </property>
@@ -55,6 +61,9 @@
             </item>
             <item>
              <widget class="QPushButton" name="editTemplateButton">
+              <property name="toolTip">
+               <string>Открыть выбранный шаблон в редакторе.</string>
+              </property>
               <property name="text">
                <string>Редактировать</string>
               </property>
@@ -62,6 +71,9 @@
             </item>
             <item>
              <widget class="QPushButton" name="deleteTemplateButton">
+              <property name="toolTip">
+               <string>Удалить выбранный шаблон с диска (после подтверждения).</string>
+              </property>
               <property name="text">
                <string>Удалить</string>
               </property>
@@ -80,6 +92,9 @@
             </item>
             <item>
              <widget class="QLineEdit" name="mkvPathLineEdit">
+              <property name="toolTip">
+               <string>Исходный контейнер серии (MKV или MP4). От него извлекаются дорожки по шаблону.</string>
+              </property>
               <property name="placeholderText">
                <string>Выберите .mkv или .mp4 файл</string>
               </property>
@@ -87,6 +102,9 @@
             </item>
             <item>
              <widget class="QPushButton" name="selectMkvButton">
+              <property name="toolTip">
+               <string>Выбрать исходный MKV или MP4.</string>
+              </property>
               <property name="text">
                <string>Обзор...</string>
               </property>
@@ -105,6 +123,9 @@
             </item>
             <item>
              <widget class="QLineEdit" name="audioPathLineEdit">
+              <property name="toolTip">
+               <string>Файл русской дорожки (WAV, FLAC, AAC, EAC3 и т.п.) для подстановки в релиз.</string>
+              </property>
               <property name="placeholderText">
                <string>Выберите .wav, .flac, .aac или .eac3  файл</string>
               </property>
@@ -112,6 +133,9 @@
             </item>
             <item>
              <widget class="QPushButton" name="selectAudioButton">
+              <property name="toolTip">
+               <string>Выбрать файл русского аудио.</string>
+              </property>
               <property name="text">
                <string>Обзор...</string>
               </property>
@@ -130,6 +154,9 @@
             </item>
             <item>
              <widget class="QLineEdit" name="episodeNumberLineEdit">
+              <property name="toolTip">
+               <string>Номер эпизода для плейсхолдеров и именования. Часто определяется из имени MKV; поле можно оставить пустым.</string>
+              </property>
               <property name="sizePolicy">
                <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
                 <horstretch>1</horstretch>
@@ -183,6 +210,9 @@
              </item>
              <item>
               <widget class="QLineEdit" name="chaptersXmlPathLineEdit">
+               <property name="toolTip">
+                <string>Внешний XML глав для этой серии (Matroska Chapters). Необязательно, если главы уже в контейнере и шаблон это допускает.</string>
+               </property>
                <property name="placeholderText">
                 <string>Matroska chapters XML для этой серии (необязательно, если главы уже в контейнере)</string>
                </property>
@@ -190,6 +220,9 @@
              </item>
              <item>
               <widget class="QPushButton" name="browseChaptersXmlButton">
+               <property name="toolTip">
+                <string>Выбрать файл XML глав для автоматического режима.</string>
+               </property>
                <property name="text">
                 <string>Обзор...</string>
                </property>
@@ -209,6 +242,9 @@
             </item>
             <item>
              <widget class="QLineEdit" name="overrideSubsPathEdit">
+              <property name="toolTip">
+               <string>Путь к внешнему ASS с полными субтитрами; дорожка из MKV не используется.</string>
+              </property>
               <property name="placeholderText">
                <string>Субтитры из MKV будут проигнорированы</string>
               </property>
@@ -216,6 +252,9 @@
             </item>
             <item>
              <widget class="QPushButton" name="browseOverrideSubsButton">
+              <property name="toolTip">
+               <string>Выбрать внешний ASS с полными субтитрами вместо дорожки из MKV.</string>
+              </property>
               <property name="text">
                <string>Обзор...</string>
               </property>
@@ -234,6 +273,9 @@
             </item>
             <item>
              <widget class="QLineEdit" name="overrideSignsPathEdit">
+              <property name="toolTip">
+               <string>Путь к внешнему ASS с надписями; дорожка надписей из MKV не используется.</string>
+              </property>
               <property name="placeholderText">
                <string>Надписи из MKV будут проигнорированы</string>
               </property>
@@ -241,6 +283,9 @@
             </item>
             <item>
              <widget class="QPushButton" name="browseOverrideSignsButton">
+              <property name="toolTip">
+               <string>Выбрать внешний ASS с надписями вместо дорожки из MKV.</string>
+              </property>
               <property name="text">
                <string>Обзор...</string>
               </property>
@@ -323,6 +368,9 @@
         </item>
         <item>
          <widget class="QPushButton" name="startButton">
+          <property name="toolTip">
+           <string>Запустить автоматический пайплайн по выбранному шаблону и файлам (извлечение, сборка, рендер и т.д.).</string>
+          </property>
           <property name="minimumSize">
            <size>
             <width>0</width>

@@ -48,6 +48,9 @@
           </item>
           <item>
            <widget class="QPushButton" name="copyTgMp4Button">
+            <property name="toolTip">
+             <string>Скопировать текст поста для Telegram (канал, MP4) в буфер обмена.</string>
+            </property>
             <property name="text">
              <string>Копировать</string>
             </property>
@@ -69,6 +72,9 @@
           </item>
           <item>
            <widget class="QPushButton" name="copyTgMkvButton">
+            <property name="toolTip">
+             <string>Скопировать текст поста для Telegram (архив MKV) в буфер обмена.</string>
+            </property>
             <property name="text">
              <string>Копировать</string>
             </property>
@@ -90,6 +96,9 @@
           </item>
           <item>
            <widget class="QPushButton" name="copyVkButton">
+            <property name="toolTip">
+             <string>Скопировать текст поста для VK в буфер обмена.</string>
+            </property>
             <property name="text">
              <string>Копировать</string>
             </property>
@@ -111,6 +120,9 @@
           </item>
           <item>
            <widget class="QPushButton" name="copyVkCommentButton">
+            <property name="toolTip">
+             <string>Скопировать текст комментария для VK в буфер обмена.</string>
+            </property>
             <property name="text">
              <string>Копировать</string>
             </property>
@@ -239,6 +251,9 @@
        <layout class="QVBoxLayout" name="verticalLayout_5">
         <item>
          <widget class="QPushButton" name="openUploadUrlsButton">
+          <property name="toolTip">
+           <string>Открыть в браузере страницы загрузки (Anime365, Anilib и др.), если они заданы в настройках.</string>
+          </property>
           <property name="text">
            <string>Открыть ссылки для загрузки</string>
           </property>
@@ -277,6 +292,9 @@
         </item>
         <item>
          <widget class="QPushButton" name="updatePostsButton">
+          <property name="toolTip">
+           <string>Пересобрать тексты постов с учётом текущих ссылок в полях Anime365 / Anilib.</string>
+          </property>
           <property name="text">
            <string>Обновить посты со ссылками</string>
           </property>
