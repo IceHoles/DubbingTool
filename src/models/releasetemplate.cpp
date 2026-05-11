@@ -23,7 +23,7 @@ void ReleaseTemplate::read(const QJsonObject& json)
     animationStudio = json["animationStudio"].toString();
     subAuthor = json["subAuthor"].toString();
     originalLanguage = json["originalLanguage"].toString("jpn");
-    endingChapterName = json["endingChapterName"].toString();
+    endingChapterName = json["endingChapterName"].toString().trimmed();
     endingStartTime = json["endingStartTime"].toString();
     if (json.contains(QStringLiteral("chaptersEnabled")))
     {

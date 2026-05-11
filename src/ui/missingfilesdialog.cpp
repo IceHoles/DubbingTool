@@ -8,6 +8,7 @@
 #include <QDesktopServices>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QListWidget>
 #include <QListWidgetItem>
 #include <QMediaPlayer>
 #include <QProcess>
@@ -19,10 +20,16 @@
 MissingFilesDialog::MissingFilesDialog(QWidget* parent) : QDialog(parent), ui(new Ui::MissingFilesDialog)
 {
     ui->setupUi(this);
+    ui->tbChaptersPickLayout->setStretch(0, 0);
+    ui->tbChaptersPickLayout->setStretch(1, 1);
+    ui->tbChaptersPickLayout->setStretch(2, 0);
     ui->audioGroupBox->setVisible(false);
     ui->fontsGroupBox->setVisible(false);
     ui->timeGroupBox->setVisible(false);
     ui->chaptersGroupBox->setVisible(false);
+    ui->tbChaptersPickGroupBox->setVisible(false);
+
+    connect(ui->tbChapterListWidget, &QListWidget::itemClicked, this, &MissingFilesDialog::onTbChapterItemClicked);
 
     connect(ui->buildWithoutChaptersCheckBox, &QCheckBox::toggled, this,
             [this](bool without)
@@ -34,10 +41,6 @@ MissingFilesDialog::MissingFilesDialog(QWidget* parent) : QDialog(parent), ui(ne
                     ui->chaptersPathEdit->clear();
                 }
             });
-
-    // Prepare the container layout for the video widget (widget added later in setVideoFile)
-    auto* containerLayout = new QVBoxLayout(ui->videoContainer);
-    containerLayout->setContentsMargins(0, 0, 0, 0);
 
     // Viewfinder connections
     connect(ui->openInPlayerButton, &QPushButton::clicked, this, &MissingFilesDialog::slotOpenInPlayer);
@@ -95,7 +98,9 @@ QMap<QString, QString> MissingFilesDialog::getResolvedFonts() const
 
 void MissingFilesDialog::setTimeInputVisible(bool visible)
 {
+    m_timeSectionEnabled = visible;
     ui->timeGroupBox->setVisible(visible);
+    updateTbChapterPickGroupVisibility();
 }
 
 void MissingFilesDialog::setChaptersInputVisible(bool visible)
@@ -126,6 +131,102 @@ QString MissingFilesDialog::getChaptersXmlPath() const
 bool MissingFilesDialog::getBuildWithoutChapters() const
 {
     return ui->buildWithoutChaptersCheckBox->isChecked();
+}
+
+void MissingFilesDialog::setTbChapterPickerData(const QList<ChapterTimingSeconds>& rows)
+{
+    m_tbChapterRows = rows;
+    ui->tbChapterListWidget->clear();
+    m_anchorChapterTitle.clear();
+    m_hasChapterAnchor = false;
+    ui->saveTbToTemplateCheckBox->setChecked(false);
+
+    for (const ChapterTimingSeconds& row : rows)
+    {
+        const QString text =
+            QStringLiteral("%1 — %2").arg(row.title, formatChapterClock(row.startSeconds));
+        ui->tbChapterListWidget->addItem(text);
+    }
+
+    updateTbChapterPickGroupVisibility();
+}
+
+void MissingFilesDialog::updateTbChapterPickGroupVisibility()
+{
+    const bool show = m_timeSectionEnabled && !m_tbChapterRows.isEmpty();
+    ui->tbChaptersPickGroupBox->setVisible(show);
+}
+
+bool MissingFilesDialog::wantsTbTemplatePersistence() const
+{
+    return m_timeSectionEnabled && ui->saveTbToTemplateCheckBox->isChecked();
+}
+
+QString MissingFilesDialog::tbPersistChapterTitleIfClean() const
+{
+    if (!wantsTbTemplatePersistence())
+    {
+        return QString();
+    }
+    if (!m_hasChapterAnchor)
+    {
+        return QString();
+    }
+    return m_anchorChapterTitle;
+}
+
+void MissingFilesDialog::markTbChapterManualAdjustment()
+{
+    if (!m_timeSectionEnabled)
+    {
+        return;
+    }
+    if (ui->saveTbToTemplateCheckBox->isChecked())
+    {
+        ui->saveTbToTemplateCheckBox->setChecked(false);
+    }
+}
+
+QString MissingFilesDialog::formatChapterClock(int startSeconds) const
+{
+    const int s = qMax(0, startSeconds);
+    const int h = s / 3600;
+    const int m = (s % 3600) / 60;
+    const int sec = s % 60;
+    return QStringLiteral("%1:%2:%3")
+        .arg(h)
+        .arg(m, 2, 10, QChar('0'))
+        .arg(sec, 2, 10, QChar('0'));
+}
+
+void MissingFilesDialog::onTbChapterItemClicked(QListWidgetItem* item)
+{
+    if (item == nullptr)
+    {
+        return;
+    }
+    const int row = ui->tbChapterListWidget->row(item);
+    if (row < 0 || row >= m_tbChapterRows.size())
+    {
+        return;
+    }
+
+    const ChapterTimingSeconds ch = m_tbChapterRows.at(row);
+    m_anchorChapterTitle = ch.title.trimmed();
+    m_hasChapterAnchor = true;
+    ui->saveTbToTemplateCheckBox->setChecked(true);
+
+    const double startSec = static_cast<double>(ch.startSeconds);
+    m_syncInProgress = true;
+    const int sliderVal = secondsToSliderValue(startSec);
+    ui->timeSlider->setValue(sliderVal);
+    syncTimeEditFromSlider(sliderVal);
+    m_syncInProgress = false;
+
+    if (m_mediaPlayer != nullptr)
+    {
+        m_mediaPlayer->setPosition(static_cast<qint64>(startSec * 1000.0));
+    }
 }
 
 void MissingFilesDialog::on_browseChaptersButton_clicked()
@@ -188,8 +289,12 @@ void MissingFilesDialog::setVideoFile(const QString& videoPath, double durationS
         m_mediaPlayer->setAudioOutput(m_audioOutput);
         m_mediaPlayer->setVideoOutput(m_videoWidget);
 
-        // Add QVideoWidget to the container (which is now visible)
-        ui->videoContainer->layout()->addWidget(m_videoWidget);
+        if (ui->tbVideoSinkPlaceholder->layout() == nullptr)
+        {
+            auto* sinkLayout = new QVBoxLayout(ui->tbVideoSinkPlaceholder);
+            sinkLayout->setContentsMargins(0, 0, 0, 0);
+            sinkLayout->addWidget(m_videoWidget);
+        }
 
         connect(m_mediaPlayer, &QMediaPlayer::positionChanged, this, &MissingFilesDialog::slotPlayerPositionChanged);
         connect(m_mediaPlayer, &QMediaPlayer::mediaStatusChanged, this, &MissingFilesDialog::slotMediaStatusChanged);
@@ -258,6 +363,7 @@ void MissingFilesDialog::slotOpenInPlayer()
 
 void MissingFilesDialog::slotSliderPressed()
 {
+    markTbChapterManualAdjustment();
     // User started dragging — pause playback
     if (m_mediaPlayer != nullptr && m_mediaPlayer->playbackState() == QMediaPlayer::PlayingState)
     {
@@ -271,6 +377,7 @@ void MissingFilesDialog::slotSliderValueChanged(int value)
     {
         return;
     }
+    markTbChapterManualAdjustment();
     m_syncInProgress = true;
     syncTimeEditFromSlider(value);
     m_syncInProgress = false;
@@ -290,6 +397,7 @@ void MissingFilesDialog::slotTimeEditChanged()
     {
         return;
     }
+    markTbChapterManualAdjustment();
     m_syncInProgress = true;
     syncSliderFromTimeEdit();
     m_syncInProgress = false;
@@ -314,6 +422,7 @@ void MissingFilesDialog::slotPrevFrame()
     {
         return;
     }
+    markTbChapterManualAdjustment();
 
     if (m_mediaPlayer->playbackState() == QMediaPlayer::PlayingState)
     {
@@ -337,6 +446,7 @@ void MissingFilesDialog::slotNextFrame()
     {
         return;
     }
+    markTbChapterManualAdjustment();
 
     if (m_mediaPlayer->playbackState() == QMediaPlayer::PlayingState)
     {

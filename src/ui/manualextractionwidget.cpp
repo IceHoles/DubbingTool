@@ -10,6 +10,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMimeData>
+#include <QRegularExpression>
 
 ManualExtractionWidget::ManualExtractionWidget(QWidget* parent)
     : QWidget(parent), ui(new Ui::ManualExtractionWidget), m_processManager(new ProcessManager(this))
@@ -476,19 +477,26 @@ void ManualExtractionWidget::onProcessStdOut(const QString& output)
 
 void ManualExtractionWidget::onProcessStdErr(const QString& output)
 {
-    if (output.contains("time="))
+    if (output.contains(QStringLiteral("time=")) && m_durationSec > 0.0)
     {
-        QRegularExpression re("time=(\\d{2}):(\\d{2}):(\\d{2})\\.(\\d{2})");
-        QRegularExpressionMatch match = re.match(output);
-        if (match.hasMatch() && m_durationSec > 0)
+        static const QRegularExpression re(QStringLiteral(R"(time=(\d+):(\d+):(\d+)(?:\.(\d+))?)"));
+        const QRegularExpressionMatch match = re.match(output);
+        if (match.hasMatch())
         {
-            int h = match.captured(1).toInt();
-            int m = match.captured(2).toInt();
-            int s = match.captured(3).toInt();
-            double currentSec = h * 3600 + m * 60 + s;
-
-            int percent = static_cast<int>((currentSec / m_durationSec) * 100);
-            emit progressUpdated(percent, "Извлечение...");
+            const int h = match.captured(1).toInt();
+            const int m = match.captured(2).toInt();
+            const int s = match.captured(3).toInt();
+            const QString frac = match.captured(4);
+            double subSec = 0.0;
+            if (!frac.isEmpty())
+            {
+                subSec = frac.toDouble() / ((frac.length() >= 3) ? 1000.0 : 100.0);
+            }
+            const double currentSec =
+                static_cast<double>(h) * 3600.0 + static_cast<double>(m) * 60.0 + static_cast<double>(s) + subSec;
+            int percent = static_cast<int>((currentSec / m_durationSec) * 100.0);
+            percent = qBound(0, percent, 100);
+            emit progressUpdated(percent, QStringLiteral("Извлечение..."));
         }
     }
 

@@ -1,6 +1,8 @@
 #ifndef MISSINGFILESDIALOG_H
 #define MISSINGFILESDIALOG_H
 
+#include "chapterhelper.h"
+
 #include <QDialog>
 #include <QListWidgetItem>
 #include <QMap>
@@ -44,11 +46,17 @@ public:
      */
     void setVideoFile(const QString& videoPath, double durationS);
 
+    void setTbChapterPickerData(const QList<ChapterTimingSeconds>& rows);
+
     [[nodiscard]] QString getAudioPath() const;
     [[nodiscard]] QMap<QString, QString> getResolvedFonts() const;
     [[nodiscard]] QString getTime() const;
     [[nodiscard]] QString getChaptersXmlPath() const;
     [[nodiscard]] bool getBuildWithoutChapters() const;
+
+    [[nodiscard]] bool wantsTbTemplatePersistence() const;
+    /// Non-empty when the save-to-template checkbox is checked and a chapter was chosen from the list.
+    [[nodiscard]] QString tbPersistChapterTitleIfClean() const;
 
 private slots:
     void on_browseAudioButton_clicked();
@@ -63,6 +71,7 @@ private slots:
     void slotPlayPause();
     void slotPlayerPositionChanged(qint64 position);
     void slotMediaStatusChanged(QMediaPlayer::MediaStatus status);
+    void onTbChapterItemClicked(QListWidgetItem* item);
 
 private:
     void stopPlayback();
@@ -73,6 +82,9 @@ private:
     [[nodiscard]] double sliderValueToSeconds(int value) const;
     [[nodiscard]] int secondsToSliderValue(double seconds) const;
     void setViewfinderEnabled(bool enabled);
+    void markTbChapterManualAdjustment();
+    [[nodiscard]] QString formatChapterClock(int startSeconds) const;
+    void updateTbChapterPickGroupVisibility();
 
     Ui::MissingFilesDialog* ui;
     QMap<QString, QString> m_resolvedFonts;
@@ -89,6 +101,12 @@ private:
     double m_fps = 25.0;
     double m_frameStepS = 1.0 / 25.0;
     bool m_initialSeekDone = false;
+
+    QList<ChapterTimingSeconds> m_tbChapterRows;
+    QString m_anchorChapterTitle;
+    bool m_hasChapterAnchor = false;
+    /// Mirrors whether setTimeInputVisible(true) was called; do not use timeGroupBox->isVisible() before exec().
+    bool m_timeSectionEnabled = false;
 
     static constexpr double kDefaultFps = 25.0;
     static constexpr double kMinFps = 1.0;

@@ -27,6 +27,8 @@
 #include <QUrlQuery>
 #include <QXmlStreamReader>
 
+#include <cmath>
+
 #include <windows.h> // Для API шрифтов
 
 namespace
@@ -84,6 +86,83 @@ QString buildSettsExprForFps(const QString& fps)
     // Generic CFR expression: frame step = den/num seconds.
     // bsf 'setts' evaluates TB as stream time base, so this avoids hardcoding 25fps/3600 ticks.
     return QString("pts=N*%1/(%2*TB):dts=N*%1/(%2*TB)").arg(den).arg(num);
+}
+
+/// mkvmerge -J may expose duration as JSON number or string (nanoseconds).
+[[nodiscard]] qint64 parseJsonNanosecondsDuration(const QJsonValue& value)
+{
+    if (value.isDouble())
+    {
+        return static_cast<qint64>(value.toDouble());
+    }
+    if (value.isString())
+    {
+        bool ok = false;
+        const qint64 parsed = value.toString().trimmed().toLongLong(&ok);
+        return ok ? parsed : 0;
+    }
+    return 0;
+}
+
+/// FFmpeg status lines include `time=HH:MM:SS.xx` on stderr; map to percent of known source duration.
+[[nodiscard]] int parseFfmpegTimeProgressPercent(const QString& output, qint64 sourceDurationS)
+{
+    if (sourceDurationS <= 0)
+    {
+        return -1;
+    }
+    static const QRegularExpression re(QStringLiteral(R"(time=(\d+):(\d+):(\d+)(?:\.(\d+))?)"));
+    QRegularExpressionMatch match;
+    for (auto it = re.globalMatch(output); it.hasNext();)
+    {
+        match = it.next();
+    }
+    if (!match.hasMatch())
+    {
+        return -1;
+    }
+    const int hours = match.captured(1).toInt();
+    const int minutes = match.captured(2).toInt();
+    const int secInt = match.captured(3).toInt();
+    const QString frac = match.captured(4);
+    double subSec = 0.0;
+    if (!frac.isEmpty())
+    {
+        const int len = frac.length();
+        const double div = (len >= 3) ? 1000.0 : 100.0;
+        subSec = frac.toDouble() / div;
+    }
+    const double currentTimeS =
+        static_cast<double>(hours) * 3600.0 + static_cast<double>(minutes) * 60.0 + static_cast<double>(secInt) + subSec;
+    const int percentage = static_cast<int>((currentTimeS / static_cast<double>(sourceDurationS)) * 100.0);
+    if (percentage < 0)
+    {
+        return 0;
+    }
+    if (percentage > 100)
+    {
+        return 100;
+    }
+    return percentage;
+}
+
+/// TB / chapter time string aligned with MissingFilesDialog::getTime (H:mm:ss.zzz).
+[[nodiscard]] QString formatChapterStartTimeFromNs(qint64 startNs)
+{
+    if (startNs < 0)
+    {
+        return QString();
+    }
+    const qint64 totalMs = (startNs + 500000LL) / 1000000LL;
+    const int h = static_cast<int>(totalMs / 3600000);
+    const int m = (totalMs % 3600000) / 60000;
+    const int s = (totalMs % 60000) / 1000;
+    const int ms = totalMs % 1000;
+    return QStringLiteral("%1:%2:%3.%4")
+        .arg(h)
+        .arg(m, 2, 10, QChar('0'))
+        .arg(s, 2, 10, QChar('0'))
+        .arg(ms, 3, 10, QChar('0'));
 }
 
 double probeTsVideoEndTime(ProcessManager* processManager, const QString& ffprobePath, const QString& tsPath)
@@ -1230,10 +1309,35 @@ void WorkflowManager::getMkvInfo()
         QJsonDocument doc = QJsonDocument::fromJson(jsonData);
         QJsonObject root = doc.object();
         QJsonArray tracks = root["tracks"].toArray();
+        qint64 containerDurationNs = 0;
         if (root.contains("container"))
         {
-            m_sourceDurationS = static_cast<qint64>(
-                root["container"].toObject()["properties"].toObject()["duration"].toDouble() / 1000000000.0);
+            const QJsonObject containerProps = root["container"].toObject()["properties"].toObject();
+            containerDurationNs = parseJsonNanosecondsDuration(containerProps.value(QStringLiteral("duration")));
+        }
+        qint64 maxVideoTrackDurationNs = 0;
+        for (const QJsonValue& val : tracks)
+        {
+            const QJsonObject track = val.toObject();
+            if (track["type"].toString() != QStringLiteral("video"))
+            {
+                continue;
+            }
+            const QJsonObject props = track["properties"].toObject();
+            const qint64 trackDurNs = parseJsonNanosecondsDuration(props.value(QStringLiteral("duration")));
+            if (trackDurNs > maxVideoTrackDurationNs)
+            {
+                maxVideoTrackDurationNs = trackDurNs;
+            }
+        }
+        const qint64 mergedDurationNs = qMax(containerDurationNs, maxVideoTrackDurationNs);
+        if (mergedDurationNs > 0)
+        {
+            m_sourceDurationS = qMax(static_cast<qint64>(1), mergedDurationNs / 1000000000LL);
+        }
+        else
+        {
+            m_sourceDurationS = 0;
         }
 
         QMap<QString, QString> languageAliases;
@@ -1355,7 +1459,6 @@ QString WorkflowManager::parseChaptersWithMkvExtract()
 {
     emit logMessage("Запуск mkvextract для извлечения глав...", LogCategory::APP);
 
-    // Мы не знаем, какой формат получим, поэтому используем .txt
     QString chaptersFilePath = QDir(m_paths->sourcesPath).filePath("chapters_temp.txt");
 
     QStringList args;
@@ -1369,96 +1472,31 @@ QString WorkflowManager::parseChaptersWithMkvExtract()
         return QString();
     }
 
-    QFile chaptersFile(chaptersFilePath);
-    if (!chaptersFile.open(QIODevice::ReadOnly | QIODevice::Text))
+    const QList<ChapterMarker> markers = ChapterHelper::loadChaptersFromFile(chaptersFilePath);
+    QFile::remove(chaptersFilePath);
+
+    if (markers.isEmpty())
     {
-        emit logMessage("Не удалось открыть временный файл с главами.", LogCategory::APP);
-        QFile::remove(chaptersFilePath);
+        emit logMessage("Не удалось разобрать извлечённые главы (пустой список).", LogCategory::APP, LogLevel::Warning);
         return QString();
     }
 
-    QString firstLine = chaptersFile.readLine();
-    chaptersFile.seek(0);
-
-    QString foundTime;
-
-    if (firstLine.trimmed().startsWith("<?xml"))
+    const QString targetTitle = m_template.endingChapterName.trimmed();
+    if (targetTitle.isEmpty())
     {
-        emit logMessage("Обнаружен XML-формат глав. Запуск XML-парсера...", LogCategory::APP);
-        QXmlStreamReader xml(&chaptersFile);
-        QString currentTimeStart;
-        QString currentChapterString;
-
-        while (!xml.atEnd() && !xml.hasError())
-        {
-            QXmlStreamReader::TokenType token = xml.readNext();
-            if (token == QXmlStreamReader::StartElement)
-            {
-                if (xml.name() == QLatin1String("ChapterAtom"))
-                {
-                    currentTimeStart.clear();
-                    currentChapterString.clear();
-                }
-                else if (xml.name() == QLatin1String("ChapterTimeStart"))
-                {
-                    currentTimeStart = xml.readElementText();
-                }
-                else if (xml.name() == QLatin1String("ChapterString"))
-                {
-                    currentChapterString = xml.readElementText();
-                }
-            }
-            if (token == QXmlStreamReader::EndElement && xml.name() == QLatin1String("ChapterAtom"))
-            {
-                if (currentChapterString.trimmed() == m_template.endingChapterName)
-                {
-                    foundTime = currentTimeStart.trimmed();
-                    break;
-                }
-            }
-        }
-        if (xml.hasError())
-        {
-            emit logMessage("Ошибка парсинга XML глав: " + xml.errorString(), LogCategory::APP, LogLevel::Error);
-        }
-    }
-    else
-    {
-        emit logMessage("Обнаружен простой формат глав. Запуск текстового парсера...", LogCategory::APP);
-        QTextStream in(&chaptersFile);
-        while (!in.atEnd())
-        {
-            QString line = in.readLine();
-            if (line.contains(m_template.endingChapterName, Qt::CaseInsensitive))
-            {
-                QRegularExpression nameRegex("CHAPTER(\\d+)NAME");
-                auto nameMatch = nameRegex.match(line);
-                if (nameMatch.hasMatch())
-                {
-                    QString chapterNumber = nameMatch.captured(1);
-                    in.seek(0);
-                    while (!in.atEnd())
-                    {
-                        QString timeLine = in.readLine();
-                        if (timeLine.startsWith(QString("CHAPTER%1=").arg(chapterNumber)))
-                        {
-                            foundTime = timeLine.split('=').last();
-                            break;
-                        }
-                    }
-                    if (!foundTime.isEmpty())
-                    {
-                        break;
-                    }
-                }
-            }
-        }
+        return QString();
     }
 
-    chaptersFile.close();
-    QFile::remove(chaptersFilePath);
+    for (const ChapterMarker& marker : markers)
+    {
+        if (QString::compare(marker.title.trimmed(), targetTitle, Qt::CaseInsensitive) != 0)
+        {
+            continue;
+        }
+        return formatChapterStartTimeFromNs(marker.startNs);
+    }
 
-    return foundTime;
+    return QString();
 }
 
 void WorkflowManager::extractTracks()
@@ -1505,6 +1543,30 @@ void WorkflowManager::extractTracks()
         emit logMessage(
             "Предупреждение: MP4 файл не содержит субтитров формата ASS. Укажите субтитры через 'Свои субтитры'.",
             LogCategory::APP, LogLevel::Warning);
+    }
+
+    if (m_sourceDurationS <= 0)
+    {
+        const QString ffprobePath = AppSettings::instance().ffprobePath();
+        if (!ffprobePath.isEmpty() && QFileInfo::exists(ffprobePath))
+        {
+            QByteArray durationOut;
+            const QStringList probeArgs = {"-v", "quiet", "-show_entries", "format=duration", "-of", "csv=p=0",
+                                           m_mkvFilePath};
+            const bool probed = m_processManager->executeAndWait(ffprobePath, probeArgs, durationOut);
+            if (probed && !durationOut.isEmpty())
+            {
+                bool ok = false;
+                const double seconds = QString::fromUtf8(durationOut).trimmed().toDouble(&ok);
+                if (ok && seconds > 0.0)
+                {
+                    m_sourceDurationS = qMax(static_cast<qint64>(1), static_cast<qint64>(std::llround(seconds)));
+                    emit logMessage(
+                        QStringLiteral("Source duration for progress (ffprobe): %1 s").arg(m_sourceDurationS),
+                        LogCategory::DEBUG);
+                }
+            }
+        }
     }
 
     emit progressUpdated(-1, "Извлечение дорожек (ffmpeg)");
@@ -1598,6 +1660,7 @@ void WorkflowManager::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
     case Step::ExtractingTracks:
     {
         emit logMessage("Извлечение дорожек завершено.", LogCategory::APP);
+        emit progressUpdated(100);
         // --- Шаг 4.5: Автозамены и пауза для ручной правки ---
         QString extractedSubsPath = m_paths->extractedSubs("ass");
         if (QFileInfo::exists(extractedSubsPath))
@@ -1858,6 +1921,7 @@ void WorkflowManager::finishWorkflow()
 void WorkflowManager::audioPreparation()
 {
     m_currentStep = Step::AudioPreparation;
+    m_tbChapterPickerRowsCache.clear();
     emit progressUpdated(-1, "Подготовка данных");
 
     UserInputRequest request;
@@ -1918,7 +1982,13 @@ void WorkflowManager::audioPreparation()
         }
     }
 
-    if (request.isValid())
+    request.tbChapterPickerRows = buildTbChapterPickerRows();
+    m_tbChapterPickerRowsCache = request.tbChapterPickerRows;
+
+    const bool needUserInput = request.audioFileRequired || !request.missingFonts.isEmpty() || request.tbTimeRequired ||
+                               request.chaptersRequired;
+
+    if (needUserInput)
     {
         request.videoFilePath = m_mkvFilePath;
         request.videoDurationS = static_cast<double>(m_sourceDurationS);
@@ -3328,8 +3398,11 @@ void WorkflowManager::onProcessStdOut(const QString& output)
             break;
 
         case Step::ExtractingTracks:
+            // stderr/stdout are from ffmpeg; use FFMPEG so log UI treats frame=/time= as in-place progress.
+            category = LogCategory::FFMPEG;
+            break;
         case Step::ExtractingAttachments:
-            category = (m_sourceFormat == SourceFormat::MP4) ? LogCategory::FFMPEG : LogCategory::MKVTOOLNIX;
+            category = LogCategory::MKVTOOLNIX;
             break;
 
         case Step::ConcatExtract:
@@ -3386,8 +3459,11 @@ void WorkflowManager::onProcessStdErr(const QString& output)
             break;
 
         case Step::ExtractingTracks:
+            // stderr/stdout are from ffmpeg; use FFMPEG so log UI treats frame=/time= as in-place progress.
+            category = LogCategory::FFMPEG;
+            break;
         case Step::ExtractingAttachments:
-            category = (m_sourceFormat == SourceFormat::MP4) ? LogCategory::FFMPEG : LogCategory::MKVTOOLNIX;
+            category = LogCategory::MKVTOOLNIX;
             break;
 
         case Step::ConcatExtract:
@@ -3415,23 +3491,14 @@ void WorkflowManager::onProcessStdErr(const QString& output)
         emit logMessage(output, category);
     }
 
-    // И парсим прогресс
+    // FFmpeg stderr progress (time=...): track extraction uses the same stats as encode; render passes use full source duration.
     if (m_currentStep == Step::RenderingMp4Pass1 || m_currentStep == Step::RenderingMp4Pass2 ||
-        m_currentStep == Step::ConcatRenderSegment2)
+        m_currentStep == Step::ConcatRenderSegment2 || m_currentStep == Step::ExtractingTracks)
     {
-        QRegularExpression re("time=(\\d{2}):(\\d{2}):(\\d{2})\\.(\\d{2})");
-        QRegularExpressionMatch match = re.match(output); // Используем match, т.к. ffmpeg пишет в stderr порциями
-        if (match.hasMatch())
+        const int percentage = parseFfmpegTimeProgressPercent(output, m_sourceDurationS);
+        if (percentage >= 0)
         {
-            int hours = match.captured(1).toInt();
-            int minutes = match.captured(2).toInt();
-            int seconds = match.captured(3).toInt();
-            double currentTimeS = (hours * 3600) + (minutes * 60) + seconds;
-            if (m_sourceDurationS > 0)
-            {
-                int percentage = static_cast<int>((currentTimeS / static_cast<double>(m_sourceDurationS)) * 100);
-                emit progressUpdated(percentage);
-            }
+            emit progressUpdated(percentage);
         }
     }
 }
@@ -3779,6 +3846,8 @@ void WorkflowManager::resumeWithUserInput(const UserInputResponse& response)
         return;
     }
 
+    const Step resumeFromStep = m_lastStepBeforeRequest;
+
     const bool chapterResume = (m_chapterContinueKind != ChapterContinueKind::None);
     if (chapterResume)
     {
@@ -3822,7 +3891,7 @@ void WorkflowManager::resumeWithUserInput(const UserInputResponse& response)
             }
         }
     }
-    else if (m_lastStepBeforeRequest == Step::AudioPreparation && m_template.createSrtMaster &&
+    else if (resumeFromStep == Step::AudioPreparation && m_template.createSrtMaster &&
              !m_mainRuAudioPath.endsWith(".wav"))
     {
         emit logMessage("WAV для мастер-копии не предоставлен. Сборка мастер-копии отменена.", LogCategory::APP);
@@ -3834,6 +3903,12 @@ void WorkflowManager::resumeWithUserInput(const UserInputResponse& response)
         m_parsedEndingTime = response.time;
     }
 
+    if (response.persistTbTemplateFields && !response.tbPersistEndingChapterName.isEmpty())
+    {
+        m_template.endingChapterName = response.tbPersistEndingChapterName.trimmed();
+        m_template.useManualTime = false;
+    }
+
     if (!response.resolvedFonts.isEmpty())
     {
         for (auto it = response.resolvedFonts.constBegin(); it != response.resolvedFonts.constEnd(); ++it)
@@ -3843,15 +3918,15 @@ void WorkflowManager::resumeWithUserInput(const UserInputResponse& response)
         }
     }
 
-    if (m_lastStepBeforeRequest == Step::AudioPreparation)
+    if (resumeFromStep == Step::AudioPreparation)
     {
         audioPreparation();
     }
-    else if (m_lastStepBeforeRequest == Step::ProcessingSubs)
+    else if (resumeFromStep == Step::ProcessingSubs)
     {
         processSubtitles();
     }
-    else if (m_lastStepBeforeRequest == Step::AssemblingMkv)
+    else if (resumeFromStep == Step::AssemblingMkv)
     {
         assembleMkv(m_finalAudioPath);
     }
@@ -4279,6 +4354,80 @@ void WorkflowManager::loadChaptersForWorkflow()
     }
 }
 
+QList<ChapterTimingSeconds> WorkflowManager::buildTbChapterPickerRows()
+{
+    const qint64 durationNs =
+        m_sourceDurationS > 0 ? static_cast<qint64>(static_cast<double>(m_sourceDurationS) * 1e9) : 0;
+
+    if (!m_chapterMarkers.isEmpty())
+    {
+        return ChapterHelper::buildChapterTimingSeconds(m_chapterMarkers, durationNs);
+    }
+
+    QList<ChapterMarker> markers;
+
+    const QString extPath = m_userChaptersXmlPath.trimmed();
+    if (!extPath.isEmpty() && QFileInfo::exists(extPath))
+    {
+        markers = ChapterHelper::loadChaptersFromFile(extPath);
+        if (!markers.isEmpty())
+        {
+            return ChapterHelper::buildChapterTimingSeconds(markers, durationNs);
+        }
+    }
+
+    if (m_paths == nullptr)
+    {
+        return {};
+    }
+
+    auto loadChaptersViaFfprobe = [this](const QString& mediaPath) -> QList<ChapterMarker>
+    {
+        const QString ffprobePath = AppSettings::instance().ffprobePath();
+        if (ffprobePath.isEmpty() || !QFileInfo::exists(ffprobePath))
+        {
+            return {};
+        }
+        QByteArray json;
+        const QStringList args = {QStringLiteral("-v"),
+                                  QStringLiteral("quiet"),
+                                  QStringLiteral("-show_chapters"),
+                                  QStringLiteral("-print_format"),
+                                  QStringLiteral("json"),
+                                  QStringLiteral("-i"),
+                                  mediaPath};
+        if (!m_processManager->executeAndWait(ffprobePath, args, json))
+        {
+            return {};
+        }
+        return ChapterHelper::parseFfprobeChaptersJson(json);
+    };
+
+    if (!QFileInfo::exists(m_mkvFilePath))
+    {
+        return {};
+    }
+
+    if (m_sourceFormat == SourceFormat::MKV)
+    {
+        const QString embPath = QDir(m_paths->sourcesPath).filePath(QStringLiteral("chapters_tb_dialog_embedded.xml"));
+        if (ChapterHelper::extractEmbeddedChaptersToFile(m_mkvextractPath, m_mkvFilePath, embPath, m_processManager))
+        {
+            markers = ChapterHelper::loadChaptersFromFile(embPath);
+        }
+        if (markers.isEmpty())
+        {
+            markers = loadChaptersViaFfprobe(m_mkvFilePath);
+        }
+    }
+    else if (m_sourceFormat == SourceFormat::MP4)
+    {
+        markers = loadChaptersViaFfprobe(m_mkvFilePath);
+    }
+
+    return ChapterHelper::buildChapterTimingSeconds(markers, durationNs);
+}
+
 void WorkflowManager::continueWorkflowAfterChaptersResolved()
 {
     switch (m_chapterContinueKind)
@@ -4458,4 +4607,9 @@ void WorkflowManager::resumeAfterSubEdit()
 {
     emit logMessage("Редактирование завершено, процесс возобновлен.", LogCategory::APP);
     audioPreparation();
+}
+
+QList<ChapterTimingSeconds> WorkflowManager::tbChapterPickerRowsForDialog() const
+{
+    return m_tbChapterPickerRowsCache;
 }

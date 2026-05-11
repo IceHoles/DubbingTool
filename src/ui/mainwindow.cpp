@@ -26,6 +26,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMessageBox>
+#include <QMetaObject>
 #include <QProcess>
 #include <QRegularExpression>
 #include <QPushButton>
@@ -215,6 +216,10 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWi
     setWindowIcon(QIcon(":/icon.png"));
     qRegisterMetaType<ChapterMarker>("ChapterMarker");
     qRegisterMetaType<QList<ChapterMarker>>("QList<ChapterMarker>");
+    qRegisterMetaType<ChapterTimingSeconds>();
+    qRegisterMetaType<QList<ChapterTimingSeconds>>();
+    qRegisterMetaType<UserInputRequest>();
+    qRegisterMetaType<UserInputResponse>();
 
     QSettings settings("MyCompany", "DubbingTool");
     restoreGeometry(settings.value("ui/mainWindowGeometry").toByteArray());
@@ -799,7 +804,7 @@ void MainWindow::on_startButton_clicked()
     connect(thread, &QThread::finished, workflowManager, &WorkflowManager::deleteLater);
     connect(workflowManager, &WorkflowManager::destroyed, thread, &QThread::deleteLater);
     connect(workflowManager, &WorkflowManager::logMessage, this, &MainWindow::logMessage);
-    connect(workflowManager, &WorkflowManager::progressUpdated, this, &MainWindow::updateProgress);
+    connect(workflowManager, &WorkflowManager::progressUpdated, this, &MainWindow::updateProgress, Qt::QueuedConnection);
 
     thread->start();
 }
@@ -1218,11 +1223,41 @@ void MainWindow::onUserInputRequired(const UserInputRequest& request)
 
         dialog.setMissingFonts(request.missingFonts);
 
-        dialog.setTimeInputVisible(request.tbTimeRequired);
-        if (request.tbTimeRequired)
+        QList<ChapterTimingSeconds> tbChapterPickerRows = request.tbChapterPickerRows;
+        if (tbChapterPickerRows.isEmpty())
         {
-            dialog.setTimePrompt(request.tbTimeReason);
+            if (auto* workflowManager = qobject_cast<WorkflowManager*>(m_currentWorker.data()))
+            {
+                QList<ChapterTimingSeconds> fromWorker;
+                const bool invokedOk = QMetaObject::invokeMethod(
+                    workflowManager,
+                    "tbChapterPickerRowsForDialog",
+                    Qt::BlockingQueuedConnection,
+                    Q_RETURN_ARG(QList<ChapterTimingSeconds>, fromWorker));
+                if (invokedOk)
+                {
+                    tbChapterPickerRows = fromWorker;
+                }
+            }
+        }
+
+        const bool chapterRowsForPicker = !tbChapterPickerRows.isEmpty();
+        const bool showTimeAndPreview = request.tbTimeRequired || chapterRowsForPicker;
+
+        dialog.setTimeInputVisible(showTimeAndPreview);
+        if (showTimeAndPreview)
+        {
+            if (request.tbTimeRequired)
+            {
+                dialog.setTimePrompt(request.tbTimeReason);
+            }
+            else
+            {
+                dialog.setTimePrompt(QStringLiteral(
+                    "Главы для перемотки превью; время ТБ для этого шага уже определено или не запрашивается."));
+            }
             dialog.setVideoFile(request.videoFilePath, request.videoDurationS);
+            dialog.setTbChapterPickerData(tbChapterPickerRows);
         }
 
         dialog.setChaptersInputVisible(request.chaptersRequired);
@@ -1244,6 +1279,8 @@ void MainWindow::onUserInputRequired(const UserInputRequest& request)
         response.time = dialog.getTime();
         response.chaptersXmlPath = dialog.getChaptersXmlPath();
         response.buildWithoutChapters = dialog.getBuildWithoutChapters();
+        response.persistTbTemplateFields = dialog.wantsTbTemplatePersistence();
+        response.tbPersistEndingChapterName = dialog.tbPersistChapterTitleIfClean();
 
         if (request.chaptersRequired && !response.buildWithoutChapters && response.chaptersXmlPath.isEmpty())
         {
@@ -1263,6 +1300,18 @@ void MainWindow::onUserInputRequired(const UserInputRequest& request)
             QMessageBox::critical(this, "Ошибка", "Время эндинга является обязательным. Сборка прервана.");
             emit userInputProvided({});
             return;
+        }
+
+        if (response.persistTbTemplateFields && request.tbTimeRequired && !response.tbPersistEndingChapterName.isEmpty())
+        {
+            const QString templateName = ui->templateComboBox->currentText().trimmed();
+            if (!templateName.isEmpty() && m_templates.contains(templateName))
+            {
+                ReleaseTemplate t = m_templates.value(templateName);
+                t.endingChapterName = response.tbPersistEndingChapterName.trimmed();
+                t.useManualTime = false;
+                saveTemplate(t);
+            }
         }
 
         logMessage("Данные от пользователя получены, возобновление процесса...", LogCategory::APP);

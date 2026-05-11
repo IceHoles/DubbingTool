@@ -23,6 +23,8 @@ struct ChapterTimingSeconds
     int startSeconds = 0;
     int endSeconds = 0;
 };
+Q_DECLARE_METATYPE(ChapterTimingSeconds)
+Q_DECLARE_METATYPE(QList<ChapterTimingSeconds>)
 
 namespace ChapterHelper
 {

@@ -16,6 +16,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QJsonObject>
+#include <QMetaType>
 #include <QNetworkAccessManager>
 #include <QNetworkCookie>
 #include <QNetworkReply>
@@ -46,6 +47,8 @@ struct UserInputRequest
     double videoDurationS = 0.0; // Source video duration in seconds
     bool chaptersRequired = false;
     QString chaptersReason;
+    /// Chapter rows for TB dialog list (optional); titles/times match embedded or external chapters XML.
+    QList<ChapterTimingSeconds> tbChapterPickerRows;
 
     bool isValid() const
     {
@@ -60,6 +63,10 @@ struct UserInputResponse
     QString time;
     QString chaptersXmlPath;
     bool buildWithoutChapters = false;
+    /// When true, MainWindow may save endingChapterName from the dialog into the active template JSON (not time).
+    bool persistTbTemplateFields = false;
+    /// Chapter title to persist when the user left the save-to-template checkbox checked after choosing a chapter row.
+    QString tbPersistEndingChapterName;
 
     bool isValid() const
     {
@@ -67,6 +74,9 @@ struct UserInputResponse
                buildWithoutChapters;
     }
 };
+
+Q_DECLARE_METATYPE(UserInputRequest)
+Q_DECLARE_METATYPE(UserInputResponse)
 
 struct PathManager
 {
@@ -188,6 +198,7 @@ public slots:
     void resumeWithSignStyles(const QStringList& styles);
     void resumeWithSelectedAudioTrack(int trackId);
     void resumeAfterSubEdit();
+    [[nodiscard]] QList<ChapterTimingSeconds> tbChapterPickerRowsForDialog() const;
 
 signals:
     void logMessage(const QString& message, LogCategory category = LogCategory::APP, LogLevel level = LogLevel::Info);
@@ -305,6 +316,7 @@ private:
     static QString concatEncoderForCodec(const QString& codecExtension);
     void prepareUserFiles();
     void loadChaptersForWorkflow();
+    [[nodiscard]] QList<ChapterTimingSeconds> buildTbChapterPickerRows();
     void warnIfExpectedChaptersMissing();
     void continueWorkflowAfterChaptersResolved();
 
@@ -360,6 +372,7 @@ private:
 
     QString m_chaptersMuxPathForMkv;
     QList<ChapterMarker> m_chapterMarkers;
+    QList<ChapterTimingSeconds> m_tbChapterPickerRowsCache;
 
     SourceFormat m_sourceFormat = SourceFormat::Unknown;
 
