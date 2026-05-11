@@ -28,6 +28,16 @@ static QString formatCommand(const QString& program, const QStringList& argument
     return QString("%1 %2").arg(program, escapedArgs.join(" "));
 }
 
+[[nodiscard]] static QString trimTrailingAsciiSpaces(const QString& s)
+{
+    int end = s.size();
+    while (end > 0 && s.at(end - 1).isSpace())
+    {
+        --end;
+    }
+    return s.left(end);
+}
+
 void ProcessManager::startProcess(const QString& program, const QStringList& arguments)
 {
     m_wasKilled = false;
@@ -107,7 +117,7 @@ bool ProcessManager::executeAndWait(const QString& program, const QStringList& a
     output = syncProcess.readAllStandardOutput();
     QString outStr = QString::fromUtf8(output);
     emit processOutput("Процесс успешно завершен. Получено " + QString::number(output.size()) + " байт данных:\n" +
-                       outStr.trimmed());
+                       trimTrailingAsciiSpaces(outStr));
     m_workingDir.clear();
     return true;
 }

@@ -72,6 +72,16 @@ static QString logLevelToString(LogLevel level)
     return "INFO";
 }
 
+[[nodiscard]] static QString trimTrailingAsciiSpaces(const QString& s)
+{
+    int end = s.size();
+    while (end > 0 && s.at(end - 1).isSpace())
+    {
+        --end;
+    }
+    return s.left(end);
+}
+
 class LogLevelHighlighter final : public QSyntaxHighlighter
 {
 public:
@@ -304,6 +314,7 @@ void MainWindow::logMessage(const QString& message, LogCategory category, LogLev
         {
             return;
         }
+        const QString displayMsg = trimTrailingAsciiSpaces(rawLine);
 
         auto stripStderrPrefix = [](const QString& s) -> QString
         {
@@ -341,7 +352,7 @@ void MainWindow::logMessage(const QString& message, LogCategory category, LogLev
                                          .arg(categoryName)
                                          .arg(levelName)
                                          .arg(QDateTime::currentDateTime().toString("hh:mm:ss"))
-                                         .arg(trimmedMsg);
+                                         .arg(displayMsg);
         const QDateTime now = QDateTime::currentDateTime();
 
         bool replaceLastLine = false;
