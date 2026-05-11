@@ -75,6 +75,9 @@ private:
     static bool containsForbiddenChars(const QString& text);
     static QString forbiddenCharsFound(const QString& text);
 
+    [[nodiscard]] QStringList standardTemplateFieldIssues() const;
+    [[nodiscard]] bool promptSaveDespiteIssues(const QStringList& issues);
+
     QMap<QString, QString> m_postTemplates;
     QMap<QString, PostTemplateMeta> m_postTemplateMeta;
     QString m_selectedPostTemplateKey;

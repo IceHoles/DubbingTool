@@ -41,6 +41,8 @@ class ReleaseTemplate
 public:
     ReleaseTemplate();
 
+    [[nodiscard]] static ReleaseTemplate newTemplateDefaults();
+
     // Основные данные релиза
     QString templateName;    // Имя самого шаблона
     QString seriesTitle;     // Название сериала

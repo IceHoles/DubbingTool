@@ -883,8 +883,10 @@
           <string>URL страниц загрузки на трекеры (Anilib, Anime365 и т.д.): по одному на строку; подставляются в посты и кнопку «Открыть ссылки» на вкладке публикации.</string>
          </property>
          <property name="placeholderText">
-          <string>https://anilib.me/upload...
-https://anime-365.ru/upload...</string>
+          <string>https://vk.com/dublyajnaya
+https://converter.kodikres.com/media-files
+https://smotret-anime.app/
+https://v5.animelib.org/ru</string>
          </property>
         </widget>
        </item>

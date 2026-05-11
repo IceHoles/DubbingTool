@@ -7,6 +7,7 @@
 #include "telegrampasteedit.h"
 #include "ui_templateeditor.h"
 
+#include <QAbstractButton>
 #include <QAbstractItemView>
 #include <QApplication>
 #include <QClipboard>
@@ -28,8 +29,10 @@
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QMimeData>
+#include <QPlainTextEdit>
 #include <QPointer>
 #include <QPropertyAnimation>
+#include <QPushButton>
 #include <QRegularExpression>
 #include <QSaveFile>
 #include <QScrollArea>
@@ -46,7 +49,47 @@
 #include <QVBoxLayout>
 #include <QWidget>
 
-#include <qplaintextedit.h>
+// Cast field: one split/trim path for save, validation, and duplicate-FIO detection.
+namespace
+{
+[[nodiscard]] QStringList splitCastPlainText(const QString& plainText)
+{
+    static const QRegularExpression separator(QStringLiteral("((\\, )|\\,|\\n)"));
+    QStringList parts = plainText.split(separator, Qt::SkipEmptyParts);
+    for (QString& part : parts)
+    {
+        part = part.trimmed();
+    }
+    return parts;
+}
+
+[[nodiscard]] bool isUnsetVersusBaseline(const QString& current, const QString& baseline)
+{
+    const QString trimmed = current.trimmed();
+    return trimmed.isEmpty() || trimmed == baseline.trimmed();
+}
+
+[[nodiscard]] bool castIsUnsetVersusBaseline(const QString& plainText, const QStringList& baselineCast)
+{
+    const QStringList parts = splitCastPlainText(plainText);
+    if (parts.isEmpty())
+    {
+        return true;
+    }
+    if (parts.size() != baselineCast.size())
+    {
+        return false;
+    }
+    for (int i = 0; i < parts.size(); ++i)
+    {
+        if (parts.at(i) != baselineCast.at(i).trimmed())
+        {
+            return false;
+        }
+    }
+    return true;
+}
+} // namespace
 
 class ClickableLabel : public QLabel
 {
@@ -127,8 +170,7 @@ static QString normalizeCastToken(QString value)
 
 static QStringList findDuplicatedCastNamePairs(const QString& castText)
 {
-    const QRegularExpression splitRx("((\\, )|\\,|\\n)");
-    const QStringList entries = castText.split(splitRx, Qt::SkipEmptyParts);
+    const QStringList entries = splitCastPlainText(castText);
     const QRegularExpression pairRx("^\\s*([A-Za-zА-Яа-яЁё\\-]+)\\s+([A-Za-zА-Яа-яЁё\\-]+)\\b");
 
     QMap<QString, int> counts;
@@ -453,8 +495,7 @@ ReleaseTemplate TemplateEditor::getTemplate()
     {
         t.voiceoverType = ReleaseTemplate::VoiceoverType::Dubbing;
     }
-    QRegularExpression rx("((\\, )|\\,|\\n)");
-    t.cast = ui->castEdit->toPlainText().split(rx, Qt::SkipEmptyParts);
+    t.cast = splitCastPlainText(ui->castEdit->toPlainText());
     t.director = ui->directorEdit->text().trimmed();
     t.assistantDirector = ui->assistantDirectorEdit->text().trimmed();
     t.soundEngineer = ui->soundEngineerEdit->text().trimmed();
@@ -1795,6 +1836,60 @@ void TemplateEditor::on_helpButton_clicked()
     m_helpDialog->show();
 }
 
+QStringList TemplateEditor::standardTemplateFieldIssues() const
+{
+    static const ReleaseTemplate baseline = ReleaseTemplate::newTemplateDefaults();
+    QStringList issues;
+
+    auto checkField = [&](const QString& label, const QString& value, const QString& reference)
+    {
+        if (isUnsetVersusBaseline(value, reference))
+        {
+            issues.append(label + QStringLiteral(": не заполнено или как у нового шаблона."));
+        }
+    };
+
+    checkField(QStringLiteral("Имя шаблона"), ui->templateNameEdit->text(), baseline.templateName);
+    checkField(QStringLiteral("Название сериала"), ui->seriesTitleEdit->text(), baseline.seriesTitle);
+    checkField(QStringLiteral("Студия анимации"), ui->animationStudioEdit->text(), baseline.animationStudio);
+    checkField(QStringLiteral("Автор перевода"), ui->subAuthorEdit->text(), baseline.subAuthor);
+    checkField(QStringLiteral("Режиссер дубляжа"), ui->directorEdit->text(), baseline.director);
+    checkField(QStringLiteral("Звукорежиссер"), ui->soundEngineerEdit->text(), baseline.soundEngineer);
+    checkField(QStringLiteral("Разметка"), ui->timingAuthorEdit->text(), baseline.timingAuthor);
+    checkField(QStringLiteral("Сборка релиза"), ui->releaseBuilderEdit->text(), baseline.releaseBuilder);
+
+    if (castIsUnsetVersusBaseline(ui->castEdit->toPlainText(), baseline.cast))
+    {
+        issues.append(QStringLiteral("Актеры: не заполнено или как у нового шаблона."));
+    }
+
+    checkField(QStringLiteral("Название для постов"), ui->seriesTitleForPostEdit->text(), baseline.seriesTitleForPost);
+
+    return issues;
+}
+
+bool TemplateEditor::promptSaveDespiteIssues(const QStringList& issues)
+{
+    if (issues.isEmpty())
+    {
+        return true;
+    }
+
+    QMessageBox box(this);
+    box.setIcon(QMessageBox::Warning);
+    box.setWindowTitle(QStringLiteral("Поля шаблона"));
+    box.setText(QStringLiteral(
+        "Часть полей пустая или совпадает с автозаполнением при создании нового шаблона."));
+    box.setInformativeText(issues.join(QLatin1Char('\n')));
+    QAbstractButton* const saveAnywayBtn =
+        box.addButton(QStringLiteral("Сохранить всё равно"), QMessageBox::AcceptRole);
+    QAbstractButton* const editBtn =
+        box.addButton(QStringLiteral("Вернуться к редактированию"), QMessageBox::RejectRole);
+    box.setDefaultButton(qobject_cast<QPushButton*>(editBtn));
+    box.exec();
+    return box.clickedButton() == saveAnywayBtn;
+}
+
 void TemplateEditor::slotValidateAndAccept()
 {
     // Validate fields that will be used in file/directory names
@@ -1810,6 +1905,11 @@ void TemplateEditor::slotValidateAndAccept()
                                      "Пожалуйста, уберите их из названия.")
                                  .arg(found));
         ui->seriesTitleEdit->setFocus();
+        return;
+    }
+
+    if (!promptSaveDespiteIssues(standardTemplateFieldIssues()))
+    {
         return;
     }
 

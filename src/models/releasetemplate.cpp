@@ -2,9 +2,107 @@
 
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QUrl>
 
 ReleaseTemplate::ReleaseTemplate()
 {
+}
+
+ReleaseTemplate ReleaseTemplate::newTemplateDefaults()
+{
+    ReleaseTemplate t;
+    t.templateName = QStringLiteral("Новый шаблон");
+    t.seriesTitle = QStringLiteral("Как в архиве mkv, но без [DUB] и - 00.mkv");
+    t.seriesTitleForPost = QStringLiteral("Как в постах, без кавычек");
+    t.rssUrl = QUrl(QStringLiteral("https://example.com/rss.xml"));
+    t.animationStudio = QStringLiteral("STUDIO (с шикимори или MAL)");
+    t.subAuthor =
+        QStringLiteral("Crunchyroll (или Имя Фамилия, если перевод свой + галочка внизу \"Свой перевод\")");
+    t.originalLanguage = QStringLiteral("ja");
+    t.endingChapterName = QStringLiteral("Ending Start");
+    t.totalEpisodes = 12;
+
+    t.director = QStringLiteral("Режиссер Дубляжа");
+    t.soundEngineer = QStringLiteral("Звукорежиссер");
+    t.timingAuthor = QStringLiteral("Разметка");
+    t.releaseBuilder = QStringLiteral("Сборщик Релиза");
+    t.cast << QStringLiteral("Актер 1") << QStringLiteral("Актер 2") << QStringLiteral("Актер 3");
+
+    t.postTemplates[QStringLiteral("tg_mp4")] =
+        QStringLiteral(
+            "▶️Серия: %EPISODE_NUMBER%/%TOTAL_EPISODES%\n\n"
+            "📌«%SERIES_TITLE%» в дубляже от ТО Дубляжная\n\n"
+            "🎁Сериал озвучен при поддержке [онлайн-кинотеатра TVOЁ](https://tvoe.live/), если вы хотите поддержать "
+            "Дубляжную, то смотрите нашу озвучку именно там, ведь TVOЁ дарит скидку нашим подписчикам по промокоду - "
+            "`Dublyazhnaya`, где 1 месяц 99 рублей вместо 299 руб\n\n"
+            "Помимо ТГ сериал можно посмотреть здесь:\n\n"
+            "[TVOЁ](https://tvoe.live/p/) (~~299~~ 99 руб. по промокоду: `Dublyazhnaya`)\n\n"
+            "[Архив MKV](https://t.me/+CVpSSg33UwI4MzYy)\n\n"
+            "🎙Роли дублировали:\n%CAST_LIST%\n\n"
+            "📝Режиссёр дубляжа:\n%DIRECTOR%\n\n"
+            "🪄Звукорежиссёр:\n%SOUND_ENGINEER%\n\n"
+            "📚Перевод:\n%SUB_AUTHOR%\n\n"
+            "✏️Разметка:\n%TIMING_AUTHOR%\n\n"
+            "✨Локализация постера:\nКирилл Хоримиев\n\n"
+            "📦Сборка релиза:\n%RELEASE_BUILDER%\n\n"
+            "#Дубрелиз@dublyajnaya #Хештег@dublyajnaya #Дубляж@dublyajnaya");
+    t.postTemplates[QStringLiteral("tg_mkv")] =
+        QStringLiteral("%SERIES_TITLE%\n"
+                       "Серия %EPISODE_NUMBER%/%TOTAL_EPISODES%\n"
+                       "#Хештег");
+    t.postTemplates[QStringLiteral("vk")] =
+        QStringLiteral("«%SERIES_TITLE%» в дубляже от ТО Дубляжная\n\n"
+                       "Серия: %EPISODE_NUMBER%/%TOTAL_EPISODES%\n\n"
+                       "Роли дублировали:\n%CAST_LIST%\n\n"
+                       "Режиссёр дубляжа:\n%DIRECTOR%\n\n"
+                       "Звукорежиссёр:\n%SOUND_ENGINEER%\n\n"
+                       "Перевод:\n%SUB_AUTHOR%\n\n"
+                       "Локализация видеоряда:\n%VIDEO_LOCALIZATION_AUTHOR%\n\n"
+                       "Локализация надписей:\n%SIGNS_AUTHOR%\n\n"
+                       "Локализация постера:\n\n"
+                       "Сборка релиза:\n%RELEASE_BUILDER%\n\n"
+                       "#Хештег@dublyajnaya");
+    t.postTemplates[QStringLiteral("vk_comment")] =
+        QStringLiteral(
+            "А также вы можете поддержать наш коллектив на бусти: "
+            "https://boosty.to/dubl/single-payment/donation/634652\n\n"
+            "ТГ: https://t.me/dublyajnaya\n\n"
+            "TVOЁ (99 руб. по промокоду: Dublyazhnaya): https://tvoe.live/p/");
+
+    PostTemplateMeta tgMp4Meta;
+    tgMp4Meta.title = QStringLiteral("Telegram (Канал)");
+    tgMp4Meta.platform = QStringLiteral("telegram");
+    tgMp4Meta.category = QStringLiteral("База");
+    tgMp4Meta.tags = {QStringLiteral("tg"), QStringLiteral("mp4"), QStringLiteral("дубляж")};
+    tgMp4Meta.sortOrder = 10;
+    tgMp4Meta.builtin = true;
+    t.postTemplateMeta.insert(QStringLiteral("tg_mp4"), tgMp4Meta);
+
+    PostTemplateMeta tgMkvMeta = tgMp4Meta;
+    tgMkvMeta.title = QStringLiteral("Telegram (Архив)");
+    tgMkvMeta.tags = {QStringLiteral("tg"), QStringLiteral("mkv"), QStringLiteral("архив")};
+    tgMkvMeta.sortOrder = 20;
+    t.postTemplateMeta.insert(QStringLiteral("tg_mkv"), tgMkvMeta);
+
+    PostTemplateMeta vkMeta;
+    vkMeta.title = QStringLiteral("VK (Пост)");
+    vkMeta.platform = QStringLiteral("vk");
+    vkMeta.category = QStringLiteral("База");
+    vkMeta.tags = {QStringLiteral("vk"), QStringLiteral("пост")};
+    vkMeta.sortOrder = 30;
+    vkMeta.builtin = true;
+    t.postTemplateMeta.insert(QStringLiteral("vk"), vkMeta);
+
+    PostTemplateMeta vkCommentMeta = vkMeta;
+    vkCommentMeta.title = QStringLiteral("VK (Комментарий)");
+    vkCommentMeta.tags = {QStringLiteral("vk"), QStringLiteral("комментарий")};
+    vkCommentMeta.sortOrder = 40;
+    t.postTemplateMeta.insert(QStringLiteral("vk_comment"), vkCommentMeta);
+
+    t.uploadUrls << QStringLiteral("https://vk.com/dublyajnaya") << QStringLiteral("https://converter.kodikres.com/media-files")
+                 << QStringLiteral("https://smotret-anime.app/") << QStringLiteral("https://v5.animelib.org/ru");
+
+    return t;
 }
 
 void ReleaseTemplate::read(const QJsonObject& json)
