@@ -11,16 +11,25 @@
 #include <QJsonDocument>
 #include <QTimer>
 
-ManualAssembler::ManualAssembler(const QVariantMap& params, QObject* parent)
-    : QObject(parent), m_params(params), m_processManager(new ProcessManager(this)), m_progressTimer(new QTimer(this))
+ManualAssembler::ManualAssembler(const QVariantMap& params, QObject* parent, IProcessRunner* processRunner)
+    : QObject(parent), m_params(params), m_processRunner(processRunner), m_progressTimer(new QTimer(this))
 {
-    connect(m_processManager, &ProcessManager::processOutput, this, &ManualAssembler::onProcessText);
-    connect(m_processManager, &ProcessManager::processStdErr, this, &ManualAssembler::onProcessText);
-    connect(m_processManager, &ProcessManager::processFinished, this, &ManualAssembler::onProcessFinished);
+    if (!m_processRunner)
+    {
+        m_processRunner = new ProcessManager(this);
+        m_ownsProcessRunner = true;
+    }
+    connect(m_processRunner, &IProcessRunner::processOutput, this, &ManualAssembler::onProcessText);
+    connect(m_processRunner, &IProcessRunner::processStdErr, this, &ManualAssembler::onProcessText);
+    connect(m_processRunner, &IProcessRunner::processFinished, this, &ManualAssembler::onProcessFinished);
 }
 
 ManualAssembler::~ManualAssembler()
 {
+    if (m_processRunner && m_ownsProcessRunner)
+    {
+        m_processRunner->killProcess();
+    }
 }
 
 void ManualAssembler::start()
@@ -114,7 +123,7 @@ void ManualAssembler::normalizeAudio()
     QTimer::singleShot(3000, this,
                        [this, ambCmdPath, tempInputPath]()
                        {
-                           m_processManager->startProcess(ambCmdPath, {"-a", tempInputPath});
+                           m_processRunner->startProcess(ambCmdPath, {"-a", tempInputPath});
                            emit progressUpdated(-1, "Нормализация аудиофайла");
                        });
 }
@@ -148,7 +157,7 @@ void ManualAssembler::convertAudio()
     QStringList ffprobeArgs = {"-v", "error", "-show_format", "-print_format", "json", audioPath};
 
     m_sourceAudioDurationS = 0.0;
-    if (m_processManager->executeAndWait(ffprobePath, ffprobeArgs, jsonData) && !jsonData.isEmpty())
+    if (m_processRunner->executeAndWait(ffprobePath, ffprobeArgs, jsonData) && !jsonData.isEmpty())
     {
         QJsonObject format = QJsonDocument::fromJson(jsonData).object()["format"].toObject();
         m_sourceAudioDurationS = format["duration"].toString().toDouble();
@@ -195,7 +204,7 @@ void ManualAssembler::convertAudio()
         m_progressTimer->start(500);
     }
 
-    m_processManager->startProcess(AppSettings::instance().ffmpegPath(), args);
+    m_processRunner->startProcess(AppSettings::instance().ffmpegPath(), args);
 }
 
 void ManualAssembler::processSubtitlesAndAssemble()
@@ -240,7 +249,7 @@ QString ManualAssembler::resolveChaptersPathForMkvMerge()
     if (videoPath.endsWith(QStringLiteral(".mkv"), Qt::CaseInsensitive))
     {
         const QString mkvextract = AppSettings::instance().mkvextractPath();
-        if (ChapterHelper::extractEmbeddedChaptersToFile(mkvextract, videoPath, embPath, m_processManager))
+        if (ChapterHelper::extractEmbeddedChaptersToFile(mkvextract, videoPath, embPath, m_processRunner))
         {
             const QList<ChapterMarker> markers = ChapterHelper::loadChaptersFromFile(embPath);
             if (!markers.isEmpty())
@@ -268,7 +277,7 @@ QString ManualAssembler::resolveChaptersPathForMkvMerge()
                                       QStringLiteral("json"),
                                       QStringLiteral("-i"),
                                       videoPath};
-            if (m_processManager->executeAndWait(ffprobePath, args, json))
+            if (m_processRunner->executeAndWait(ffprobePath, args, json))
             {
                 const QList<ChapterMarker> markers = ChapterHelper::parseFfprobeChaptersJson(json);
                 if (!markers.isEmpty() && ChapterHelper::writeMatroskaChapterXml(markers, muxPath))
@@ -537,12 +546,12 @@ void ManualAssembler::assemble()
         args << "--track-order" << trackOrder.join(',');
     }
 
-    m_processManager->startProcess(mkvmergePath, args);
+    m_processRunner->startProcess(mkvmergePath, args);
 }
 
 void ManualAssembler::onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
-    if ((m_processManager != nullptr) && m_processManager->wasKilled())
+    if ((m_processRunner != nullptr) && m_processRunner->wasKilled())
     {
         emit logMessage("Ручная сборка отменена пользователем.", LogCategory::APP);
         emit finished(false);
@@ -685,13 +694,8 @@ void ManualAssembler::onConversionProgress()
 void ManualAssembler::cancelOperation()
 {
     emit logMessage("Получена команда на отмену ручной сборки...", LogCategory::APP);
-    if (m_processManager != nullptr)
+    if (m_processRunner != nullptr)
     {
-        m_processManager->killProcess();
+        m_processRunner->killProcess();
     }
-}
-
-ProcessManager* ManualAssembler::getProcessManager() const
-{
-    return m_processManager;
 }

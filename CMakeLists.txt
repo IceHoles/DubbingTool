@@ -48,6 +48,7 @@ set(SOURCES_PROCESSING
     src/processing/fontfinder.cpp
     src/processing/manualassembler.cpp
     src/processing/manualrenderer.cpp
+    src/processing/mediaprobe.cpp
     src/processing/postgenerator.cpp
     src/processing/renderhelper.cpp
     src/processing/telegramformatter.cpp
@@ -89,6 +90,7 @@ set(HEADERS_PROCESSING
     src/processing/fontfinder.h
     src/processing/manualassembler.h
     src/processing/manualrenderer.h
+    src/processing/mediaprobe.h
     src/processing/postgenerator.h
     src/processing/renderhelper.h
     src/processing/telegramformatter.h
@@ -251,6 +253,10 @@ if(BUILD_TESTING)
         src/core/processmanager.cpp
         src/processing/fontfinder.cpp
         src/processing/assprocessor.cpp
+        src/processing/manualassembler.cpp
+        src/processing/manualrenderer.cpp
+        src/processing/mediaprobe.cpp
+        src/processing/renderhelper.cpp
         src/processing/telegramformatter.cpp
         src/processing/postgenerator.cpp
         src/models/releasetemplate.cpp
@@ -263,6 +269,10 @@ if(BUILD_TESTING)
         src/core/processmanager.h
         src/processing/fontfinder.h
         src/processing/assprocessor.h
+        src/processing/manualassembler.h
+        src/processing/manualrenderer.h
+        src/processing/mediaprobe.h
+        src/processing/renderhelper.h
         src/processing/telegramformatter.h
         src/processing/postgenerator.h
         src/models/releasetemplate.h
@@ -351,6 +361,25 @@ if(BUILD_TESTING)
     target_link_libraries(manualrenderer_test PRIVATE DubbingToolTestSupport Qt6::Test)
     add_test(NAME ManualRendererTest COMMAND manualrenderer_test)
 
+    add_executable(mediaprobe_test tests/mediaprobe_test.cpp)
+    set_target_properties(mediaprobe_test PROPERTIES AUTOMOC ON)
+    target_link_libraries(mediaprobe_test PRIVATE DubbingToolTestSupport Qt6::Test)
+    add_test(NAME MediaProbeTest COMMAND mediaprobe_test)
+
+    add_executable(manualassembler_test
+        tests/manualassembler_test.cpp
+        tests/fakeprocessrunner.cpp
+        tests/fakeprocessrunner.h
+    )
+    set_target_properties(manualassembler_test PROPERTIES AUTOMOC ON)
+    target_include_directories(manualassembler_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/core
+        ${CMAKE_SOURCE_DIR}/src/processing
+        ${CMAKE_SOURCE_DIR}/tests
+    )
+    target_link_libraries(manualassembler_test PRIVATE DubbingToolTestSupport Qt6::Test)
+    add_test(NAME ManualAssemblerTest COMMAND manualassembler_test)
+
     add_executable(ffmpeg_smoke_test tests/ffmpeg_smoke_test.cpp)
     set_target_properties(ffmpeg_smoke_test PROPERTIES AUTOMOC ON)
     target_link_libraries(ffmpeg_smoke_test PRIVATE Qt6::Core Qt6::Test)
@@ -361,7 +390,7 @@ if(BUILD_TESTING)
         get_filename_component(_qt_bin_for_tests "${Qt6_DIR}/../../../bin" ABSOLUTE)
         set(_ctest_path "${_qt_bin_for_tests};$ENV{PATH}")
         string(REPLACE ";" "\\;" _ctest_path_esc "${_ctest_path}")
-        set_tests_properties(FontFinderTest ChapterHelperTest TelegramFormatterTest PostGeneratorTest ManualRendererTest FfmpegSmokeTest PROPERTIES
+        set_tests_properties(FontFinderTest ChapterHelperTest TelegramFormatterTest PostGeneratorTest ManualRendererTest MediaProbeTest ManualAssemblerTest FfmpegSmokeTest PROPERTIES
             ENVIRONMENT "PATH=${_ctest_path_esc}")
     endif()
 endif()

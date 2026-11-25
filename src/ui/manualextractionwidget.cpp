@@ -1,14 +1,12 @@
 #include "manualextractionwidget.h"
 
 #include "appsettings.h" // Здесь должен быть LogCategory
+#include "mediaprobe.h"
 #include "ui_manualextractionwidget.h"
 
 #include <QDir>
 #include <QDragEnterEvent>
 #include <QFileDialog>
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QJsonObject>
 #include <QMimeData>
 #include <QRegularExpression>
 
@@ -220,13 +218,8 @@ QString ManualExtractionWidget::getExtensionForMkvCodec(const QString& codecId, 
 
 void ManualExtractionWidget::parseMkvJson(const QByteArray& data)
 {
-    QJsonDocument doc = QJsonDocument::fromJson(data);
-    QJsonObject root = doc.object();
-    if (root.contains("container") && root["container"].toObject().contains("properties"))
-    {
-        double durationNs = root["container"].toObject()["properties"].toObject()["duration"].toDouble();
-        m_durationSec = durationNs / 1000000000.0;
-    }
+    const MediaProbeResult result = MediaProbe::parseMkvMergeJson(data);
+    m_durationSec = static_cast<double>(result.durationNs) / 1000000000.0;
 
     QTreeWidgetItem* videoRoot = new QTreeWidgetItem(ui->tracksTree, {"Видео"});
     QTreeWidgetItem* audioRoot = new QTreeWidgetItem(ui->tracksTree, {"Аудио"});
@@ -239,99 +232,62 @@ void ManualExtractionWidget::parseMkvJson(const QByteArray& data)
     subsRoot->setExpanded(true);
     attachRoot->setExpanded(false);
 
-    // 1. Парсим дорожки
-    int videoCounter = 0;
-    int audioCounter = 0;
-    int subsCounter = 0;
-    QJsonArray tracks = root["tracks"].toArray();
-    for (const QJsonValue& v : tracks)
+    auto addTrackItem = [this](QTreeWidgetItem* parent, const MediaTrackInfo& track, const QString& type)
     {
-        QJsonObject track = v.toObject();
-        QJsonObject props = track["properties"].toObject();
-
-        QString type = track["type"].toString();
-        int id = track["id"].toInt();
-        QString codecName = track["codec"].toString();
-        QString codecIdProp = props["codec_id"].toString();
-        QString combinedInfo = codecName + " " + codecIdProp;
+        QString combinedInfo = track.codec + " " + track.codecId;
         QString ext = getExtensionForMkvCodec(combinedInfo, type);
-
-        QString lang = props.contains("language") ? props["language"].toString() : "und";
-        QString name = props["track_name"].toString();
-
-        int typeIndex = 0;
-        QTreeWidgetItem* parentItem = nullptr;
-        if (type == "video")
-        {
-            parentItem = videoRoot;
-            typeIndex = videoCounter++;
-        }
-        else if (type == "audio")
-        {
-            parentItem = audioRoot;
-            typeIndex = audioCounter++;
-        }
-        else if (type == "subtitles")
-        {
-            parentItem = subsRoot;
-            typeIndex = subsCounter++;
-        }
-        else
-        {
-            parentItem = ui->tracksTree->invisibleRootItem();
-        }
-
-        QTreeWidgetItem* item = new QTreeWidgetItem(parentItem);
-
-        // Формируем описание
-        QString displayName = name.isEmpty() ? type : name;
+        QTreeWidgetItem* item = new QTreeWidgetItem(parent);
+        QString displayName = track.trackName.isEmpty() ? type : track.trackName;
         item->setText(0, displayName);
-        item->setText(1, QString::number(id));
+        item->setText(1, QString::number(track.id));
         item->setText(2, ext);
-        item->setText(3, lang);
+        item->setText(3, track.language);
         item->setText(4, combinedInfo);
 
         // Сохраняем данные для экстракта
         item->setData(0, Qt::UserRole, "track");
-        item->setData(1, Qt::UserRole, id);
+        item->setData(1, Qt::UserRole, track.id);
         item->setData(2, Qt::UserRole, ext);
         item->setData(3, Qt::UserRole, type);
-        item->setData(4, Qt::UserRole, typeIndex);
+        item->setData(4, Qt::UserRole, track.typeIndex);
 
         item->setCheckState(0, Qt::Unchecked);
+    };
+
+    for (const auto& track : result.videoTracks)
+    {
+        addTrackItem(videoRoot, track, "video");
+    }
+    for (const auto& track : result.audioTracks)
+    {
+        addTrackItem(audioRoot, track, "audio");
+    }
+    for (const auto& track : result.subtitleTracks)
+    {
+        addTrackItem(subsRoot, track, "subtitles");
     }
 
-    // 2. Парсим вложения (Шрифты)
-    if (root.contains("attachments"))
+    for (const auto& att : result.attachments)
     {
-        QJsonArray atts = root["attachments"].toArray();
-        for (const QJsonValue& v : atts)
+        QTreeWidgetItem* item = new QTreeWidgetItem(attachRoot);
+        item->setText(0, att.fileName);
+        item->setText(1, QString::number(att.id));
+        item->setText(2, "attach");
+        item->setText(4, att.contentType);
+
+        item->setData(0, Qt::UserRole, "attachment");
+        item->setData(1, Qt::UserRole, att.id);
+        item->setData(2, Qt::UserRole, att.fileName);
+
+        // Авто-выбор шрифтов, если это шрифт
+        if ((att.contentType.contains("font") || att.fileName.endsWith(".ttf") || att.fileName.endsWith(".otf")) &&
+            ui->extractFontsCheckBox->isChecked())
         {
-            QJsonObject att = v.toObject();
-            int id = att["id"].toInt();
-            QString fileName = att["file_name"].toString();
-            QString mime = att["content_type"].toString();
-
-            QTreeWidgetItem* item = new QTreeWidgetItem(attachRoot);
-            item->setText(0, fileName);
-            item->setText(1, QString::number(id));
-            item->setText(2, "attach");
-            item->setText(4, mime);
-
-            item->setData(0, Qt::UserRole, "attachment");
-            item->setData(1, Qt::UserRole, id);
-            item->setData(2, Qt::UserRole, fileName);
-
-            // Авто-выбор шрифтов, если это шрифт
-            if ((mime.contains("font") || fileName.endsWith(".ttf") || fileName.endsWith(".otf")) &&
-                ui->extractFontsCheckBox->isChecked())
-            {
-                item->setCheckState(0, Qt::Checked);
-            }
-            else
-            {
-                item->setCheckState(0, Qt::Unchecked);
-            }
+            item->setCheckState(0, Qt::Checked);
+        }
+        else
+        {
+            item->setCheckState(0, Qt::Unchecked);
         }
     }
 }

@@ -2,10 +2,24 @@
 
 #include "ui_trackselectordialog.h"
 
-TrackSelectorDialog::TrackSelectorDialog(const QList<AudioTrackInfo>& tracks, QWidget* parent)
+#include <QPushButton>
+
+TrackSelectorDialog::TrackSelectorDialog(const QList<AudioTrackInfo>& tracks, QWidget* parent, bool allowDecline)
     : QDialog(parent), ui(new Ui::TrackSelectorDialog), m_tracks(tracks)
 {
     ui->setupUi(this);
+
+    if (allowDecline)
+    {
+        if (auto* btn = ui->buttonBox->button(QDialogButtonBox::Cancel))
+        {
+            btn->setText(tr("Не использовать звук из видео"));
+        }
+        if (auto* btn = ui->buttonBox->button(QDialogButtonBox::Ok))
+        {
+            btn->setText(tr("Выбрать"));
+        }
+    }
 
     for (const auto& track : m_tracks)
     {
@@ -14,6 +28,10 @@ TrackSelectorDialog::TrackSelectorDialog(const QList<AudioTrackInfo>& tracks, QW
                                .arg(track.codec)
                                .arg(track.language)
                                .arg(track.name.isEmpty() ? "Без имени" : track.name);
+        if (track.channels > 0)
+        {
+            itemText += QString(" | Каналы: %1").arg(track.channels);
+        }
         ui->tracksListWidget->addItem(itemText);
     }
 
@@ -36,4 +54,16 @@ int TrackSelectorDialog::getSelectedTrackId() const
         return m_tracks[currentRow].id;
     }
     return -1; // В случае ошибки или отмены
+}
+
+void TrackSelectorDialog::setSelectedTrackId(int trackId)
+{
+    for (int i = 0; i < m_tracks.size(); ++i)
+    {
+        if (m_tracks[i].id == trackId)
+        {
+            ui->tracksListWidget->setCurrentRow(i);
+            break;
+        }
+    }
 }

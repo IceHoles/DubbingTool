@@ -1,6 +1,6 @@
 #include "chapterhelper.h"
 
-#include "processmanager.h"
+#include "iprocessrunner.h"
 
 #include <QCryptographicHash>
 #include <QDateTime>
@@ -347,7 +347,7 @@ QList<ChapterMarker> ChapterHelper::loadChaptersFromFile(const QString& path)
 }
 
 bool ChapterHelper::extractEmbeddedChaptersToFile(const QString& mkvextractPath, const QString& mkvPath,
-                                                  const QString& outXmlPath, ProcessManager* proc)
+                                                  const QString& outXmlPath, IProcessRunner* proc)
 {
     if (!QFileInfo::exists(mkvextractPath) || !QFileInfo::exists(mkvPath))
     {
@@ -611,7 +611,7 @@ bool ChapterHelper::writeOgmChapterText(const QList<ChapterMarker>& chapters, co
 }
 
 bool ChapterHelper::applyChaptersToMp4(const QString& mp4Path, const QList<ChapterMarker>& chapters, qint64 durationNs,
-                                       const QString& ffmpegPath, ProcessManager* proc, QString* errorMessage)
+                                       const QString& ffmpegPath, IProcessRunner* proc, QString* errorMessage)
 {
     if (chapters.isEmpty() || !QFileInfo::exists(mp4Path) || ffmpegPath.isEmpty())
     {

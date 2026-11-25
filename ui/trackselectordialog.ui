@@ -81,7 +81,7 @@
    </hints>
   </connection>
   <connection>
-   <sender>trackListWidget</sender>
+   <sender>tracksListWidget</sender>
    <signal>itemDoubleClicked(QListWidgetItem*)</signal>
    <receiver>TrackSelectorDialog</receiver>
    <slot>accept()</slot>

@@ -2,10 +2,11 @@
 #define RENDERHELPER_H
 
 #include "appsettings.h"
+#include "iprocessrunner.h"
 
 #include <QObject>
 
-class ProcessManager;
+class IProcessRunner;
 
 enum class RerenderDecision
 {
@@ -18,7 +19,7 @@ class RenderHelper : public QObject
     Q_OBJECT
 
 public:
-    explicit RenderHelper(RenderPreset preset, const QString& outputMp4Path, ProcessManager* procManager,
+    explicit RenderHelper(RenderPreset preset, const QString& outputMp4Path, IProcessRunner* procManager,
                           QObject* parent = nullptr);
 
     void startCheck();
@@ -34,7 +35,7 @@ public slots:
 private:
     RenderPreset m_preset;
     QString m_outputMp4Path;
-    ProcessManager* m_procManager;
+    IProcessRunner* m_procManager;
 };
 
 #endif // RENDERHELPER_H

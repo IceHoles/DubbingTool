@@ -2,23 +2,32 @@
 #define MANUALASSEMBLER_H
 
 #include "appsettings.h"
+#include "iprocessrunner.h"
 
 #include <QObject>
 #include <QProcess>
 #include <QTimer>
 #include <QVariantMap>
 
-class ProcessManager;
+class IProcessRunner;
 
 class ManualAssembler : public QObject
 {
     Q_OBJECT
 
 public:
-    explicit ManualAssembler(const QVariantMap& params, QObject* parent = nullptr);
-    ~ManualAssembler();
+    explicit ManualAssembler(const QVariantMap& params, QObject* parent = nullptr,
+                             IProcessRunner* processRunner = nullptr);
+    ~ManualAssembler() override;
     void start();
-    ProcessManager* getProcessManager() const;
+    IProcessRunner* getProcessRunner() const
+    {
+        return m_processRunner;
+    }
+    IProcessRunner* getProcessManager() const
+    {
+        return m_processRunner;
+    }
 
 public slots:
     void cancelOperation();
@@ -42,7 +51,8 @@ private:
     void assemble();
 
     QVariantMap m_params;
-    ProcessManager* m_processManager;
+    IProcessRunner* m_processRunner = nullptr;
+    bool m_ownsProcessRunner = false;
 
     enum class Step
     {

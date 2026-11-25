@@ -11,7 +11,7 @@
 #include <QStringList>
 #include <QVariantMap>
 
-class ProcessManager;
+class IProcessRunner;
 
 enum class RenderState
 {
@@ -38,11 +38,20 @@ class ManualRenderer : public QObject
     Q_OBJECT
 
 public:
-    explicit ManualRenderer(const QVariantMap& params, QObject* parent = nullptr);
-    ~ManualRenderer();
+    explicit ManualRenderer(const QVariantMap& params, QObject* parent = nullptr,
+                            IProcessRunner* processRunner = nullptr);
+    ~ManualRenderer() override;
 
     void start();
-    ProcessManager* getProcessManager() const;
+    bool parsePreset(const QString& commandTemplate, QStringList& outVideoArgs, QStringList& outAudioArgs);
+    IProcessRunner* getProcessRunner() const
+    {
+        return m_processRunner;
+    }
+    IProcessRunner* getProcessManager() const
+    {
+        return m_processRunner;
+    }
 
 public slots:
     void cancelOperation();
@@ -59,13 +68,16 @@ private slots:
     void onBitrateCheckFinished(RerenderDecision decision, const RenderPreset& newPreset);
 
 private:
+#ifdef DUBBINGTOOL_ENABLE_TEST_HOOKS
+    friend class ManualRendererTest;
+#endif
     void runStep();
-    bool parsePreset(const QString& commandTemplate, QStringList& outVideoArgs, QStringList& outAudioArgs);
     void cleanupTempFiles();
     QList<ChapterMarker> prepareChapters();
 
     QVariantMap m_params;
-    ProcessManager* m_processManager = nullptr;
+    IProcessRunner* m_processRunner = nullptr;
+    bool m_ownsProcessRunner = false;
     RenderPreset m_preset;
 
     RenderState m_currentState = RenderState::Init;
@@ -76,7 +88,6 @@ private:
     QString m_tempVideoMp4;
     QString m_tempAudioM4a;
     QString m_tempChaptersTxt;
-    QString m_tempMuxedMp4;
     QString m_finalOutputMp4;
 
     QStringList m_currentVideoArgs;

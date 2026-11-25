@@ -2,7 +2,7 @@
 
 #include <QFileInfo>
 
-ProcessManager::ProcessManager(QObject* parent) : QObject{parent}
+ProcessManager::ProcessManager(QObject* parent) : IProcessRunner{parent}
 {
 }
 

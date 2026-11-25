@@ -3,6 +3,8 @@
 
 #include <QWidget>
 
+class MediaProbe;
+
 namespace Ui
 {
 class ManualRenderWidget;
@@ -42,6 +44,7 @@ signals:
 private:
     void setInputVideoPath(const QString& path);
 
+    MediaProbe* m_mediaProbe = nullptr;
     Ui::ManualRenderWidget* ui;
 };
 

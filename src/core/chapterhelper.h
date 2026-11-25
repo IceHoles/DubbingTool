@@ -6,7 +6,7 @@
 #include <QMetaType>
 #include <QString>
 
-class ProcessManager;
+class IProcessRunner;
 
 struct ChapterMarker
 {
@@ -37,7 +37,7 @@ QList<ChapterMarker> loadChaptersFromFile(const QString& path);
 
 /// Extract embedded chapters from MKV to XML file; returns false on failure.
 bool extractEmbeddedChaptersToFile(const QString& mkvextractPath, const QString& mkvPath, const QString& outXmlPath,
-                                   ProcessManager* proc);
+                                   IProcessRunner* proc);
 
 QList<ChapterMarker> parseFfprobeChaptersJson(const QByteArray& json);
 
@@ -55,7 +55,7 @@ bool writeOgmChapterText(const QList<ChapterMarker>& chapters, const QString& ou
 
 /// Remux MP4 with chapters from ffmetadata (stream copy). Returns false on error.
 bool applyChaptersToMp4(const QString& mp4Path, const QList<ChapterMarker>& chapters, qint64 durationNs,
-                        const QString& ffmpegPath, ProcessManager* proc, QString* errorMessage = nullptr);
+                        const QString& ffmpegPath, IProcessRunner* proc, QString* errorMessage = nullptr);
 } // namespace ChapterHelper
 
 #endif

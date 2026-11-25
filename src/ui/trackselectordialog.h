@@ -7,10 +7,11 @@
 
 struct AudioTrackInfo
 {
-    int id;
+    int id = -1;
     QString codec;
     QString name;
     QString language;
+    int channels = 0;
 };
 
 namespace Ui
@@ -23,10 +24,12 @@ class TrackSelectorDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit TrackSelectorDialog(const QList<AudioTrackInfo>& tracks, QWidget* parent = nullptr);
-    ~TrackSelectorDialog();
+    explicit TrackSelectorDialog(const QList<AudioTrackInfo>& tracks, QWidget* parent = nullptr,
+                                 bool allowDecline = false);
+    ~TrackSelectorDialog() override;
 
     int getSelectedTrackId() const;
+    void setSelectedTrackId(int trackId);
 
 private:
     Ui::TrackSelectorDialog* ui;

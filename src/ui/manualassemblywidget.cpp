@@ -2,28 +2,21 @@
 
 #include "appsettings.h"
 #include "fontfinder.h"
+#include "mediaprobe.h"
+#include "trackselectordialog.h"
 #include "ui_manualassemblywidget.h"
 
-#include <QDialog>
-#include <QDialogButtonBox>
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QFileDialog>
 #include <QFileInfo>
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QLabel>
-#include <QListWidget>
 #include <QListWidgetItem>
 #include <QMessageBox>
 #include <QMimeData>
-#include <QProcess>
 #include <QPushButton>
 #include <QSettings>
 #include <QTimer>
 #include <QUrl>
-#include <QVBoxLayout>
 #include <QVariantMap>
 
 ManualAssemblyWidget::ManualAssemblyWidget(QWidget* parent)
@@ -39,6 +32,9 @@ ManualAssemblyWidget::ManualAssemblyWidget(QWidget* parent)
     }
 
     connect(m_fontFinder, &FontFinder::finished, this, &ManualAssemblyWidget::onFontFinderFinished);
+
+    m_mediaProbe = new MediaProbe(this);
+    connect(m_mediaProbe, &MediaProbe::finished, this, &ManualAssemblyWidget::onMediaProbeFinished);
 
     const bool hasNugenAmb = AppSettings::instance().isNugenAmbAvailable();
     ui->normalizeAudioCheckBox->setEnabled(hasNugenAmb);
@@ -78,25 +74,30 @@ void ManualAssemblyWidget::probeVideoAudioTracks(const QString& videoPath, bool 
         m_selectedVideoTrackId = -1;
         m_selectedVideoAudioTrackId = -1;
         m_hasAudioInVideo = false;
+        m_isProbingVideo = false;
         ui->selectAudioFromVideoButton->setEnabled(false);
         ui->originalAudioPathEdit->setPlaceholderText(QString());
         return;
     }
 
-    if (videoPath == m_lastProbedVideoPath)
+    if (videoPath == m_lastProbedVideoPath && (m_isProbingVideo || !m_videoAudioTracks.isEmpty()))
     {
         return;
     }
 
     m_lastProbedVideoPath = videoPath;
+    m_autoPromptAudio = autoPrompt;
     m_videoAudioTracks.clear();
     m_selectedVideoTrackId = -1;
     m_selectedVideoAudioTrackId = -1;
     m_hasAudioInVideo = false;
+    m_isProbingVideo = true;
+    ui->originalAudioPathEdit->setPlaceholderText("Анализ дорожек видео...");
 
     const QString ext = QFileInfo(videoPath).suffix().toLower();
     if (ext != "mp4" && ext != "mkv" && ext != "m4v" && ext != "mov" && ext != "ts")
     {
+        m_isProbingVideo = false;
         ui->selectAudioFromVideoButton->setEnabled(false);
         ui->originalAudioPathEdit->setPlaceholderText(QString());
         return;
@@ -105,50 +106,46 @@ void ManualAssemblyWidget::probeVideoAudioTracks(const QString& videoPath, bool 
     const QString mkvmergeExe = AppSettings::instance().mkvmergePath();
     if (mkvmergeExe.isEmpty() || !QFileInfo::exists(mkvmergeExe))
     {
+        m_isProbingVideo = false;
+        ui->originalAudioPathEdit->setPlaceholderText(QString());
         return;
     }
 
-    QProcess process;
-    process.start(mkvmergeExe, {"--identify", "--identification-format", "json", videoPath});
-    if (!process.waitForFinished(5000))
+    m_mediaProbe->probeFileAsync(mkvmergeExe, videoPath);
+}
+
+void ManualAssemblyWidget::onMediaProbeFinished(const QString& filePath, const MediaProbeResult& result)
+{
+    m_isProbingVideo = false;
+
+    if (filePath != m_lastProbedVideoPath || !result.ok)
     {
-        process.kill();
+        if (filePath == m_lastProbedVideoPath && !result.ok)
+        {
+            ui->originalAudioPathEdit->setPlaceholderText(QString());
+            ui->selectAudioFromVideoButton->setEnabled(false);
+        }
+        if (m_notifyIfNoAudio)
+        {
+            m_notifyIfNoAudio = false;
+            QMessageBox::information(this, "Аудиодорожки", "В выбранном видеофайле не обнаружено аудиодорожек.");
+        }
         return;
     }
 
-    const QByteArray output = process.readAllStandardOutput();
-    const QJsonDocument doc = QJsonDocument::fromJson(output);
-    const QJsonObject root = doc.object();
-    const QJsonArray tracks = root["tracks"].toArray();
-
-    for (const QJsonValue& val : tracks)
+    if (!result.videoTracks.isEmpty())
     {
-        const QJsonObject track = val.toObject();
-        const QString type = track["type"].toString();
-        if (type == "video")
-        {
-            if (m_selectedVideoTrackId == -1)
-            {
-                m_selectedVideoTrackId = track["id"].toInt();
-            }
-        }
-        else if (type == "audio")
-        {
-            ContainerAudioTrack t;
-            t.id = track["id"].toInt();
-            t.codec = track["codec"].toString();
-            const QJsonObject props = track["properties"].toObject();
-            t.language = props.contains("language") ? props["language"].toString() : "und";
-            t.trackName = props["track_name"].toString();
-            t.channels = props["audio_channels"].toInt();
-            m_videoAudioTracks.append(t);
-        }
+        m_selectedVideoTrackId = result.videoTracks.first().id;
     }
-
-    if (m_selectedVideoTrackId == -1)
+    else
     {
         m_selectedVideoTrackId = 0;
     }
+
+    m_videoAudioTracks = result.audioTracks;
+
+    const bool userExplicitlyClicked = m_notifyIfNoAudio;
+    m_notifyIfNoAudio = false;
 
     if (m_videoAudioTracks.isEmpty())
     {
@@ -156,6 +153,10 @@ void ManualAssemblyWidget::probeVideoAudioTracks(const QString& videoPath, bool 
         m_selectedVideoAudioTrackId = -1;
         ui->selectAudioFromVideoButton->setEnabled(false);
         ui->originalAudioPathEdit->setPlaceholderText(QString());
+        if (userExplicitlyClicked)
+        {
+            QMessageBox::information(this, "Аудиодорожки", "В выбранном видеофайле не обнаружено аудиодорожек.");
+        }
     }
     else if (m_videoAudioTracks.size() == 1)
     {
@@ -169,12 +170,16 @@ void ManualAssemblyWidget::probeVideoAudioTracks(const QString& videoPath, bool 
         {
             ui->languageEdit->setText(t.language);
         }
+        if (userExplicitlyClicked)
+        {
+            promptUserForAudioTrack(m_videoAudioTracks);
+        }
     }
     else
     {
         m_hasAudioInVideo = true;
         ui->selectAudioFromVideoButton->setEnabled(true);
-        if (autoPrompt)
+        if (m_autoPromptAudio || userExplicitlyClicked)
         {
             promptUserForAudioTrack(m_videoAudioTracks);
         }
@@ -186,56 +191,36 @@ void ManualAssemblyWidget::probeVideoAudioTracks(const QString& videoPath, bool 
     }
 }
 
-bool ManualAssemblyWidget::promptUserForAudioTrack(const QList<ContainerAudioTrack>& tracks)
+bool ManualAssemblyWidget::promptUserForAudioTrack(const QList<MediaTrackInfo>& tracks)
 {
     if (tracks.isEmpty())
     {
         return false;
     }
 
-    QDialog dialog(this);
-    dialog.setWindowTitle("Выбор оригинальной аудиодорожки");
-    dialog.setMinimumWidth(440);
-
-    auto* layout = new QVBoxLayout(&dialog);
-    auto* label = new QLabel(QString("В видеофайле найдено несколько аудиодорожек (%1).\n"
-                                     "Выберите дорожку для использования в качестве оригинального аудио:")
-                                 .arg(tracks.size()),
-                             &dialog);
-    layout->addWidget(label);
-
-    auto* listWidget = new QListWidget(&dialog);
-    for (int i = 0; i < tracks.size(); ++i)
+    QList<AudioTrackInfo> dialogTracks;
+    dialogTracks.reserve(tracks.size());
+    for (const auto& t : tracks)
     {
-        const auto& t = tracks.at(i);
-        QString desc = QString("Дорожка #%1: %2 (%3%4)%5")
-                           .arg(t.id)
-                           .arg(t.language.toUpper())
-                           .arg(t.codec)
-                           .arg(t.channels > 0 ? QString(", %1ch").arg(t.channels) : QString())
-                           .arg(!t.trackName.isEmpty() ? QString(" — %1").arg(t.trackName) : QString());
-
-        auto* item = new QListWidgetItem(desc, listWidget);
-        item->setData(Qt::UserRole, t.id);
-        if (t.id == m_selectedVideoAudioTrackId || (m_selectedVideoAudioTrackId == -1 && i == 0))
-        {
-            listWidget->setCurrentItem(item);
-        }
+        AudioTrackInfo info;
+        info.id = t.id;
+        info.codec = t.codec;
+        info.name = t.trackName;
+        info.language = t.language;
+        info.channels = t.channels;
+        dialogTracks.append(info);
     }
-    layout->addWidget(listWidget);
-    connect(listWidget, &QListWidget::itemDoubleClicked, &dialog, &QDialog::accept);
 
-    auto* btnBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
-    btnBox->button(QDialogButtonBox::Ok)->setText("Выбрать");
-    btnBox->button(QDialogButtonBox::Cancel)->setText("Не использовать звук из видео");
-    layout->addWidget(btnBox);
-
-    connect(btnBox, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
-    connect(btnBox, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-
-    if (dialog.exec() == QDialog::Accepted && listWidget->currentItem())
+    TrackSelectorDialog dialog(dialogTracks, this, true);
+    if (m_selectedVideoAudioTrackId >= 0)
     {
-        m_selectedVideoAudioTrackId = listWidget->currentItem()->data(Qt::UserRole).toInt();
+        dialog.setSelectedTrackId(m_selectedVideoAudioTrackId);
+    }
+
+    if (dialog.exec() == QDialog::Accepted)
+    {
+        m_selectedVideoAudioTrackId = dialog.getSelectedTrackId();
+        ui->includeOriginalAudioCheckBox->setChecked(true);
         ui->originalAudioPathEdit->clear();
         for (const auto& t : tracks)
         {
@@ -263,19 +248,27 @@ bool ManualAssemblyWidget::promptUserForAudioTrack(const QList<ContainerAudioTra
 
 void ManualAssemblyWidget::on_selectAudioFromVideoButton_clicked()
 {
-    if (m_videoAudioTracks.isEmpty())
+    const QString videoPath = ui->videoPathEdit->text().trimmed();
+    if (videoPath.isEmpty() || !QFileInfo::exists(videoPath))
     {
-        probeVideoAudioTracks(ui->videoPathEdit->text().trimmed(), false);
+        return;
     }
 
-    if (!m_videoAudioTracks.isEmpty())
+    if (m_isProbingVideo)
     {
-        promptUserForAudioTrack(m_videoAudioTracks);
+        m_notifyIfNoAudio = true;
+        return;
     }
-    else
+
+    if (m_videoAudioTracks.isEmpty())
     {
-        QMessageBox::information(this, "Аудиодорожки", "В выбранном видеофайле не обнаружено аудиодорожек.");
+        m_lastProbedVideoPath.clear();
+        m_notifyIfNoAudio = true;
+        probeVideoAudioTracks(videoPath, true);
+        return;
     }
+
+    promptUserForAudioTrack(m_videoAudioTracks);
 }
 
 void ManualAssemblyWidget::updateChaptersUiVisibility()
@@ -466,6 +459,7 @@ void ManualAssemblyWidget::on_browseVideo_clicked()
     if (browseForFile(ui->videoPathEdit, "Выберите видеофайл",
                       "Видеофайлы (*.mp4 *.mkv *.h264 *.h265 *.avc *.hevc *.mov *.ts);;Все файлы (*)"))
     {
+        ui->includeVideoCheckBox->setChecked(true);
         const QString path = ui->videoPathEdit->text().trimmed();
         if (!path.isEmpty())
         {
@@ -477,24 +471,36 @@ void ManualAssemblyWidget::on_browseVideo_clicked()
 
 void ManualAssemblyWidget::on_browseOriginalAudio_clicked()
 {
-    browseForFile(ui->originalAudioPathEdit, "Выберите оригинальную аудиодорожку",
-                  "Аудиофайлы (*.aac *.ac3 *.eac3 *.flac *.wav *.opus *.m4a *.mka);;Все файлы (*)");
+    if (browseForFile(ui->originalAudioPathEdit, "Выберите оригинальную аудиодорожку",
+                      "Аудиофайлы (*.aac *.ac3 *.eac3 *.flac *.wav *.opus *.m4a *.mka);;Все файлы (*)"))
+    {
+        ui->includeOriginalAudioCheckBox->setChecked(true);
+    }
 }
 
 void ManualAssemblyWidget::on_browseRussianAudio_clicked()
 {
-    browseForFile(ui->russianAudioPathEdit, "Выберите русскую аудиодорожку",
-                  "Аудиофайлы (*.wav *.aac *.flac *.m4a *.mka);;Все файлы (*)");
+    if (browseForFile(ui->russianAudioPathEdit, "Выберите русскую аудиодорожку",
+                      "Аудиофайлы (*.wav *.aac *.flac *.m4a *.mka);;Все файлы (*)"))
+    {
+        ui->includeRussianAudioCheckBox->setChecked(true);
+    }
 }
 
 void ManualAssemblyWidget::on_browseSubtitles_clicked()
 {
-    browseForFile(ui->subtitlesPathEdit, "Выберите файл полных субтитров", "Subtitles (*.ass *.srt)");
+    if (browseForFile(ui->subtitlesPathEdit, "Выберите файл полных субтитров", "Subtitles (*.ass *.srt)"))
+    {
+        ui->includeSubtitlesCheckBox->setChecked(true);
+    }
 }
 
 void ManualAssemblyWidget::on_browseSigns_clicked()
 {
-    browseForFile(ui->signsPathEdit, "Выберите файл надписей", "Subtitles (*.ass *.srt)");
+    if (browseForFile(ui->signsPathEdit, "Выберите файл надписей", "Subtitles (*.ass *.srt)"))
+    {
+        ui->includeSignsCheckBox->setChecked(true);
+    }
 }
 
 void ManualAssemblyWidget::on_analyzeSubsButton_clicked()
@@ -522,15 +528,34 @@ void ManualAssemblyWidget::on_analyzeSubsButton_clicked()
 
 void ManualAssemblyWidget::on_addFontsButton_clicked()
 {
-    QStringList paths = QFileDialog::getOpenFileNames(this, "Выберите файлы шрифтов", "",
+    QSettings settings("MyCompany", "DubbingTool");
+    QString lastDir = settings.value("ui/lastBrowseDir").toString();
+    QStringList paths = QFileDialog::getOpenFileNames(this, "Выберите файлы шрифтов", lastDir,
                                                       "Файлы шрифтов (*.ttf *.otf *.ttc);;Все файлы (*)");
+    if (!paths.isEmpty())
+    {
+        settings.setValue("ui/lastBrowseDir", QFileInfo(paths.first()).absolutePath());
+    }
+
     for (const QString& path : paths)
     {
-        auto* item = new QListWidgetItem(QFileInfo(path).fileName());
-        item->setForeground(Qt::magenta);
-        item->setText(item->text() + " - добавлен вручную");
-        item->setData(Qt::UserRole, path);
-        ui->fontsListWidget->addItem(item);
+        bool alreadyExists = false;
+        for (int i = 0; i < ui->fontsListWidget->count(); ++i)
+        {
+            if (ui->fontsListWidget->item(i)->data(Qt::UserRole).toString() == path)
+            {
+                alreadyExists = true;
+                break;
+            }
+        }
+        if (!alreadyExists)
+        {
+            auto* item =
+                new QListWidgetItem(QFileInfo(path).fileName() + tr(" - добавлен вручную"), ui->fontsListWidget);
+            item->setForeground(Qt::magenta);
+            item->setData(Qt::UserRole, path);
+            item->setToolTip(path);
+        }
     }
 }
 
@@ -675,6 +700,12 @@ QString ManualAssemblyWidget::chapterTimingSourcePath() const
 
 void ManualAssemblyWidget::on_assembleButton_clicked()
 {
+    if (m_isProbingVideo)
+    {
+        QMessageBox::information(this, "Анализ видео", "Подождите секунду, идёт анализ дорожек видеофайла.");
+        return;
+    }
+
     if (ui->includeOriginalAudioCheckBox->isChecked() && ui->originalAudioPathEdit->text().trimmed().isEmpty())
     {
         if (m_videoAudioTracks.size() > 1 && m_selectedVideoAudioTrackId < 0)

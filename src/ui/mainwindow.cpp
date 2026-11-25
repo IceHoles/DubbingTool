@@ -745,7 +745,6 @@ void MainWindow::on_startButton_clicked()
         new WorkflowManager(currentTemplate, episodeForPost, episodeForSearch, settings, this);
 
     m_currentWorker = workflowManager; // Сохраняем указатель на текущего воркера
-    m_activeProcessManagers.append(workflowManager->getProcessManager());
     connect(workflowManager, &WorkflowManager::multipleTorrentsFound, this, &MainWindow::onMultipleTorrentsFound,
             Qt::QueuedConnection);
     connect(this, &MainWindow::torrentSelected, workflowManager, &WorkflowManager::resumeWithSelectedTorrent);
@@ -964,7 +963,6 @@ void MainWindow::startManualAssembly()
     ManualAssembler* worker = new ManualAssembler(m_manualAssemblyWidget->getParameters(), nullptr);
 
     m_currentWorker = worker;
-    m_activeProcessManagers.append(worker->getProcessManager());
     worker->moveToThread(thread);
 
     connect(thread, &QThread::started, worker, &ManualAssembler::start);
@@ -1002,7 +1000,6 @@ void MainWindow::startManualRender()
     ManualRenderer* worker = new ManualRenderer(m_manualRenderWidget->getParameters(), nullptr);
 
     m_currentWorker = worker;
-    m_activeProcessManagers.append(worker->getProcessManager());
     worker->moveToThread(thread);
 
     connect(thread, &QThread::started, worker, &ManualRenderer::start);
@@ -1304,13 +1301,6 @@ void MainWindow::finishWorkerProcess()
 
     if (m_currentWorker)
     {
-        if (auto ptr = qobject_cast<WorkflowManager*>(m_currentWorker.data()))
-            m_activeProcessManagers.removeOne(ptr->getProcessManager());
-        else if (auto ptr = qobject_cast<ManualAssembler*>(m_currentWorker.data()))
-            m_activeProcessManagers.removeOne(ptr->getProcessManager());
-        else if (auto ptr = qobject_cast<ManualRenderer*>(m_currentWorker.data()))
-            m_activeProcessManagers.removeOne(ptr->getProcessManager());
-
         if (m_currentWorker->thread())
             m_currentWorker->thread()->quit();
         m_currentWorker = nullptr;

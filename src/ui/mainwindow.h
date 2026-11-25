@@ -112,7 +112,6 @@ private:
     QList<ChapterMarker> m_lastChapterMarkers;
     qint64 m_lastChapterDurationNs = 0;
 
-    QList<ProcessManager*> m_activeProcessManagers;
     QPointer<QObject> m_currentWorker;
 
     QDateTime m_logLastProgressTime;

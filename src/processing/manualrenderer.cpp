@@ -1,16 +1,13 @@
 #include "manualrenderer.h"
 
 #include "appsettings.h"
-#include "assprocessor.h"
 #include "chapterhelper.h"
+#include "mediaprobe.h"
 #include "processmanager.h"
 
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QJsonObject>
 #include <QProcess>
 #include <QRegularExpression>
 
@@ -98,18 +95,27 @@ void applyForcedAacAudioArgs(QStringList& args, const QString& bitrate)
 }
 } // namespace
 
-ManualRenderer::ManualRenderer(const QVariantMap& params, QObject* parent)
-    : QObject(parent), m_params(params), m_processManager(new ProcessManager(this))
+ManualRenderer::ManualRenderer(const QVariantMap& params, QObject* parent, IProcessRunner* processRunner)
+    : QObject(parent), m_params(params), m_processRunner(processRunner)
 {
-    connect(m_processManager, &ProcessManager::processOutput, this, &ManualRenderer::onProcessText);
-    connect(m_processManager, &ProcessManager::processStdErr, this, &ManualRenderer::onProcessText);
-    connect(m_processManager, &ProcessManager::processError, this, &ManualRenderer::onProcessText);
-    connect(m_processManager, &ProcessManager::processFinished, this, &ManualRenderer::onProcessFinished);
+    if (!m_processRunner)
+    {
+        m_processRunner = new ProcessManager(this);
+        m_ownsProcessRunner = true;
+    }
+    connect(m_processRunner, &IProcessRunner::processOutput, this, &ManualRenderer::onProcessText);
+    connect(m_processRunner, &IProcessRunner::processStdErr, this, &ManualRenderer::onProcessText);
+    connect(m_processRunner, &IProcessRunner::processError, this, &ManualRenderer::onProcessText);
+    connect(m_processRunner, &IProcessRunner::processFinished, this, &ManualRenderer::onProcessFinished);
 }
 
 ManualRenderer::~ManualRenderer()
 {
     cleanupTempFiles();
+    if (m_processRunner && m_ownsProcessRunner)
+    {
+        m_processRunner->killProcess();
+    }
 }
 
 void ManualRenderer::start()
@@ -170,7 +176,7 @@ void ManualRenderer::start()
         QStringList ffmpegArgs = {"-y",   "-i",  m_actualInputMkv,       "-map", QString("0:s:%1").arg(trackIndex),
                                   "-c:s", "ass", m_tempExtractedSubsPath};
         QByteArray dummy;
-        if (!m_processManager->executeAndWait(AppSettings::instance().ffmpegPath(), ffmpegArgs, dummy, 120000) ||
+        if (!m_processRunner->executeAndWait(AppSettings::instance().ffmpegPath(), ffmpegArgs, dummy, 120000) ||
             !QFileInfo::exists(m_tempExtractedSubsPath))
         {
             emit logMessage("Ошибка: не удалось извлечь субтитры для хардсаба через ffmpeg.", LogCategory::APP,
@@ -190,13 +196,12 @@ void ManualRenderer::start()
     }
 
     QByteArray jsonData;
-    if (m_processManager->executeAndWait(AppSettings::instance().mkvmergePath(), {"-J", m_actualInputMkv}, jsonData))
+    if (m_processRunner->executeAndWait(AppSettings::instance().mkvmergePath(), {"-J", m_actualInputMkv}, jsonData))
     {
-        QJsonObject root = QJsonDocument::fromJson(jsonData).object();
-        if (root.contains("container"))
+        const MediaProbeResult probeResult = MediaProbe::parseMkvMergeJson(jsonData);
+        if (probeResult.ok && probeResult.durationNs > 0)
         {
-            m_sourceDurationS = static_cast<qint64>(
-                root["container"].toObject()["properties"].toObject()["duration"].toDouble() / 1000000000.0);
+            m_sourceDurationS = static_cast<qint64>(probeResult.durationNs / 1000000000.0);
         }
     }
 
@@ -264,7 +269,7 @@ void ManualRenderer::runStep()
 
     emit progressUpdated(m_currentState == RenderState::MuxMP4Box ? 95 : -1, stepName);
 
-    m_processManager->startProcess(program, args);
+    m_processRunner->startProcess(program, args);
 }
 
 bool ManualRenderer::parsePreset(const QString& commandTemplate, QStringList& outVideoArgs, QStringList& outAudioArgs)
@@ -287,7 +292,7 @@ bool ManualRenderer::parsePreset(const QString& commandTemplate, QStringList& ou
         if (!subFilePath.isEmpty() && QFileInfo::exists(subFilePath))
         {
             QFileInfo fileInfo(subFilePath);
-            m_processManager->setWorkingDirectory(fileInfo.absolutePath());
+            m_processRunner->setWorkingDirectory(fileInfo.absolutePath());
 
             QString extEscaped = fileInfo.fileName().replace("'", "\\'");
             QString filterValue = QString("filename='%1'").arg(extEscaped);
@@ -392,6 +397,11 @@ bool ManualRenderer::parsePreset(const QString& commandTemplate, QStringList& ou
         }
     }
 
+    if (outVideoArgs.isEmpty())
+    {
+        return false;
+    }
+
     outVideoArgs.insert(outVideoArgs.size() - 1, "-an"); // Отключаем звук в видео
 
     if (!isAudioMapFound)
@@ -424,7 +434,7 @@ QList<ChapterMarker> ManualRenderer::prepareChapters()
         const QString kEmbPath =
             QDir(QFileInfo(m_actualInputMkv).absolutePath()).filePath("manual_chapters_extract.xml");
         if (ChapterHelper::extractEmbeddedChaptersToFile(AppSettings::instance().mkvextractPath(), m_actualInputMkv,
-                                                         kEmbPath, m_processManager))
+                                                         kEmbPath, m_processRunner))
         {
             markers = ChapterHelper::loadChaptersFromFile(kEmbPath);
         }
@@ -435,15 +445,15 @@ QList<ChapterMarker> ManualRenderer::prepareChapters()
 void ManualRenderer::cancelOperation()
 {
     emit logMessage("Получена команда на отмену ручного рендера...", LogCategory::APP);
-    if (m_processManager != nullptr)
+    if (m_processRunner != nullptr)
     {
-        m_processManager->killProcess();
+        m_processRunner->killProcess();
     }
 }
 
 void ManualRenderer::onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
-    if (m_processManager != nullptr && m_processManager->wasKilled())
+    if (m_processRunner != nullptr && m_processRunner->wasKilled())
     {
         emit logMessage("Ручной рендер отменен пользователем.", LogCategory::APP);
         emit finished();
@@ -467,7 +477,7 @@ void ManualRenderer::onProcessFinished(int exitCode, QProcess::ExitStatus exitSt
         }
         else
         {
-            auto* helper = new RenderHelper(m_preset, m_tempVideoMp4, m_processManager, this);
+            auto* helper = new RenderHelper(m_preset, m_tempVideoMp4, m_processRunner, this);
             connect(helper, &RenderHelper::logMessage, this, &ManualRenderer::logMessage);
             connect(helper, &RenderHelper::showDialogRequest, this, &ManualRenderer::bitrateCheckRequest);
             connect(helper, &RenderHelper::finished, this, &ManualRenderer::onBitrateCheckFinished);
@@ -477,7 +487,7 @@ void ManualRenderer::onProcessFinished(int exitCode, QProcess::ExitStatus exitSt
 
     case RenderState::VideoPass2:
     {
-        auto* helper = new RenderHelper(m_preset, m_tempVideoMp4, m_processManager, this);
+        auto* helper = new RenderHelper(m_preset, m_tempVideoMp4, m_processRunner, this);
         connect(helper, &RenderHelper::logMessage, this, &ManualRenderer::logMessage);
         connect(helper, &RenderHelper::showDialogRequest, this, &ManualRenderer::bitrateCheckRequest);
         connect(helper, &RenderHelper::finished, this, &ManualRenderer::onBitrateCheckFinished);
@@ -533,20 +543,27 @@ void ManualRenderer::onProcessText(const QString& output)
 
 void ManualRenderer::cleanupTempFiles()
 {
-    QFile::remove(m_tempVideoMp4);
-    QFile::remove(m_tempAudioM4a);
-    QFile::remove(m_tempChaptersTxt);
+    if (!m_tempVideoMp4.isEmpty())
+    {
+        QFile::remove(m_tempVideoMp4);
+    }
+    if (!m_tempAudioM4a.isEmpty())
+    {
+        QFile::remove(m_tempAudioM4a);
+    }
+    if (!m_tempChaptersTxt.isEmpty())
+    {
+        QFile::remove(m_tempChaptersTxt);
+    }
     if (!m_tempExtractedSubsPath.isEmpty())
     {
         QFile::remove(m_tempExtractedSubsPath);
         m_tempExtractedSubsPath.clear();
     }
-    QFile::remove(QDir(QFileInfo(m_actualInputMkv).absolutePath()).filePath("manual_chapters_extract.xml"));
-}
-
-ProcessManager* ManualRenderer::getProcessManager() const
-{
-    return m_processManager;
+    if (!m_actualInputMkv.isEmpty())
+    {
+        QFile::remove(QDir(QFileInfo(m_actualInputMkv).absolutePath()).filePath("manual_chapters_extract.xml"));
+    }
 }
 
 void ManualRenderer::onBitrateCheckFinished(RerenderDecision decision, const RenderPreset& newPreset)

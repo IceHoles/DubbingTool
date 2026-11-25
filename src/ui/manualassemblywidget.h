@@ -2,6 +2,7 @@
 #define MANUALASSEMBLYWIDGET_H
 
 #include "fontfinder.h"
+#include "mediaprobe.h"
 
 #include <QLineEdit>
 #include <QList>
@@ -11,15 +12,6 @@ namespace Ui
 {
 class ManualAssemblyWidget;
 } // namespace Ui
-
-struct ContainerAudioTrack
-{
-    int id = -1;
-    QString codec;
-    QString language;
-    QString trackName;
-    int channels = 0;
-};
 
 class ManualAssemblyWidget : public QWidget
 {
@@ -53,19 +45,24 @@ private slots:
     void on_browseWorkDirButton_clicked();
     void on_browseChaptersXmlManualAssemblyButton_clicked();
     void onFontFinderFinished(const FontFinderResult& result);
+    void onMediaProbeFinished(const QString& filePath, const MediaProbeResult& result);
 
 private:
     bool browseForFile(QLineEdit* lineEdit, const QString& caption, const QString& filter);
     void updateChaptersUiVisibility();
     void updateAutoOutputName(const QString& videoPath);
     void probeVideoAudioTracks(const QString& videoPath, bool autoPrompt = false);
-    bool promptUserForAudioTrack(const QList<ContainerAudioTrack>& tracks);
+    bool promptUserForAudioTrack(const QList<MediaTrackInfo>& tracks);
 
     FontFinder* m_fontFinder;
+    MediaProbe* m_mediaProbe = nullptr;
 
     QString m_lastAutoOutputName;
     QString m_lastProbedVideoPath;
-    QList<ContainerAudioTrack> m_videoAudioTracks;
+    bool m_autoPromptAudio = false;
+    bool m_isProbingVideo = false;
+    bool m_notifyIfNoAudio = false;
+    QList<MediaTrackInfo> m_videoAudioTracks;
     int m_selectedVideoTrackId = -1;
     int m_selectedVideoAudioTrackId = -1;
     bool m_hasAudioInVideo = false;

@@ -102,8 +102,6 @@ public:
     QList<RenderPreset> renderPresets() const;
     void setRenderPresets(const QList<RenderPreset>& presets);
     RenderPreset findRenderPreset(const QString& name) const;
-    void setManualRenderPreset();
-    RenderPreset manualRenderPreset(const QString& name) const;
     bool isSetupCompleted() const;
     void setSetupCompleted(bool completed);
 

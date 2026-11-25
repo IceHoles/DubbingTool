@@ -70,6 +70,8 @@ tf_out.txt
 diff_changes.txt
 diff_*.txt
 sources_before_changes.txt
+sources_after_changes.txt
+sources_*.txt
 
 # Bundled tools (ffmpeg, mkvtoolnix, etc.)
 tools/

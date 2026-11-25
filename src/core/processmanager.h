@@ -1,34 +1,30 @@
 #ifndef PROCESSMANAGER_H
 #define PROCESSMANAGER_H
 
+#include "iprocessrunner.h"
+
 #include <QHash>
 #include <QList>
 #include <QObject>
 #include <QProcess>
 
-class ProcessManager : public QObject
+class ProcessManager : public IProcessRunner
 {
     Q_OBJECT
 
 public:
     explicit ProcessManager(QObject* parent = nullptr);
-    ~ProcessManager();
+    ~ProcessManager() override;
 
-    void startProcess(const QString& program, const QStringList& arguments);
+    void startProcess(const QString& program, const QStringList& arguments) override;
     bool executeAndWait(const QString& program, const QStringList& arguments, QByteArray& output,
-                        int timeoutMs = 30000);
-    void killProcess();
-    bool wasKilled() const;
-    void setWorkingDirectory(const QString& dir)
+                        int timeoutMs = 30000) override;
+    void killProcess() override;
+    bool wasKilled() const override;
+    void setWorkingDirectory(const QString& dir) override
     {
         m_workingDir = dir;
     }
-
-signals:
-    void processOutput(const QString& output);
-    void processFinished(int exitCode, QProcess::ExitStatus exitStatus);
-    void processError(const QString& error);
-    void processStdErr(const QString& output);
 
 private slots:
     void onReadyReadStandardOutput();

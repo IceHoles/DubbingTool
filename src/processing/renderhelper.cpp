@@ -1,6 +1,6 @@
 #include "renderhelper.h"
 
-#include "processmanager.h"
+#include "iprocessrunner.h"
 
 #include <QDir>
 #include <QFileInfo>
@@ -8,7 +8,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 
-RenderHelper::RenderHelper(RenderPreset preset, const QString& outputMp4Path, ProcessManager* procManager,
+RenderHelper::RenderHelper(RenderPreset preset, const QString& outputMp4Path, IProcessRunner* procManager,
                            QObject* parent)
     : QObject(parent), m_preset(preset), m_outputMp4Path(outputMp4Path), m_procManager(procManager)
 {
