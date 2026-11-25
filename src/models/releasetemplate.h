@@ -9,20 +9,6 @@
 #include <QStringList>
 #include <QUrl>
 
-struct TbStyleInfo
-{
-    QString name = "default_1080p";
-    int resolutionX = 0;
-    QString tags = "{\\fad(500,500)\\b1\\an3\\fnTahoma\\fs50\\shad3\\bord1.3\\4c&H000000&\\4a&H00&}";
-    int marginLeft = 10;
-    int marginRight = 30;
-    int marginV = 10;
-    QString styleName = "Основной";
-
-    void read(const QJsonObject& json);
-    void write(QJsonObject& json) const;
-};
-
 struct PostTemplateMeta
 {
     QString title;
@@ -61,14 +47,10 @@ public:
     QString originalLanguage = "jpn"; // Язык оригинала
     QStringList cast;                 // Список актеров дубляжа по умолчанию
     QStringList signStyles;           // Стили ASS, которые считаются надписями
-    QString endingChapterName;        // Название главы MKV, обозначающей эндинг
-    QString endingStartTime;          // Тайминг эндинга, если нет главы
     /// Если true — в авто-режиме показывается поле пути к XML глав на главной странице; при отсутствии глав —
     /// предупреждение в лог.
     bool chaptersEnabled = true;
-    bool useManualTime = false;       // Использовать тайминг по парсингу главы
     bool useOriginalAudio = false;    // Использовать оригинальную аудиодорожку
-    bool generateTb = true;           // Генерировать ТБ?
     bool isCustomTranslation = false; // Свой перевод или нет
     bool createSrtMaster = false;     // Нужен ли .mkv с .srt и аудио без сжатия
     QString director;                 // Режиссер
@@ -88,13 +70,11 @@ public:
         Voiceover
     };
     VoiceoverType voiceoverType = VoiceoverType::Dubbing; // Закадр ? Дубляж
-    QString defaultTbStyleName;                           // Имя стиля ТБ, используемого по умолчанию
     bool sourceHasSubtitles = true;                       // Есть ли субтитры в исходнике
     QString targetAudioFormat = "aac";                    // Формат аудио для .mkv
     bool forceSignStyleRequest = false;                   // Всегда запрашивать стили для надписей
     bool pauseForSubEdit = false;                         // Пауза для ручной правки субтитров
-    bool useConcatRender = false;         // Умный рендер: перекодировать только ТБ, остальное копировать
-    QMap<QString, QString> substitutions; // Карта замен "Найти" -> "Заменить на"
+    QMap<QString, QString> substitutions;                 // Карта замен "Найти" -> "Заменить на"
 
     // Шаблоны для постов
     QMap<QString, QString> postTemplates;             // Ключ: "VK", "Telegram", Значение: шаблон

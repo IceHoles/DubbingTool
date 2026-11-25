@@ -217,6 +217,9 @@ void ManualExtractionWidget::parseMkvJson(const QByteArray& data)
     attachRoot->setExpanded(false);
 
     // 1. Парсим дорожки
+    int videoCounter = 0;
+    int audioCounter = 0;
+    int subsCounter = 0;
     QJsonArray tracks = root["tracks"].toArray();
     for (const QJsonValue& v : tracks)
     {
@@ -233,15 +236,27 @@ void ManualExtractionWidget::parseMkvJson(const QByteArray& data)
         QString lang = props.contains("language") ? props["language"].toString() : "und";
         QString name = props["track_name"].toString();
 
+        int typeIndex = 0;
         QTreeWidgetItem* parentItem = nullptr;
         if (type == "video")
+        {
             parentItem = videoRoot;
+            typeIndex = videoCounter++;
+        }
         else if (type == "audio")
+        {
             parentItem = audioRoot;
+            typeIndex = audioCounter++;
+        }
         else if (type == "subtitles")
+        {
             parentItem = subsRoot;
+            typeIndex = subsCounter++;
+        }
         else
+        {
             parentItem = ui->tracksTree->invisibleRootItem();
+        }
 
         QTreeWidgetItem* item = new QTreeWidgetItem(parentItem);
 
@@ -258,6 +273,7 @@ void ManualExtractionWidget::parseMkvJson(const QByteArray& data)
         item->setData(1, Qt::UserRole, id);
         item->setData(2, Qt::UserRole, ext);
         item->setData(3, Qt::UserRole, type);
+        item->setData(4, Qt::UserRole, typeIndex);
 
         item->setCheckState(0, Qt::Unchecked);
     }
@@ -331,6 +347,7 @@ void ManualExtractionWidget::onExtractClicked()
             {
                 QString ext = (*it)->data(2, Qt::UserRole).toString();
                 const QString trackType = (*it)->data(3, Qt::UserRole).toString();
+                const int typeIndex = (*it)->data(4, Qt::UserRole).toInt();
                 QString lang = (*it)->text(3);
 
                 if (trackType == "audio")
@@ -341,13 +358,31 @@ void ManualExtractionWidget::onExtractClicked()
                 QString outName = QString("%1_track%2_%3.%4").arg(baseName).arg(id).arg(lang).arg(ext);
                 QString outPath = QDir(sourceDir).filePath(outName);
 
+                QString ffmpegMap;
+                if (trackType == "video")
+                {
+                    ffmpegMap = QString("0:v:%1").arg(typeIndex);
+                }
+                else if (trackType == "audio")
+                {
+                    ffmpegMap = QString("0:a:%1").arg(typeIndex);
+                }
+                else if (trackType == "subtitles")
+                {
+                    ffmpegMap = QString("0:s:%1").arg(typeIndex);
+                }
+                else
+                {
+                    ffmpegMap = QString("0:%1").arg(id);
+                }
+
                 if (trackType == "audio")
                 {
                     if (ffmpegArgs.isEmpty())
                     {
                         ffmpegArgs << "-y" << "-i" << m_currentFile;
                     }
-                    ffmpegArgs << "-map" << QString("0:%1").arg(id) << "-c" << "copy" << outPath;
+                    ffmpegArgs << "-map" << ffmpegMap << "-c" << "copy" << outPath;
                 }
                 else if (isMkv)
                 {
@@ -355,7 +390,7 @@ void ManualExtractionWidget::onExtractClicked()
                 }
                 else
                 {
-                    ffmpegArgs << "-map" << QString("0:%1").arg(id) << "-c" << "copy" << outPath;
+                    ffmpegArgs << "-map" << ffmpegMap << "-c" << "copy" << outPath;
                 }
                 hasWork = true;
             }
@@ -382,78 +417,103 @@ void ManualExtractionWidget::onExtractClicked()
         return;
     }
 
-    ui->extractButton->setEnabled(false);
-
-    emit progressUpdated(0, "Начало извлечения...");
-    emit logMessage("Запуск извлечения...", LogCategory::APP);
+    m_taskQueue.clear();
 
     if (isMkv)
     {
         QString mkvextractExe = AppSettings::instance().mkvextractPath();
-
-        // --- ИЗМЕНЕНИЕ ЗДЕСЬ (стиль WorkflowManager) ---
-
-        // 1. Извлекаем ДОРОЖКИ (tracks source.mkv ID:Path...)
         if (!mkvextractTracks.isEmpty())
         {
             QStringList args;
-            args << "tracks" << m_currentFile << mkvextractTracks; // "tracks" ПЕРВЫМ
-
-            if (!mkvextractAttach.isEmpty() || !ffmpegArgs.isEmpty())
-            {
-                QByteArray dummy;
-                m_processManager->executeAndWait(mkvextractExe, args, dummy);
-            }
-            else
-            {
-                m_processManager->startProcess(mkvextractExe, args);
-                return;
-            }
+            args << "tracks" << m_currentFile << mkvextractTracks;
+            m_taskQueue.enqueue({mkvextractExe, args, "Извлечение дорожек..."});
         }
 
-        // 2. Извлекаем ВЛОЖЕНИЯ (attachments source.mkv ID:Path...)
         if (!mkvextractAttach.isEmpty())
         {
             QStringList args;
-            args << "attachments" << m_currentFile << mkvextractAttach; // "attachments" ПЕРВЫМ
-            if (!ffmpegArgs.isEmpty())
-            {
-                QByteArray dummy;
-                m_processManager->executeAndWait(mkvextractExe, args, dummy);
-            }
-            else
-            {
-                m_processManager->startProcess(mkvextractExe, args);
-                return;
-            }
+            args << "attachments" << m_currentFile << mkvextractAttach;
+            m_taskQueue.enqueue({mkvextractExe, args, "Извлечение вложений..."});
         }
 
         if (!ffmpegArgs.isEmpty())
         {
             QString ffmpegExe = AppSettings::instance().ffmpegPath();
-            m_processManager->startProcess(ffmpegExe, ffmpegArgs);
+            m_taskQueue.enqueue({ffmpegExe, ffmpegArgs, "Извлечение аудио (ffmpeg)..."});
         }
     }
     else
     {
-        QString ffmpegExe = AppSettings::instance().ffmpegPath();
-        m_processManager->startProcess(ffmpegExe, ffmpegArgs);
+        if (!ffmpegArgs.isEmpty())
+        {
+            QString ffmpegExe = AppSettings::instance().ffmpegPath();
+            m_taskQueue.enqueue({ffmpegExe, ffmpegArgs, "Извлечение дорожек (ffmpeg)..."});
+        }
+    }
+
+    if (m_taskQueue.isEmpty())
+    {
+        emit logMessage("Нет задач для выполнения.", LogCategory::APP);
+        return;
+    }
+
+    ui->extractButton->setEnabled(false);
+    emit extractionStarted();
+
+    emit progressUpdated(0, "Начало извлечения...");
+    emit logMessage("Запуск извлечения...", LogCategory::APP);
+
+    runNextTask();
+}
+
+void ManualExtractionWidget::runNextTask()
+{
+    if (m_taskQueue.isEmpty())
+    {
+        ui->extractButton->setEnabled(true);
+        emit logMessage("Извлечение завершено успешно.", LogCategory::APP);
+        emit progressUpdated(100, "Готово");
+        emit extractionFinished(true);
+        return;
+    }
+
+    ExtractionTask task = m_taskQueue.dequeue();
+    emit logMessage(task.description, LogCategory::APP);
+    m_processManager->startProcess(task.program, task.args);
+}
+
+void ManualExtractionWidget::cancel()
+{
+    m_taskQueue.clear();
+    if (m_processManager)
+    {
+        m_processManager->killProcess();
     }
 }
 
 void ManualExtractionWidget::onProcessFinished(int exitCode)
 {
-    ui->extractButton->setEnabled(true);
+    if (m_processManager != nullptr && m_processManager->wasKilled())
+    {
+        m_taskQueue.clear();
+        ui->extractButton->setEnabled(true);
+        emit logMessage("Извлечение отменено пользователем.", LogCategory::APP);
+        emit progressUpdated(0, "Отменено");
+        emit extractionFinished(false);
+        return;
+    }
 
-    if (exitCode == 0)
+    if (exitCode != 0)
     {
-        emit logMessage("Извлечение завершено успешно.", LogCategory::APP);
-    }
-    else
-    {
+        m_taskQueue.clear();
+        ui->extractButton->setEnabled(true);
         emit logMessage(QString("Ошибка извлечения (код %1).").arg(exitCode), LogCategory::APP, LogLevel::Error);
+        emit progressUpdated(0, "Ошибка");
+        emit extractionFinished(false);
+        return;
     }
-    emit progressUpdated(100, "Готово");
+
+    runNextTask();
 }
 
 void ManualExtractionWidget::onProcessStdOut(const QString& output)

@@ -27,8 +27,6 @@ private slots:
     void on_browseQbittorrentButton_clicked();
     void on_browseNugenAmbButton_clicked();
     void on_browseProjectDirectoryButton_clicked();
-    void on_addTbStyleButton_clicked();
-    void on_removeTbStyleButton_clicked();
     void on_renderPresetsList_currentRowChanged(int currentRow);
     void on_newRenderPresetButton_clicked();
     void on_saveRenderPresetButton_clicked();

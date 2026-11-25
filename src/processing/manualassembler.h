@@ -9,8 +9,6 @@
 #include <QVariantMap>
 
 class ProcessManager;
-class AssProcessor;
-class ReleaseTemplate;
 
 class ManualAssembler : public QObject
 {
@@ -45,7 +43,6 @@ private:
 
     QVariantMap m_params;
     ProcessManager* m_processManager;
-    AssProcessor* m_assProcessor;
 
     enum class Step
     {
@@ -56,7 +53,6 @@ private:
     };
     Step m_currentStep = Step::Idle;
 
-    QString m_ffmpegPath;
     QString m_finalMkvPath;
     double m_sourceAudioDurationS = 0.0;
     QTimer* m_progressTimer;

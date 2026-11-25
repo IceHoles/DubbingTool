@@ -37,19 +37,6 @@ void SettingsDialog::loadSettings()
     ui->userFileActionComboBox->setCurrentIndex(static_cast<int>(settings.userFileAction()));
     ui->projectDirectoryEdit->setText(settings.projectDirectory());
 
-    ui->tbStylesTable->setRowCount(0);
-    for (const auto& style : settings.tbStyles())
-    {
-        int row = ui->tbStylesTable->rowCount();
-        ui->tbStylesTable->insertRow(row);
-        ui->tbStylesTable->setItem(row, 0, new QTableWidgetItem(style.name));
-        ui->tbStylesTable->setItem(row, 1, new QTableWidgetItem(QString::number(style.resolutionX)));
-        ui->tbStylesTable->setItem(row, 2, new QTableWidgetItem(style.tags));
-        ui->tbStylesTable->setItem(row, 3, new QTableWidgetItem(QString::number(style.marginLeft)));
-        ui->tbStylesTable->setItem(row, 4, new QTableWidgetItem(QString::number(style.marginRight)));
-        ui->tbStylesTable->setItem(row, 5, new QTableWidgetItem(QString::number(style.marginV)));
-    }
-
     m_renderPresets = settings.renderPresets();
     ui->renderPresetsList->clear();
     for (const auto& preset : m_renderPresets)
@@ -92,20 +79,6 @@ void SettingsDialog::accept()
     settings.setDeleteTempFiles(ui->deleteTempFilesCheckBox->isChecked());
     settings.setUserFileAction(static_cast<UserFileAction>(ui->userFileActionComboBox->currentIndex()));
     settings.setProjectDirectory(ui->projectDirectoryEdit->text().trimmed());
-
-    QList<TbStyleInfo> styles;
-    for (int row = 0; row < ui->tbStylesTable->rowCount(); ++row)
-    {
-        TbStyleInfo style;
-        style.name = ui->tbStylesTable->item(row, 0)->text();
-        style.resolutionX = ui->tbStylesTable->item(row, 1)->text().toInt();
-        style.tags = ui->tbStylesTable->item(row, 2)->text();
-        style.marginLeft = ui->tbStylesTable->item(row, 3)->text().toInt();
-        style.marginRight = ui->tbStylesTable->item(row, 4)->text().toInt();
-        style.marginV = ui->tbStylesTable->item(row, 5)->text().toInt();
-        styles.append(style);
-    }
-    settings.setTbStyles(styles);
 
     settings.setRenderPresets(m_renderPresets);
 
@@ -196,29 +169,6 @@ void SettingsDialog::on_browseProjectDirectoryButton_clicked()
     if (!dir.isEmpty())
     {
         ui->projectDirectoryEdit->setText(dir);
-    }
-}
-
-void SettingsDialog::on_addTbStyleButton_clicked()
-{
-    int row = ui->tbStylesTable->rowCount();
-    ui->tbStylesTable->insertRow(row);
-    ui->tbStylesTable->setItem(row, 0, new QTableWidgetItem("Новый стиль"));
-    ui->tbStylesTable->setItem(row, 1, new QTableWidgetItem("1920"));
-    ui->tbStylesTable->setItem(
-        row, 2,
-        new QTableWidgetItem("{\\fad(500,500)\\b1\\an3\\fnTahoma\\fs50\\shad3\\bord1.3\\4c&H000000&\\4a&H00&}"));
-    ui->tbStylesTable->setItem(row, 3, new QTableWidgetItem("10"));
-    ui->tbStylesTable->setItem(row, 4, new QTableWidgetItem("30"));
-    ui->tbStylesTable->setItem(row, 5, new QTableWidgetItem("10"));
-}
-
-void SettingsDialog::on_removeTbStyleButton_clicked()
-{
-    int currentRow = ui->tbStylesTable->currentRow();
-    if (currentRow >= 0)
-    {
-        ui->tbStylesTable->removeRow(currentRow);
     }
 }
 

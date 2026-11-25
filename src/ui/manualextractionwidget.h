@@ -5,6 +5,7 @@
 #include "processmanager.h"
 
 #include <QFileInfo>
+#include <QQueue>
 #include <QTreeWidgetItem>
 #include <QWidget>
 
@@ -20,11 +21,14 @@ class ManualExtractionWidget : public QWidget
 public:
     explicit ManualExtractionWidget(QWidget* parent = nullptr);
     ~ManualExtractionWidget();
+    void cancel();
 
 signals:
     // Используем ваш enum LogCategory, убедитесь что он виден (через include appsettings.h или workflowmanager.h)
     void logMessage(const QString& message, LogCategory category, LogLevel level = LogLevel::Info);
     void progressUpdated(int value, const QString& status);
+    void extractionStarted();
+    void extractionFinished(bool success);
 
 protected:
     // Драг-н-дроп
@@ -42,7 +46,16 @@ private:
     Ui::ManualExtractionWidget* ui;
     ProcessManager* m_processManager;
     QString m_currentFile;
-    double m_durationSec;
+    double m_durationSec = 0.0;
+
+    struct ExtractionTask
+    {
+        QString program;
+        QStringList args;
+        QString description;
+    };
+    QQueue<ExtractionTask> m_taskQueue;
+    void runNextTask();
 
     void scanFile(const QString& path);
     void parseMkvJson(const QByteArray& data);

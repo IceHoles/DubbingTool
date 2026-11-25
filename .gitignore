@@ -66,6 +66,11 @@ CoverageReport-*/
 occ_verbose.txt
 tf_out.txt
 
+# Exports & temporary dumps
+diff_changes.txt
+diff_*.txt
+sources_before_changes.txt
+
 # Bundled tools (ffmpeg, mkvtoolnix, etc.)
 tools/
 

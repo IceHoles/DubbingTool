@@ -2,7 +2,6 @@
 #define ASSPROCESSOR_H
 
 #include "appsettings.h"
-#include "concattbrenderer.h"
 #include "releasetemplate.h"
 
 #include <QObject>
@@ -15,25 +14,17 @@ class AssProcessor : public QObject
 public:
     explicit AssProcessor(QObject* parent = nullptr);
 
-    bool processExistingFile(const QString& inputPath, const QString& outputPathBase, const ReleaseTemplate& t,
-                             const QString& startTime);
-    bool generateTbOnlyFile(const QString& outputPath, const ReleaseTemplate& t, const QString& startTime,
-                            int resolutionX = 1920);
-    bool addTbToFile(const QString& inputPath, const QString& outputPath, const ReleaseTemplate& t,
-                     const QString& startTime);
+    bool processExistingFile(const QString& inputPath, const QString& outputPathBase, const ReleaseTemplate& t);
+    bool copySignsFile(const QString& inputPath, const QString& outputPath);
     bool processFromTwoSources(const QString& dialoguesInputPath, const QString& signsInputPath,
-                               const QString& outputPathBase, const ReleaseTemplate& t, const QString& startTime);
+                               const QString& outputPathBase, const ReleaseTemplate& t);
     bool convertToSrt(const QString& inputAssPath, const QString& outputSrtPath, const QStringList& signStyles);
     bool applySubstitutions(const QString& filePath, const QMap<QString, QString>& substitutions);
-    static int calculateTbLineCount(const ReleaseTemplate& t);
-    static TbSegment detectTbSegmentFromFile(const QString& assPath);
 
 signals:
     void logMessage(const QString&, LogCategory, LogLevel = LogLevel::Info);
 
 private:
-    QStringList generateTb(const ReleaseTemplate& t, const QString& startTime, int detectedResX);
-    QString balanceCastLine(const QStringList& actors, bool shouldSort);
     QString convertAssTagsToSrt(const QString& assText);
 };
 

@@ -227,16 +227,6 @@
         </widget>
        </item>
        <item row="13" column="0" colspan="2">
-        <widget class="QCheckBox" name="useConcatRenderCheckBox">
-         <property name="toolTip">
-          <string>Перекодировать только сегмент с ТБ, остальное видео копировать без перекодирования. Сохраняет оригинальное качество и значительно ускоряет рендер.</string>
-         </property>
-         <property name="text">
-          <string>Умный рендер (concat) — перекодировать только ТБ</string>
-         </property>
-        </widget>
-       </item>
-       <item row="14" column="0" colspan="2">
         <widget class="QCheckBox" name="chaptersEnabledCheckBox">
          <property name="toolTip">
           <string>Включает главы в релиз: при отсутствии глав ни во входном файле, ни во внешнем XML пайплайн запросит данные или предупредит. XML серии задаётся на главной вкладке автоматического режима.</string>
@@ -420,246 +410,164 @@
        </item>
       </layout>
      </widget>
-     <widget class="QWidget" name="tabTbCreation">
+     <widget class="QWidget" name="tabTeamAndPosts">
       <attribute name="title">
-       <string>Создание ТБ</string>
+       <string>Команда и посты</string>
       </attribute>
       <layout class="QVBoxLayout" name="verticalLayout_2">
        <item>
-        <widget class="QCheckBox" name="generateTbCheckBox">
-         <property name="toolTip">
-          <string>Строит титры благодарности по данным шаблона и таймингу эндинга (глава или ручное время). При выключении этапы ТБ в рендере пропускаются.</string>
-         </property>
-         <property name="text">
-          <string>Генерировать Титры Благодарности (ТБ)</string>
-         </property>
-         <property name="checked">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="Line" name="line_2">
-         <property name="orientation">
-          <enum>Qt::Orientation::Horizontal</enum>
-         </property>
-        </widget>
-       </item>
-       <item>
         <layout class="QFormLayout" name="formLayout_2">
          <item row="0" column="0">
-          <widget class="QLabel" name="label_9">
-           <property name="text">
-            <string>Название главы эндинга:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="1">
-          <widget class="QLineEdit" name="endingChapterNameEdit">
-           <property name="toolTip">
-            <string>Имя главы эндинга в исходном MKV: по ней ищется время начала для титров благодарности, если не задано только ручное время.</string>
-           </property>
-           <property name="placeholderText">
-            <string>например, Ending</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="0">
-          <widget class="QLabel" name="label_11">
-           <property name="text">
-            <string>Время начала эндинга:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="1">
-          <layout class="QHBoxLayout" name="horizontalLayout_10">
-           <item>
-            <widget class="QTimeEdit" name="endingStartTimeEdit">
-             <property name="toolTip">
-              <string>Таймкод начала эндинга: при включённой галочке «Вручную» — начало титров благодарности; иначе может использоваться как подсказка.</string>
-             </property>
-             <property name="displayFormat">
-              <string>H:mm:ss.zzz</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QCheckBox" name="useManualTimeCheckBox">
-             <property name="toolTip">
-              <string>Если включено: время начала титров благодарности берётся из поля «Время начала эндинга» в шаблоне. Если выключено — из автоматически найденного времени (глава эндинга, диалог и т.п.).</string>
-             </property>
-             <property name="text">
-              <string>Вручную</string>
-             </property>
-            </widget>
-           </item>
-          </layout>
-         </item>
-         <item row="2" column="0">
-          <widget class="QLabel" name="label_19">
-           <property name="text">
-            <string>Стиль ТБ по умолчанию:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="1">
-          <widget class="QComboBox" name="defaultTbStyleComboBox">
-           <property name="toolTip">
-            <string>Стиль ASS по умолчанию для блока титров благодарности (список стилей задаётся в настройках приложения).</string>
-           </property>
-          </widget>
-         </item>
-         <item row="3" column="0">
           <widget class="QLabel" name="label_12">
            <property name="text">
             <string>Режиссер дубляжа:</string>
            </property>
           </widget>
          </item>
-         <item row="3" column="1">
+         <item row="0" column="1">
           <widget class="QLineEdit" name="directorEdit">
            <property name="toolTip">
-            <string>Режиссёр дубляжа для титров благодарности и плейсхолдера %DIRECTOR%.</string>
+            <string>Режиссёр дубляжа для плейсхолдера %DIRECTOR%.</string>
            </property>
           </widget>
          </item>
-         <item row="4" column="0">
+         <item row="1" column="0">
           <widget class="QLabel" name="label_assistant_director">
            <property name="text">
             <string>Помощник режиссера:</string>
            </property>
           </widget>
          </item>
-         <item row="4" column="1">
+         <item row="1" column="1">
           <widget class="QLineEdit" name="assistantDirectorEdit">
            <property name="toolTip">
-            <string>Помощник режиссёра для строк титров благодарности.</string>
+            <string>Помощник режиссёра дубляжа.</string>
            </property>
           </widget>
          </item>
-         <item row="5" column="0">
+         <item row="2" column="0">
           <widget class="QLabel" name="label_13">
            <property name="text">
             <string>Звукорежиссер:</string>
            </property>
           </widget>
          </item>
-         <item row="5" column="1">
+         <item row="2" column="1">
           <widget class="QLineEdit" name="soundEngineerEdit">
            <property name="toolTip">
-            <string>Звукорежиссёр для титров благодарности и плейсхолдера %SOUND_ENGINEER%.</string>
+            <string>Звукорежиссёр для плейсхолдера %SOUND_ENGINEER%.</string>
            </property>
           </widget>
          </item>
-         <item row="6" column="0">
+         <item row="3" column="0">
           <widget class="QLabel" name="label_16">
            <property name="text">
             <string>Звукорежиссер песен:</string>
            </property>
           </widget>
          </item>
-         <item row="6" column="1">
+         <item row="3" column="1">
           <widget class="QLineEdit" name="songsSoundEngineerEdit">
            <property name="toolTip">
-            <string>Звукорежиссёр песен для титров благодарности и плейсхолдера %SONG_ENGINEER%.</string>
+            <string>Звукорежиссёр песен для плейсхолдера %SONG_ENGINEER%.</string>
            </property>
           </widget>
          </item>
-         <item row="7" column="0">
+         <item row="4" column="0">
           <widget class="QLabel" name="label_26">
            <property name="text">
             <string>Звукорежиссер эпизода:</string>
            </property>
           </widget>
          </item>
-         <item row="7" column="1">
+         <item row="4" column="1">
           <widget class="QLineEdit" name="episodeSoundEngineerEdit">
            <property name="toolTip">
-            <string>Звукорежиссёр эпизода для титров благодарности и плейсхолдера %EPISODE_ENGINEER%.</string>
+            <string>Звукорежиссёр эпизода для плейсхолдера %EPISODE_ENGINEER%.</string>
            </property>
           </widget>
          </item>
-         <item row="8" column="0">
+         <item row="5" column="0">
           <widget class="QLabel" name="label_27">
            <property name="text">
             <string>Звукорежиссер записи:</string>
            </property>
           </widget>
          </item>
-         <item row="8" column="1">
+         <item row="5" column="1">
           <widget class="QLineEdit" name="recordingSoundEngineerEdit">
            <property name="toolTip">
-            <string>Звукорежиссёр записи для титров благодарности и плейсхолдера %RECORDING_ENGINEER%.</string>
+            <string>Звукорежиссёр записи для плейсхолдера %RECORDING_ENGINEER%.</string>
            </property>
           </widget>
          </item>
-         <item row="9" column="0">
+         <item row="6" column="0">
           <widget class="QLabel" name="label_video_localization">
            <property name="text">
             <string>Локализация видеоряда:</string>
            </property>
           </widget>
          </item>
-         <item row="9" column="1">
+         <item row="6" column="1">
           <widget class="QLineEdit" name="videoLocalizationAuthorEdit">
            <property name="toolTip">
-            <string>Автор локализации видеоряда для титров благодарности и плейсхолдера %VIDEO_LOCALIZATION_AUTHOR%.</string>
+            <string>Автор локализации видеоряда для плейсхолдера %VIDEO_LOCALIZATION_AUTHOR%.</string>
            </property>
           </widget>
          </item>
-         <item row="10" column="0">
+         <item row="7" column="0">
           <widget class="QLabel" name="label_14">
            <property name="text">
             <string>Разметка:</string>
            </property>
           </widget>
          </item>
-         <item row="10" column="1">
+         <item row="7" column="1">
           <widget class="QLineEdit" name="timingAuthorEdit">
            <property name="toolTip">
-            <string>Автор разметки/тайминга для титров благодарности и плейсхолдера %TIMING_AUTHOR%.</string>
+            <string>Автор разметки/тайминга для плейсхолдера %TIMING_AUTHOR%.</string>
            </property>
           </widget>
          </item>
-         <item row="11" column="0">
+         <item row="8" column="0">
           <widget class="QLabel" name="label_signs_author">
            <property name="text">
             <string>Локализация надписей:</string>
            </property>
           </widget>
          </item>
-         <item row="11" column="1">
+         <item row="8" column="1">
           <widget class="QLineEdit" name="signsAuthorEdit">
            <property name="toolTip">
-            <string>Автор локализации надписей для титров благодарности и плейсхолдера %SIGNS_AUTHOR%.</string>
+            <string>Автор локализации надписей для плейсхолдера %SIGNS_AUTHOR%.</string>
            </property>
           </widget>
          </item>
-         <item row="12" column="0">
+         <item row="9" column="0">
           <widget class="QLabel" name="label_translation_editor">
            <property name="text">
             <string>Редактор перевода:</string>
            </property>
           </widget>
          </item>
-         <item row="12" column="1">
+         <item row="9" column="1">
           <widget class="QLineEdit" name="translationEditorEdit">
            <property name="toolTip">
-            <string>Редактор перевода для титров благодарности и плейсхолдера %TRANSLATION_EDITOR%.</string>
+            <string>Редактор перевода для плейсхолдера %TRANSLATION_EDITOR%.</string>
            </property>
           </widget>
          </item>
-         <item row="13" column="0">
+         <item row="10" column="0">
           <widget class="QLabel" name="label_15">
            <property name="text">
             <string>Сборка релиза:</string>
            </property>
           </widget>
          </item>
-         <item row="13" column="1">
+         <item row="10" column="1">
           <widget class="QLineEdit" name="releaseBuilderEdit">
            <property name="toolTip">
-            <string>Ответственный за сборку релиза для титров благодарности и плейсхолдера %RELEASE_BUILDER%.</string>
+            <string>Ответственный за сборку релиза для плейсхолдера %RELEASE_BUILDER%.</string>
            </property>
           </widget>
          </item>

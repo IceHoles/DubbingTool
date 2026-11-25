@@ -2,9 +2,9 @@
 #define MANUALASSEMBLYWIDGET_H
 
 #include "fontfinder.h"
-#include "releasetemplate.h"
 
 #include <QLineEdit>
+#include <QList>
 #include <QWidget>
 
 namespace Ui
@@ -12,18 +12,25 @@ namespace Ui
 class ManualAssemblyWidget;
 } // namespace Ui
 
+struct ContainerAudioTrack
+{
+    int id = -1;
+    QString codec;
+    QString language;
+    QString trackName;
+    int channels = 0;
+};
+
 class ManualAssemblyWidget : public QWidget
 {
     Q_OBJECT
 
 public:
     explicit ManualAssemblyWidget(QWidget* parent = nullptr);
-    ~ManualAssemblyWidget();
+    ~ManualAssemblyWidget() override;
 
     QVariantMap getParameters() const;
     QString chapterTimingSourcePath() const;
-
-    void updateTemplateList(const QStringList& templateNames);
 
     /// Clears the font attachment list (e.g. after a successful MKV build for the next episode).
     void clearFontsList();
@@ -31,6 +38,7 @@ public:
 private slots:
     void on_browseVideo_clicked();
     void on_browseOriginalAudio_clicked();
+    void on_selectAudioFromVideoButton_clicked();
     void on_browseRussianAudio_clicked();
     void on_browseSubtitles_clicked();
     void on_browseSigns_clicked();
@@ -38,29 +46,31 @@ private slots:
     void on_addFontsButton_clicked();
     void on_clearFontsButton_clicked();
     void on_assembleButton_clicked();
-    void on_templateComboBox_currentIndexChanged(int index);
     void on_browseWorkDirButton_clicked();
     void on_browseChaptersXmlManualAssemblyButton_clicked();
     void onFontFinderFinished(const FontFinderResult& result);
-    void onModeSwitched(bool isManualMode);
 
 private:
-    void browseForFile(QLineEdit* lineEdit, const QString& caption, const QString& filter);
-    void updateUiState(bool isManualMode);
+    bool browseForFile(QLineEdit* lineEdit, const QString& caption, const QString& filter);
     void updateChaptersUiVisibility();
+    void probeVideoAudioTracks(const QString& videoPath, bool autoPrompt = false);
+    bool promptUserForAudioTrack(const QList<ContainerAudioTrack>& tracks);
+
     FontFinder* m_fontFinder;
-    QIcon m_templateModeIcon;
-    QIcon m_manualModeIcon;
-    bool m_templateChaptersEnabled = true;
+
+    QString m_lastProbedVideoPath;
+    QList<ContainerAudioTrack> m_videoAudioTracks;
+    int m_selectedVideoTrackId = -1;
+    int m_selectedVideoAudioTrackId = -1;
+    bool m_hasAudioInVideo = false;
 
     Ui::ManualAssemblyWidget* ui;
+
 signals:
-    void templateDataRequested(const QString& templateName);
     void assemblyRequested();
     void chapterTimingsRequested(const QString& sourcePath);
 
 public slots:
-    void onTemplateDataReceived(const ReleaseTemplate& t);
     void setAssembling(bool assembling);
 };
 

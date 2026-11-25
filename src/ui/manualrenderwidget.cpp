@@ -87,7 +87,9 @@ void ManualRenderWidget::on_browseInputButton_clicked()
     {
         ui->inputMkvPathEdit->setText(path);
         analyzeMkvForSubtitles(path);
-        ui->outputMp4PathEdit->setText(path.replace(".mkv", ".mp4"));
+        QFileInfo fi(path);
+        ui->outputMp4PathEdit->setText(
+            QDir::toNativeSeparators(fi.absolutePath() + "/" + fi.completeBaseName() + ".mp4"));
     }
 }
 
@@ -232,12 +234,6 @@ QVariantMap ManualRenderWidget::getParameters() const
 
     bool useHardsub = ui->hardsubCheckBox->isChecked();
     params["useHardsub"] = useHardsub;
-    bool useConcatTb = false;
-    if (auto* concatTbCheckBox = findChild<QCheckBox*>("concatTbCheckBox"))
-    {
-        useConcatTb = concatTbCheckBox->isChecked();
-    }
-    params["useConcatTb"] = useConcatTb;
     params["chaptersExternalPath"] = ui->chaptersExternalPathManualEdit->text().trimmed();
     params["transferEmbeddedChapters"] = ui->transferEmbeddedChaptersCheckBox->isChecked();
     params[QStringLiteral("reencodeAudioAac256")] = ui->reencodeAudioAac256CheckBox->isChecked();

@@ -3,7 +3,6 @@
 
 #include "appsettings.h"
 #include "chapterhelper.h"
-#include "concattbrenderer.h"
 #include "renderhelper.h"
 
 #include <QDir>
@@ -13,7 +12,6 @@
 #include <QVariantMap>
 
 class ProcessManager;
-class ConcatTbRenderer;
 
 enum class RenderState
 {
@@ -24,7 +22,7 @@ enum class RenderState
     MuxMP4Box
 };
 
-static QString escapePathForFfmpegFilter(const QString& path)
+inline QString escapePathForFfmpegFilter(const QString& path)
 {
     QString escaped = QDir::toNativeSeparators(path);
     escaped.replace("\\", "/");
@@ -63,18 +61,16 @@ private slots:
 private:
     void runStep();
     bool parsePreset(const QString& commandTemplate, QStringList& outVideoArgs, QStringList& outAudioArgs);
-    void applyChaptersIfNeeded();
     void cleanupTempFiles();
     QList<ChapterMarker> prepareChapters();
 
     QVariantMap m_params;
     ProcessManager* m_processManager = nullptr;
-    ConcatTbRenderer* m_concatRenderer = nullptr;
     RenderPreset m_preset;
 
     RenderState m_currentState = RenderState::Init;
     qint64 m_sourceDurationS = 0;
-    QString m_tempConcatSubsPath;
+    QString m_tempExtractedSubsPath;
 
     QString m_actualInputMkv;
     QString m_tempVideoMp4;

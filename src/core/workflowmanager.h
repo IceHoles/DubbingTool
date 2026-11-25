@@ -41,18 +41,12 @@ struct UserInputRequest
     bool audioFileRequired = false;
     bool isWavRequired = false;
     QStringList missingFonts;
-    bool tbTimeRequired = false;
-    QString tbTimeReason;
-    QString videoFilePath;       // Path to source video for TB viewfinder preview
-    double videoDurationS = 0.0; // Source video duration in seconds
     bool chaptersRequired = false;
     QString chaptersReason;
-    /// Chapter rows for TB dialog list (optional); titles/times match embedded or external chapters XML.
-    QList<ChapterTimingSeconds> tbChapterPickerRows;
 
     bool isValid() const
     {
-        return audioFileRequired || !missingFonts.isEmpty() || tbTimeRequired || chaptersRequired;
+        return audioFileRequired || !missingFonts.isEmpty() || chaptersRequired;
     }
 };
 
@@ -60,18 +54,12 @@ struct UserInputResponse
 {
     QString audioPath;
     QMap<QString, QString> resolvedFonts;
-    QString time;
     QString chaptersXmlPath;
     bool buildWithoutChapters = false;
-    /// When true, MainWindow may save endingChapterName from the dialog into the active template JSON (not time).
-    bool persistTbTemplateFields = false;
-    /// Chapter title to persist when the user left the save-to-template checkbox checked after choosing a chapter row.
-    QString tbPersistEndingChapterName;
 
     bool isValid() const
     {
-        return !audioPath.isEmpty() || !resolvedFonts.isEmpty() || !time.isEmpty() || !chaptersXmlPath.isEmpty() ||
-               buildWithoutChapters;
+        return !audioPath.isEmpty() || !resolvedFonts.isEmpty() || !chaptersXmlPath.isEmpty() || buildWithoutChapters;
     }
 };
 
@@ -198,7 +186,6 @@ public slots:
     void resumeWithSignStyles(const QStringList& styles);
     void resumeWithSelectedAudioTrack(int trackId);
     void resumeAfterSubEdit();
-    [[nodiscard]] QList<ChapterTimingSeconds> tbChapterPickerRowsForDialog() const;
 
 signals:
     void logMessage(const QString& message, LogCategory category = LogCategory::APP, LogLevel level = LogLevel::Info);
@@ -254,24 +241,7 @@ private:
         RenderingMp4Pass2,
         RenderingMp4Audio,
         MuxingMp4,
-        ConcatFindKeyframe,
-        ConcatCutSegment1,
-        ConcatRenderSegment2,
-        ConcatCutSegment3,
-        ConcatJoin,
-        ConcatExtract,
-        ConcatRemux,
         NormalizingAudio
-    };
-
-    enum class ProcessingSubStep
-    {
-        Idle,
-        RequestingStyles,
-        RequestingTime,
-        RunningAssProcessor,
-        RequestingWav,
-        Done
     };
 
     Step m_currentStep = Step::Idle;
@@ -290,7 +260,6 @@ private:
     QString findMkvFileInSavePath();
     void getMkvInfo();
     void getMp4Info();
-    QString parseChaptersWithMkvExtract();
     void extractTracks();
     void extractTracksMp4();
     void extractAttachments(const QJsonArray& attachments);
@@ -304,19 +273,8 @@ private:
                                 QStringList& outVideoArgs, QStringList& outAudioArgs);
     bool runMp4MuxWithMp4Box();
     void startMp4MuxPipeline();
-    void renderMp4Concat();
-    void concatFindKeyframe();
-    void concatCutSegment1();
-    void concatRenderSegment2();
-    void concatCutSegment3();
-    void concatJoinSegments();
-    void concatExtractH264();
-    void concatRemux();
-    void concatCleanup();
-    static QString concatEncoderForCodec(const QString& codecExtension);
     void prepareUserFiles();
     void loadChaptersForWorkflow();
-    [[nodiscard]] QList<ChapterTimingSeconds> buildTbChapterPickerRows();
     void warnIfExpectedChaptersMissing();
     void continueWorkflowAfterChaptersResolved();
 
@@ -336,7 +294,6 @@ private:
     void runAssProcessing();
     void findFontsInProcessedSubs();
 
-    QStringList prepareCommandArguments(const QString& commandTemplate);
     QString getExtensionForCodec(const QString& codecId);
     QString getExtensionForFfprobeCodec(const QString& codecName);
     static SourceFormat detectSourceFormat(const QString& filePath);
@@ -364,7 +321,6 @@ private:
     QString m_tempAudioForMp4Path;
     QString m_tempMp4ChaptersTxtPath;
     QString m_customRenderArgs;
-    QString m_parsedEndingTime;
     QString m_overrideSubsPath;
     QString m_overrideSignsPath;
     QString m_userChaptersXmlPath;
@@ -372,16 +328,9 @@ private:
 
     QString m_chaptersMuxPathForMkv;
     QList<ChapterMarker> m_chapterMarkers;
-    QList<ChapterTimingSeconds> m_tbChapterPickerRowsCache;
 
     SourceFormat m_sourceFormat = SourceFormat::Unknown;
 
-    // Concat render state
-    double m_concatTbStartSeconds = 0.0;
-    double m_concatTbEndSeconds = 0.0;
-    double m_concatKeyframeTime = 0.0;
-    double m_concatKfBeforeTbStart = 0.0;
-    int m_concatSegmentCount = 0;
     bool m_wasUserInputRequested = false;
     bool m_wereStylesRequested = false;
     bool m_wereFontsRequested = false;
@@ -405,7 +354,6 @@ private:
         int bitrateKbps = 0;
         QString frameRate; // e.g. "25/1", "24000/1001"
         QString avgFrameRate;
-        bool isCfr = false;
     };
 
     FontFinder* m_fontFinder;

@@ -1,8 +1,7 @@
 #include "postgenerator.h"
 
-#include <algorithm>
-
 #include <QRegularExpression>
+#include <algorithm>
 
 namespace
 {
@@ -34,13 +33,11 @@ QString normalizeForStructureParsing(QString text)
     {
         const QString escaped = QRegularExpression::escape(anchor);
         QString rxBody;
-        if (soundMainExcludeSongLine &&
-            (anchor.compare(QStringLiteral("звукорежиссёр"), Qt::CaseInsensitive) == 0 ||
-             anchor.compare(QStringLiteral("звукорежиссер"), Qt::CaseInsensitive) == 0))
+        if (soundMainExcludeSongLine && (anchor.compare(QStringLiteral("звукорежиссёр"), Qt::CaseInsensitive) == 0 ||
+                                         anchor.compare(QStringLiteral("звукорежиссер"), Qt::CaseInsensitive) == 0))
         {
-            rxBody =
-                QStringLiteral("(?im)^[^\n]*(?<![\\p{L}])%1(?!\\s*песен(?![\\p{L}]))(?![\\p{L}])[^\n]*[:：]")
-                    .arg(escaped);
+            rxBody = QStringLiteral("(?im)^[^\n]*(?<![\\p{L}])%1(?!\\s*песен(?![\\p{L}]))(?![\\p{L}])[^\n]*[:：]")
+                         .arg(escaped);
         }
         else
         {
@@ -62,8 +59,7 @@ qsizetype findNextSectionHeaderStart(const QString& postText, qsizetype fromPos,
     for (const QString& anchor : allAnchors)
     {
         const QString escaped = QRegularExpression::escape(anchor);
-        const QString rxBody =
-            QStringLiteral("(?im)^[^\n]*(?<![\\p{L}])%1(?![\\p{L}])[^\n]*[:：]").arg(escaped);
+        const QString rxBody = QStringLiteral("(?im)^[^\n]*(?<![\\p{L}])%1(?![\\p{L}])[^\n]*[:：]").arg(escaped);
         const QRegularExpression rx(rxBody);
         const QRegularExpressionMatch match = rx.match(postText, fromPos);
         if (match.hasMatch())
@@ -85,8 +81,8 @@ struct CreditsSectionParse
     qsizetype spanLength = 0;
 };
 
-CreditsSectionParse extractCreditsSection(const QString& postText, const QStringList& anchors, const QStringList& allAnchors,
-                                          bool soundMainExcludeSongLine = false)
+CreditsSectionParse extractCreditsSection(const QString& postText, const QStringList& anchors,
+                                          const QStringList& allAnchors, bool soundMainExcludeSongLine = false)
 {
     CreditsSectionParse out;
     const qsizetype sectionStart = findSectionHeaderStart(postText, anchors, soundMainExcludeSongLine);
@@ -369,7 +365,7 @@ QString extractPlatformLink(const QString& postText, const QString& platformLabe
 }
 
 [[nodiscard]] QString buildVkPostTemplateFromParseResultImpl(const PostParseResult& parseResult,
-                                                            const QString& sourcePostText)
+                                                             const QString& sourcePostText)
 {
     const QString parsedTemplateLower =
         parseFieldValueForVk(parseResult, QStringLiteral("%PARSED_TEMPLATE_TEXT%")).toLower();
@@ -587,10 +583,22 @@ QMap<QString, PostVersions> PostGenerator::generate(const ReleaseTemplate& t, co
 
 QStringList PostGenerator::supportedPlaceholders()
 {
-    return {"%SERIES_TITLE%",       "%EPISODE_NUMBER%",  "%TOTAL_EPISODES%", "%CAST_LIST%",
-            "%DIRECTOR%",           "%SOUND_ENGINEER%",  "%SONG_ENGINEER%",  "%EPISODE_ENGINEER%",
-            "%RECORDING_ENGINEER%", "%SUB_AUTHOR%",      "%TIMING_AUTHOR%",  "%SIGNS_AUTHOR%",
-            "%VIDEO_LOCALIZATION_AUTHOR%", "%TRANSLATION_EDITOR%", "%RELEASE_BUILDER%", "%LINK_ANILIB%",
+    return {"%SERIES_TITLE%",
+            "%EPISODE_NUMBER%",
+            "%TOTAL_EPISODES%",
+            "%CAST_LIST%",
+            "%DIRECTOR%",
+            "%SOUND_ENGINEER%",
+            "%SONG_ENGINEER%",
+            "%EPISODE_ENGINEER%",
+            "%RECORDING_ENGINEER%",
+            "%SUB_AUTHOR%",
+            "%TIMING_AUTHOR%",
+            "%SIGNS_AUTHOR%",
+            "%VIDEO_LOCALIZATION_AUTHOR%",
+            "%TRANSLATION_EDITOR%",
+            "%RELEASE_BUILDER%",
+            "%LINK_ANILIB%",
             "%LINK_ANIME365%"};
 }
 
@@ -622,9 +630,8 @@ PostParseResult PostGenerator::parsePostToFields(const QString& postTextRaw, con
         TemplateSpanOp op;
         op.start = episodeMatch.capturedStart(0);
         op.length = episodeMatch.capturedLength(0);
-        op.replacement = QString("%1%2/%3")
-                             .arg(episodeMatch.captured(1), QStringLiteral("%EPISODE_NUMBER%"),
-                                  QStringLiteral("%TOTAL_EPISODES%"));
+        op.replacement = QString("%1%2/%3").arg(episodeMatch.captured(1), QStringLiteral("%EPISODE_NUMBER%"),
+                                                QStringLiteral("%TOTAL_EPISODES%"));
         op.fieldKey = QStringLiteral("%EPISODE_NUMBER%");
         op.fieldValue = episodeMatch.captured(2).trimmed();
         spanOps.append(op);
@@ -669,8 +676,7 @@ PostParseResult PostGenerator::parsePostToFields(const QString& postTextRaw, con
     auto pushCreditsSection = [&](const QStringList& anchors, const QString& fieldKey, const QString& placeholder,
                                   bool soundMainExcludeSongLine = false)
     {
-        const CreditsSectionParse sec =
-            extractCreditsSection(postText, anchors, allAnchors, soundMainExcludeSongLine);
+        const CreditsSectionParse sec = extractCreditsSection(postText, anchors, allAnchors, soundMainExcludeSongLine);
         if (sec.spanLength <= 0 || sec.value.trimmed().isEmpty())
         {
             return;
@@ -689,16 +695,16 @@ PostParseResult PostGenerator::parsePostToFields(const QString& postTextRaw, con
         result.fields.insert(fieldKey, sec.value);
     };
 
-    pushCreditsSection({QStringLiteral("роли дублировали"), QStringLiteral("роли озвучивали"),
-                        QStringLiteral("озвучивали роли")},
-                       QStringLiteral("%CAST_LIST%"), QStringLiteral("%CAST_LIST%"));
-    pushCreditsSection({QStringLiteral("режиссёр дубляжа"), QStringLiteral("режиссер дубляжа"), QStringLiteral("режиссёр"),
-                        QStringLiteral("режиссер"), QStringLiteral("куратор закадра")},
+    pushCreditsSection(
+        {QStringLiteral("роли дублировали"), QStringLiteral("роли озвучивали"), QStringLiteral("озвучивали роли")},
+        QStringLiteral("%CAST_LIST%"), QStringLiteral("%CAST_LIST%"));
+    pushCreditsSection({QStringLiteral("режиссёр дубляжа"), QStringLiteral("режиссер дубляжа"),
+                        QStringLiteral("режиссёр"), QStringLiteral("режиссер"), QStringLiteral("куратор закадра")},
                        QStringLiteral("%DIRECTOR%"), QStringLiteral("%DIRECTOR%"));
     pushCreditsSection({QStringLiteral("звукорежиссёр песен"), QStringLiteral("звукорежиссер песен")},
                        QStringLiteral("%SONG_ENGINEER%"), QStringLiteral("%SONG_ENGINEER%"));
-    pushCreditsSection({QStringLiteral("звукорежиссёр"), QStringLiteral("звукорежиссер")}, QStringLiteral("%SOUND_ENGINEER%"),
-                       QStringLiteral("%SOUND_ENGINEER%"), true);
+    pushCreditsSection({QStringLiteral("звукорежиссёр"), QStringLiteral("звукорежиссер")},
+                       QStringLiteral("%SOUND_ENGINEER%"), QStringLiteral("%SOUND_ENGINEER%"), true);
     pushCreditsSection({QStringLiteral("звукорежиссёр эпизода"), QStringLiteral("звукорежиссер эпизода")},
                        QStringLiteral("%EPISODE_ENGINEER%"), QStringLiteral("%EPISODE_ENGINEER%"));
     pushCreditsSection({QStringLiteral("звукорежиссёр записи"), QStringLiteral("звукорежиссер записи")},
@@ -716,10 +722,7 @@ PostParseResult PostGenerator::parsePostToFields(const QString& postTextRaw, con
                        QStringLiteral("%RELEASE_BUILDER%"));
 
     std::sort(spanOps.begin(), spanOps.end(),
-              [](const TemplateSpanOp& a, const TemplateSpanOp& b)
-              {
-                  return a.start > b.start;
-              });
+              [](const TemplateSpanOp& a, const TemplateSpanOp& b) { return a.start > b.start; });
 
     QString working = postText;
     int mutationCount = 0;

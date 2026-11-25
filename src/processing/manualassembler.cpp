@@ -1,10 +1,8 @@
-﻿#include "manualassembler.h"
+#include "manualassembler.h"
 
 #include "appsettings.h"
-#include "assprocessor.h"
 #include "chapterhelper.h"
 #include "processmanager.h"
-#include "releasetemplate.h"
 
 #include <QByteArray>
 #include <QDir>
@@ -14,12 +12,10 @@
 #include <QTimer>
 
 ManualAssembler::ManualAssembler(const QVariantMap& params, QObject* parent)
-    : QObject(parent), m_params(params), m_processManager(new ProcessManager(this)),
-      m_assProcessor(new AssProcessor(this)), m_progressTimer(new QTimer(this))
+    : QObject(parent), m_params(params), m_processManager(new ProcessManager(this)), m_progressTimer(new QTimer(this))
 {
     connect(m_processManager, &ProcessManager::processOutput, this, &ManualAssembler::onProcessText);
     connect(m_processManager, &ProcessManager::processStdErr, this, &ManualAssembler::onProcessText);
-    connect(m_assProcessor, &AssProcessor::logMessage, this, &ManualAssembler::logMessage);
     connect(m_processManager, &ProcessManager::processFinished, this, &ManualAssembler::onProcessFinished);
 }
 
@@ -204,79 +200,31 @@ void ManualAssembler::convertAudio()
 
 void ManualAssembler::processSubtitlesAndAssemble()
 {
-    if (!m_params["isManualMode"].toBool() && m_params["addTb"].toBool())
-    {
-        emit logMessage("Добавление ТБ в субтитры...", LogCategory::APP);
-
-        ReleaseTemplate t;
-        QFile file("templates/" + m_params["templateName"].toString() + ".json");
-        if (file.open(QIODevice::ReadOnly))
-        {
-            t.read(QJsonDocument::fromJson(file.readAll()).object());
-        }
-        else
-        {
-            emit logMessage("Ошибка: не удалось загрузить шаблон для генерации ТБ.", LogCategory::APP, LogLevel::Error);
-            assemble();
-            return;
-        }
-
-        QString tbStartTime = m_params["tbStartTime"].toString();
-        t.defaultTbStyleName = m_params["tbStyleName"].toString();
-
-        if (m_params.contains("subtitlesPath"))
-        {
-            QString subsPath = m_params.value("subtitlesPath").toString();
-            QString newSubsPath = QFileInfo(subsPath).dir().filePath(QFileInfo(subsPath).baseName() + "_with_tb.ass");
-            if (m_assProcessor->addTbToFile(subsPath, newSubsPath, t, tbStartTime))
-            {
-                m_params["subtitlesPath"] = newSubsPath;
-            }
-        }
-
-        // Обрабатываем файл надписей, если он есть
-        if (m_params.contains("signsPath"))
-        {
-            QString signsPath = m_params.value("signsPath").toString();
-            QString newSignsPath =
-                QFileInfo(signsPath).dir().filePath(QFileInfo(signsPath).baseName() + "_with_tb.ass");
-            if (m_assProcessor->addTbToFile(signsPath, newSignsPath, t, tbStartTime))
-            {
-                m_params["signsPath"] = newSignsPath;
-            }
-        }
-    }
-
     assemble();
 }
 
 QString ManualAssembler::resolveChaptersPathForMkvMerge()
 {
-    const QString customPath = m_params.value(QStringLiteral("chaptersXmlPath")).toString().trimmed();
-    if (!customPath.isEmpty())
+    const bool useCustomChapters = m_params.value(QStringLiteral("useCustomChaptersXml"), false).toBool();
+    if (useCustomChapters)
     {
-        if (QFileInfo::exists(customPath))
+        const QString customPath = m_params.value(QStringLiteral("chaptersXmlPath")).toString().trimmed();
+        if (!customPath.isEmpty())
         {
-            const QString abs = QFileInfo(customPath).absoluteFilePath();
-            emit logMessage(QStringLiteral("Главы: используется указанный XML: %1").arg(abs), LogCategory::APP);
-            return abs;
+            if (QFileInfo::exists(customPath))
+            {
+                const QString abs = QFileInfo(customPath).absoluteFilePath();
+                emit logMessage(QStringLiteral("Главы: используется указанный XML: %1").arg(abs), LogCategory::APP);
+                return abs;
+            }
+            emit logMessage(QStringLiteral("ПРЕДУПРЕЖДЕНИЕ: файл глав не найден: %1").arg(customPath), LogCategory::APP,
+                            LogLevel::Warning);
         }
-        emit logMessage(QStringLiteral("ПРЕДУПРЕЖДЕНИЕ: файл глав не найден: %1").arg(customPath), LogCategory::APP,
-                        LogLevel::Warning);
-    }
-
-    const bool tplEnabled = m_params.value(QStringLiteral("templateChaptersEnabled"), true).toBool();
-    if (!tplEnabled)
-    {
-        return {};
     }
 
     const QString videoPath = m_params.value(QStringLiteral("videoPath")).toString();
     if (videoPath.isEmpty())
     {
-        emit logMessage(QStringLiteral("ВНИМАНИЕ: в шаблоне включены главы, но не указан видеофайл и нет валидного "
-                                       "внешнего XML."),
-                        LogCategory::APP);
         return {};
     }
 
@@ -332,9 +280,6 @@ QString ManualAssembler::resolveChaptersPathForMkvMerge()
         }
     }
 
-    emit logMessage(QStringLiteral("ВНИМАНИЕ: для релиза ожидались главы, но ни встроенных в контейнере, ни "
-                                   "валидного внешнего XML не найдено."),
-                    LogCategory::APP);
     return {};
 }
 
@@ -430,14 +375,60 @@ void ManualAssembler::assemble()
     }
 
     // Дорожки
-    if (m_params["isManualMode"].toBool())
+    QString studio = m_params["studio"].toString();
+    QString lang = m_params["language"].toString();
+    QString subAuthor = m_params["subAuthor"].toString();
+    bool useAudioFromVideo = m_params.value("useAudioFromVideo", false).toBool();
+    int audioTrackFromVideoId = m_params.value("audioTrackFromVideoId", -1).toInt();
+    int videoTrackId = m_params.value("videoTrackId", 0).toInt();
+
+    QStringList trackOrder;
+    int nextFileIndex = 0;
+
+    int videoFileIndex = -1;
+    if (m_params.contains("videoPath"))
     {
-        QString studio = m_params["studio"].toString();
-        QString lang = m_params["language"].toString();
-        QString subAuthor = m_params["subAuthor"].toString();
-        if (m_params.contains("videoPath"))
+        const QString videoPath = m_params["videoPath"].toString();
+        const QString ext = QFileInfo(videoPath).suffix().toLower();
+        const bool isContainer = (ext == "mp4" || ext == "mkv" || ext == "m4v" || ext == "mov" || ext == "ts");
+
+        videoFileIndex = nextFileIndex++;
+        trackOrder << QString("%1:%2").arg(videoFileIndex).arg(videoTrackId);
+
+        if (isContainer)
         {
-            const QString videoPath = m_params["videoPath"].toString();
+            args << "--video-tracks" << QString::number(videoTrackId);
+            if (!lang.isEmpty())
+            {
+                args << "--language" << QString("%1:%2").arg(videoTrackId).arg(lang);
+            }
+            if (!studio.isEmpty())
+            {
+                args << "--track-name" << QString("%1:Видеоряд [%2]").arg(videoTrackId).arg(studio);
+            }
+
+            if (useAudioFromVideo && audioTrackFromVideoId >= 0)
+            {
+                args << "--audio-tracks" << QString::number(audioTrackFromVideoId);
+                args << "--default-track-flag" << QString("%1:no").arg(audioTrackFromVideoId);
+                if (!lang.isEmpty())
+                {
+                    args << "--language" << QString("%1:%2").arg(audioTrackFromVideoId).arg(lang);
+                }
+                if (!studio.isEmpty())
+                {
+                    args << "--track-name" << QString("%1:Оригинал [%2]").arg(audioTrackFromVideoId).arg(studio);
+                }
+            }
+            else
+            {
+                args << "--no-audio";
+            }
+
+            args << "--no-subtitles" << "--no-attachments";
+        }
+        else
+        {
             if (!lang.isEmpty())
             {
                 args << "--language" << "0:" + lang;
@@ -446,20 +437,33 @@ void ManualAssembler::assemble()
             {
                 args << "--track-name" << QString("0:Видеоряд [%1]").arg(studio);
             }
-            addNoChaptersForContainer(videoPath);
-            args << videoPath;
         }
-        if (m_params.contains("russianAudioPath"))
+
+        addNoChaptersForContainer(videoPath);
+        args << videoPath;
+    }
+
+    int rusAudioFileIndex = -1;
+    if (m_params.contains("russianAudioPath"))
+    {
+        const QString russianAudioPath = m_params["russianAudioPath"].toString();
+        if (!russianAudioPath.isEmpty())
         {
-            const QString russianAudioPath = m_params["russianAudioPath"].toString();
+            rusAudioFileIndex = nextFileIndex++;
             args << "--default-track-flag" << "0:yes" << "--language" << "0:rus" << "--track-name"
                  << "0:Русский [Дубляжная]";
             addNoChaptersForContainer(russianAudioPath);
             args << russianAudioPath;
         }
-        if (m_params.contains("originalAudioPath"))
+    }
+
+    int origAudioFileIndex = -1;
+    if (!useAudioFromVideo && m_params.contains("originalAudioPath"))
+    {
+        const QString originalAudioPath = m_params["originalAudioPath"].toString();
+        if (!originalAudioPath.isEmpty())
         {
-            const QString originalAudioPath = m_params["originalAudioPath"].toString();
+            origAudioFileIndex = nextFileIndex++;
             args << "--default-track-flag" << "0:no";
             if (!lang.isEmpty())
             {
@@ -472,62 +476,65 @@ void ManualAssembler::assemble()
             addNoChaptersForContainer(originalAudioPath);
             args << originalAudioPath;
         }
-        if (m_params.contains("signsPath"))
+    }
+
+    int signsFileIndex = -1;
+    if (m_params.contains("signsPath"))
+    {
+        const QString signsPath = m_params["signsPath"].toString();
+        if (!signsPath.isEmpty())
         {
+            signsFileIndex = nextFileIndex++;
+            const QString trackName =
+                subAuthor.isEmpty() ? QStringLiteral("0:Надписи") : QString("0:Надписи [%1]").arg(subAuthor);
             args << "--forced-display-flag" << "0:yes" << "--default-track-flag" << "0:yes" << "--language" << "0:rus"
-                 << "--track-name" << QString("0:Надписи [%1]").arg(subAuthor) << m_params["signsPath"].toString();
-        }
-        if (m_params.contains("subtitlesPath"))
-        {
-            args << "--default-track-flag" << "0:no" << "--forced-display-flag" << "0:no" << "--language" << "0:rus"
-                 << "--track-name" << QString("0:Субтитры [%1]").arg(subAuthor) << m_params["subtitlesPath"].toString();
+                 << "--track-name" << trackName;
+            addNoChaptersForContainer(signsPath);
+            args << signsPath;
         }
     }
-    else
+
+    int subsFileIndex = -1;
+    if (m_params.contains("subtitlesPath"))
     {
-        ReleaseTemplate t;
-        QFile file("templates/" + m_params["templateName"].toString() + ".json");
-        if (file.open(QIODevice::ReadOnly))
+        const QString subtitlesPath = m_params["subtitlesPath"].toString();
+        if (!subtitlesPath.isEmpty())
         {
-            t.read(QJsonDocument::fromJson(file.readAll()).object());
-        }
-        QString subTrackAuthorName = t.isCustomTranslation ? "Дубляжная" : t.subAuthor;
-        if (m_params.contains("videoPath"))
-        {
-            const QString videoPath = m_params["videoPath"].toString();
-            args << "--language" << "0:" + t.originalLanguage << "--track-name"
-                 << QString("0:Видеоряд [%1]").arg(t.animationStudio);
-            addNoChaptersForContainer(videoPath);
-            args << videoPath;
-        }
-        if (m_params.contains("russianAudioPath"))
-        {
-            const QString russianAudioPath = m_params["russianAudioPath"].toString();
-            args << "--default-track-flag" << "0:yes" << "--language" << "0:rus" << "--track-name"
-                 << "0:Русский [Дубляжная]";
-            addNoChaptersForContainer(russianAudioPath);
-            args << russianAudioPath;
-        }
-        if (m_params.contains("originalAudioPath"))
-        {
-            const QString originalAudioPath = m_params["originalAudioPath"].toString();
-            args << "--default-track-flag" << "0:no" << "--language" << "0:" + t.originalLanguage << "--track-name"
-                 << QString("0:Оригинал [%1]").arg(t.animationStudio);
-            addNoChaptersForContainer(originalAudioPath);
-            args << originalAudioPath;
-        }
-        if (m_params.contains("signsPath"))
-        {
-            args << "--forced-display-flag" << "0:yes" << "--default-track-flag" << "0:yes" << "--language" << "0:rus"
-                 << "--track-name" << QString("0:Надписи [%1]").arg(subTrackAuthorName)
-                 << m_params["signsPath"].toString();
-        }
-        if (m_params.contains("subtitlesPath"))
-        {
+            subsFileIndex = nextFileIndex++;
+            const QString trackName =
+                subAuthor.isEmpty() ? QStringLiteral("0:Субтитры") : QString("0:Субтитры [%1]").arg(subAuthor);
             args << "--default-track-flag" << "0:no" << "--forced-display-flag" << "0:no" << "--language" << "0:rus"
-                 << "--track-name" << QString("0:Субтитры [%1]").arg(subTrackAuthorName)
-                 << m_params["subtitlesPath"].toString();
+                 << "--track-name" << trackName;
+            addNoChaptersForContainer(subtitlesPath);
+            args << subtitlesPath;
         }
+    }
+
+    // Порядок дорожек: Видео -> Русский звук -> Оригинальный звук -> Надписи -> Полные субтитры
+    if (rusAudioFileIndex >= 0)
+    {
+        trackOrder << QString("%1:0").arg(rusAudioFileIndex);
+    }
+    if (useAudioFromVideo && audioTrackFromVideoId >= 0 && videoFileIndex >= 0)
+    {
+        trackOrder << QString("%1:%2").arg(videoFileIndex).arg(audioTrackFromVideoId);
+    }
+    else if (origAudioFileIndex >= 0)
+    {
+        trackOrder << QString("%1:0").arg(origAudioFileIndex);
+    }
+    if (signsFileIndex >= 0)
+    {
+        trackOrder << QString("%1:0").arg(signsFileIndex);
+    }
+    if (subsFileIndex >= 0)
+    {
+        trackOrder << QString("%1:0").arg(subsFileIndex);
+    }
+
+    if (trackOrder.size() > 1)
+    {
+        args << "--track-order" << trackOrder.join(',');
     }
 
     m_processManager->startProcess(mkvmergePath, args);
@@ -542,7 +549,12 @@ void ManualAssembler::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
         return;
     }
 
-    if (exitCode != 0 || exitStatus != QProcess::NormalExit)
+    if (m_currentStep == Step::AssemblingMkv && exitCode == 1 && exitStatus == QProcess::NormalExit)
+    {
+        emit logMessage("mkvmerge завершился с предупреждением (exit code 1). Сборка успешна.", LogCategory::MKVTOOLNIX,
+                        LogLevel::Warning);
+    }
+    else if (exitCode != 0 || exitStatus != QProcess::NormalExit)
     {
         emit logMessage("Ошибка выполнения дочернего процесса. Рабочий процесс остановлен.", LogCategory::APP,
                         LogLevel::Error);

@@ -383,7 +383,6 @@ void TemplateEditor::setTemplate(const ReleaseTemplate& t)
     ui->targetAudioFormatComboBox->setCurrentText(t.targetAudioFormat);
     ui->createSrtMasterCheckBox->setChecked(t.createSrtMaster);
     ui->isCustomTranslationCheckBox->setChecked(t.isCustomTranslation);
-    ui->useConcatRenderCheckBox->setChecked(t.useConcatRender);
     ui->renderPresetComboBox->clear();
     for (const auto& preset : AppSettings::instance().renderPresets())
     {
@@ -391,19 +390,9 @@ void TemplateEditor::setTemplate(const ReleaseTemplate& t)
     }
     ui->renderPresetComboBox->setCurrentText(t.renderPresetName);
 
-    // Вкладка "Создание ТБ"
-    ui->generateTbCheckBox->setChecked(t.generateTb);
+    // Вкладка "Команда и посты"
     ui->chaptersEnabledCheckBox->setChecked(t.chaptersEnabled);
-    ui->endingChapterNameEdit->setText(t.endingChapterName);
-    ui->endingStartTimeEdit->setTime(QTime::fromString(t.endingStartTime, "H:mm:ss.zzz"));
-    ui->useManualTimeCheckBox->setChecked(t.useManualTime);
     ui->useOriginalAudioCheckBox->setChecked(t.useOriginalAudio);
-    ui->defaultTbStyleComboBox->clear();
-    for (const auto& style : AppSettings::instance().tbStyles())
-    {
-        ui->defaultTbStyleComboBox->addItem(style.name);
-    }
-    ui->defaultTbStyleComboBox->setCurrentText(t.defaultTbStyleName);
     if (t.voiceoverType == ReleaseTemplate::VoiceoverType::Voiceover)
     {
         ui->voiceoverTypeComboBox->setCurrentText("Закадр");
@@ -476,17 +465,11 @@ ReleaseTemplate TemplateEditor::getTemplate()
     t.targetAudioFormat = ui->targetAudioFormatComboBox->currentText();
     t.createSrtMaster = ui->createSrtMasterCheckBox->isChecked();
     t.isCustomTranslation = ui->isCustomTranslationCheckBox->isChecked();
-    t.useConcatRender = ui->useConcatRenderCheckBox->isChecked();
     t.renderPresetName = ui->renderPresetComboBox->currentText();
 
-    // Вкладка "Создание ТБ"
-    t.generateTb = ui->generateTbCheckBox->isChecked();
+    // Вкладка "Команда и посты"
     t.chaptersEnabled = ui->chaptersEnabledCheckBox->isChecked();
-    t.endingChapterName = ui->endingChapterNameEdit->text().trimmed();
-    t.endingStartTime = ui->endingStartTimeEdit->time().toString("H:mm:ss.zzz");
-    t.useManualTime = ui->useManualTimeCheckBox->isChecked();
     t.useOriginalAudio = ui->useOriginalAudioCheckBox->isChecked();
-    t.defaultTbStyleName = ui->defaultTbStyleComboBox->currentText();
     if (ui->voiceoverTypeComboBox->currentText() == "Закадр")
     {
         t.voiceoverType = ReleaseTemplate::VoiceoverType::Voiceover;
@@ -1097,18 +1080,17 @@ QMap<QString, QString> TemplateEditor::builtinPostTemplates()
     result["tg_mkv"] = "%SERIES_TITLE%\n"
                        "Серия %EPISODE_NUMBER%/%TOTAL_EPISODES%\n"
                        "#Хештег";
-    result["vk"] =
-        "«%SERIES_TITLE%» в дубляже от ТО Дубляжная\n\n"
-        "Серия: %EPISODE_NUMBER%/%TOTAL_EPISODES%\n\n"
-        "Роли дублировали:\n%CAST_LIST%\n\n"
-        "Режиссёр дубляжа:\n%DIRECTOR%\n\n"
-        "Звукорежиссёр:\n%SOUND_ENGINEER%\n\n"
-        "Перевод:\n%SUB_AUTHOR%\n\n"
-        "Локализация видеоряда:\n%VIDEO_LOCALIZATION_AUTHOR%\n\n"
-        "Локализация надписей:\n%SIGNS_AUTHOR%\n\n"
-        "Локализация постера:\n\n"
-        "Сборка релиза:\n%RELEASE_BUILDER%\n\n"
-        "#Хештег@dublyajnaya";
+    result["vk"] = "«%SERIES_TITLE%» в дубляже от ТО Дубляжная\n\n"
+                   "Серия: %EPISODE_NUMBER%/%TOTAL_EPISODES%\n\n"
+                   "Роли дублировали:\n%CAST_LIST%\n\n"
+                   "Режиссёр дубляжа:\n%DIRECTOR%\n\n"
+                   "Звукорежиссёр:\n%SOUND_ENGINEER%\n\n"
+                   "Перевод:\n%SUB_AUTHOR%\n\n"
+                   "Локализация видеоряда:\n%VIDEO_LOCALIZATION_AUTHOR%\n\n"
+                   "Локализация надписей:\n%SIGNS_AUTHOR%\n\n"
+                   "Локализация постера:\n\n"
+                   "Сборка релиза:\n%RELEASE_BUILDER%\n\n"
+                   "#Хештег@dublyajnaya";
     result["vk_comment"] =
         "А также вы можете поддержать наш коллектив на бусти: https://boosty.to/dubl/single-payment/donation/634652\n\n"
         "ТГ: https://t.me/dublyajnaya\n\n"
@@ -1646,15 +1628,15 @@ void TemplateEditor::onParsePostToTemplateClicked()
     const qsizetype extractedFieldsCount =
         parseResult.fields.size() - (parseResult.fields.contains("%PARSED_TEMPLATE_TEXT%") ? 1 : 0);
     QString doneMessage =
-        QStringLiteral("Импорт из буфера (записей с данными: %1).\n\n%2\n\nПроверьте вкладки «Создание ТБ» и «Публикация».")
+        QStringLiteral(
+            "Импорт из буфера (записей с данными: %1).\n\n%2\n\nПроверьте вкладки «Команда и посты» и «Публикация».")
             .arg(static_cast<int>(qMax(qsizetype(0), extractedFieldsCount)))
             .arg(summarizeParsedFieldValuesForUser(parseResult));
     if (!parsedBodyUsable)
     {
-        doneMessage +=
-            "\n\nТекст шаблона поста в редакторе не заменён: удалось выполнить слишком мало автоматических "
-            "замен блоков (заголовки «Роли…», «Режиссёр…» и т.д.). "
-            "Проверьте формат текста; при необходимости поправьте шаблон вручную.";
+        doneMessage += "\n\nТекст шаблона поста в редакторе не заменён: удалось выполнить слишком мало автоматических "
+                       "замен блоков (заголовки «Роли…», «Режиссёр…» и т.д.). "
+                       "Проверьте формат текста; при необходимости поправьте шаблон вручную.";
     }
     QMessageBox::information(this, "Готово", doneMessage);
 }
@@ -1878,8 +1860,7 @@ bool TemplateEditor::promptSaveDespiteIssues(const QStringList& issues)
     QMessageBox box(this);
     box.setIcon(QMessageBox::Warning);
     box.setWindowTitle(QStringLiteral("Поля шаблона"));
-    box.setText(QStringLiteral(
-        "Часть полей пустая или совпадает с автозаполнением при создании нового шаблона."));
+    box.setText(QStringLiteral("Часть полей пустая или совпадает с автозаполнением при создании нового шаблона."));
     box.setInformativeText(issues.join(QLatin1Char('\n')));
     QAbstractButton* const saveAnywayBtn =
         box.addButton(QStringLiteral("Сохранить всё равно"), QMessageBox::AcceptRole);

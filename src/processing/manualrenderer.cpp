@@ -16,41 +16,6 @@
 
 namespace
 {
-bool parseFpsRational(const QString& fps, qint64& num, qint64& den)
-{
-    const QStringList parts = fps.split('/');
-    if (parts.size() != 2)
-    {
-        return false;
-    }
-    bool numOk = false;
-    bool denOk = false;
-    const qint64 parsedNum = parts[0].toLongLong(&numOk);
-    const qint64 parsedDen = parts[1].toLongLong(&denOk);
-    if (!numOk || !denOk || parsedNum <= 0 || parsedDen <= 0)
-    {
-        return false;
-    }
-    num = parsedNum;
-    den = parsedDen;
-    return true;
-}
-
-bool isLikelyCfr(const QString& rFrameRate, const QString& avgFrameRate)
-{
-    qint64 rNum = 0;
-    qint64 rDen = 0;
-    qint64 avgNum = 0;
-    qint64 avgDen = 0;
-    if (!parseFpsRational(rFrameRate, rNum, rDen) || !parseFpsRational(avgFrameRate, avgNum, avgDen))
-    {
-        return false;
-    }
-    const double r = static_cast<double>(rNum) / static_cast<double>(rDen);
-    const double avg = static_cast<double>(avgNum) / static_cast<double>(avgDen);
-    return qAbs(r - avg) < 0.001;
-}
-
 void applyForcedAac256AudioArgs(QStringList& args)
 {
     if (args.contains(QLatin1String("-an")))
@@ -163,31 +128,47 @@ void ManualRenderer::start()
         return;
     }
 
-    // Инициализируем пути ДО переименования
+    if (AppSettings::instance().mp4boxPath().isEmpty() || !QFileInfo::exists(AppSettings::instance().mp4boxPath()))
+    {
+        emit logMessage("Ошибка: mp4box.exe не найден в настройках. Рендер невозможен.", LogCategory::APP,
+                        LogLevel::Error);
+        emit finished();
+        return;
+    }
+
     QFileInfo outInfo(m_finalOutputMp4);
     QString baseDir = outInfo.absolutePath();
     QString baseName = outInfo.baseName();
     m_tempVideoMp4 = QDir(baseDir).filePath(baseName + "_temp_video.mp4");
     m_tempAudioM4a = QDir(baseDir).filePath(baseName + "_temp_audio.m4a");
     m_tempChaptersTxt = QDir(baseDir).filePath(baseName + "_temp_chapters.txt");
+    m_tempExtractedSubsPath.clear();
 
-    // Удаляем старые временные файлы напрямую, не вызывая cleanupTempFiles(),
-    // чтобы не сбросить переименование m_actualInputMkv
     QFile::remove(m_tempVideoMp4);
     QFile::remove(m_tempAudioM4a);
     QFile::remove(m_tempChaptersTxt);
     QFile::remove(QDir(QFileInfo(m_actualInputMkv).absolutePath()).filePath("manual_chapters_extract.xml"));
 
-    // Переименовываем файл для безопасного хардсаба
+    // Если запрошен хардсаб из внутренней дорожки — извлекаем её во временный файл через FFmpeg
     if (m_params.value("useHardsub").toBool() && m_params.value("hardsubMode").toString() == "internal")
     {
-        QFileInfo fi(m_actualInputMkv);
-        QString tempPath = fi.absolutePath() + QDir::separator() + "temp_name_to_extract_subtitle.mkv";
-        if (QFile::rename(m_actualInputMkv, tempPath))
+        int trackIndex = m_params.value("subtitleTrackIndex").toInt();
+        m_tempExtractedSubsPath = QDir(baseDir).filePath("dt_temp_render_subs.ass");
+        QFile::remove(m_tempExtractedSubsPath);
+
+        emit logMessage(QString("Извлечение внутренней дорожки субтитров 0:s:%1 во временный файл...").arg(trackIndex),
+                        LogCategory::APP);
+
+        QStringList ffmpegArgs = {"-y",   "-i",  m_actualInputMkv,       "-map", QString("0:s:%1").arg(trackIndex),
+                                  "-c:s", "ass", m_tempExtractedSubsPath};
+        QByteArray dummy;
+        if (!m_processManager->executeAndWait(AppSettings::instance().ffmpegPath(), ffmpegArgs, dummy, 120000) ||
+            !QFileInfo::exists(m_tempExtractedSubsPath))
         {
-            m_actualInputMkv = tempPath;
-            m_processManager->setWorkingDirectory(fi.absolutePath());
-            emit logMessage("Входной файл временно переименован для фильтра субтитров.", LogCategory::APP);
+            emit logMessage("Ошибка: не удалось извлечь субтитры для хардсаба через ffmpeg.", LogCategory::APP,
+                            LogLevel::Error);
+            emit finished();
+            return;
         }
     }
 
@@ -201,12 +182,6 @@ void ManualRenderer::start()
     }
 
     QByteArray jsonData;
-    QString videoCodecExtension = "h264";
-    int detectedVideoBitrateKbps = -1;
-    QString detectedVideoFrameRate;
-    QString detectedVideoAvgFrameRate;
-    bool detectedVideoIsCfr = false;
-
     if (m_processManager->executeAndWait(AppSettings::instance().mkvmergePath(), {"-J", m_actualInputMkv}, jsonData))
     {
         QJsonObject root = QJsonDocument::fromJson(jsonData).object();
@@ -215,153 +190,12 @@ void ManualRenderer::start()
             m_sourceDurationS = static_cast<qint64>(
                 root["container"].toObject()["properties"].toObject()["duration"].toDouble() / 1000000000.0);
         }
-
-        QJsonArray tracks = root["tracks"].toArray();
-        for (const QJsonValue& val : tracks)
-        {
-            QJsonObject track = val.toObject();
-            if (track["type"].toString() != "video")
-            {
-                continue;
-            }
-            QString codec = track["codec"].toString().toLower();
-            if (codec.contains("hevc") || codec.contains("h265"))
-            {
-                videoCodecExtension = "h265";
-            }
-            else
-            {
-                videoCodecExtension = "h264";
-            }
-            break;
-        }
-    }
-
-    const QString ffprobePath = AppSettings::instance().ffprobePath();
-    if (!ffprobePath.isEmpty() && QFileInfo::exists(ffprobePath))
-    {
-        QByteArray probeData;
-        QStringList probeArgs = {"-v", "quiet", "-print_format", "json", "-show_streams", m_actualInputMkv};
-        if (m_processManager->executeAndWait(ffprobePath, probeArgs, probeData) && !probeData.isEmpty())
-        {
-            const QJsonObject probeRoot = QJsonDocument::fromJson(probeData).object();
-            const QJsonArray streams = probeRoot.value("streams").toArray();
-            for (const auto& streamVal : streams)
-            {
-                const QJsonObject stream = streamVal.toObject();
-                if (stream.value("codec_type").toString() != "video")
-                {
-                    continue;
-                }
-                const QString bitRateStr = stream.value("bit_rate").toString();
-                if (!bitRateStr.isEmpty())
-                {
-                    detectedVideoBitrateKbps = static_cast<int>(bitRateStr.toLongLong() / 1000);
-                }
-                detectedVideoFrameRate = stream.value("r_frame_rate").toString();
-                detectedVideoAvgFrameRate = stream.value("avg_frame_rate").toString();
-                detectedVideoIsCfr = isLikelyCfr(detectedVideoFrameRate, detectedVideoAvgFrameRate);
-                break;
-            }
-        }
     }
 
     if (m_sourceDurationS == 0)
     {
         emit logMessage("Предупреждение: не удалось определить длительность файла. Прогресс не будет отображаться.",
                         LogCategory::APP, LogLevel::Warning);
-    }
-
-    const bool useConcatTb = m_params.value("useConcatTb").toBool();
-    const bool useHardsub = m_params.value("useHardsub").toBool();
-    if (useConcatTb && useHardsub)
-    {
-        emit logMessage("Включен режим умного рендера ТБ (concat).", LogCategory::APP);
-        TbSegment segment;
-
-        const QString hardsubMode = m_params.value("hardsubMode").toString();
-        if (hardsubMode == "external")
-        {
-            const QString subsPath = m_params.value("externalSubsPath").toString();
-            segment = AssProcessor::detectTbSegmentFromFile(subsPath);
-        }
-        else if (hardsubMode == "internal")
-        {
-            const int subtitleTrackIndex = m_params.value("subtitleTrackIndex").toInt();
-            const QString tempAssPath = QDir(QFileInfo(m_actualInputMkv).absolutePath())
-                                            .filePath(QString("temp_internal_subs_%1.ass").arg(subtitleTrackIndex));
-            QFile::remove(tempAssPath);
-
-            QByteArray extractOutput;
-            const QString ffmpegPath = AppSettings::instance().ffmpegPath();
-            QStringList extractArgs;
-            extractArgs << "-y" << "-i" << m_actualInputMkv << "-map" << QString("0:s:%1").arg(subtitleTrackIndex)
-                        << "-c:s" << "ass" << tempAssPath;
-            if (m_processManager->executeAndWait(ffmpegPath, extractArgs, extractOutput) &&
-                QFileInfo::exists(tempAssPath))
-            {
-                segment = AssProcessor::detectTbSegmentFromFile(tempAssPath);
-            }
-            else
-            {
-                emit logMessage("Concat рендер: не удалось извлечь внутреннюю дорожку субтитров в .ass.",
-                                LogCategory::APP);
-            }
-            if (segment.isValid())
-            {
-                m_tempConcatSubsPath = tempAssPath;
-            }
-            else
-            {
-                QFile::remove(tempAssPath);
-            }
-        }
-
-        if (segment.isValid())
-        {
-            emit logMessage(QString("Concat рендер: найден сегмент ТБ: %1s - %2s")
-                                .arg(segment.startSeconds, 0, 'f', 3)
-                                .arg(segment.endSeconds, 0, 'f', 3),
-                            LogCategory::APP);
-            const QString outputMp4 = QFileInfo(m_params.value("outputMp4").toString()).absoluteFilePath();
-            QString hardsubModeForConcat = m_params.value("hardsubMode").toString();
-            const int subtitleTrackIndex = m_params.value("subtitleTrackIndex").toInt();
-            QString externalSubsPath = m_params.value("externalSubsPath").toString();
-            if (!m_tempConcatSubsPath.isEmpty())
-            {
-                hardsubModeForConcat = "external";
-                externalSubsPath = m_tempConcatSubsPath;
-            }
-
-            const bool reencodeAudioAac = m_params.value(QStringLiteral("reencodeAudioAac256"), true).toBool();
-            m_concatRenderer = new ConcatTbRenderer(
-                m_actualInputMkv, outputMp4, segment, m_sourceDurationS, videoCodecExtension, hardsubModeForConcat,
-                subtitleTrackIndex, externalSubsPath, detectedVideoBitrateKbps, detectedVideoFrameRate,
-                detectedVideoAvgFrameRate, detectedVideoIsCfr, reencodeAudioAac, m_processManager, this);
-            connect(m_concatRenderer, &ConcatTbRenderer::logMessage, this, &ManualRenderer::logMessage);
-            connect(m_concatRenderer, &ConcatTbRenderer::progressUpdated, this, &ManualRenderer::progressUpdated);
-            connect(m_concatRenderer, &ConcatTbRenderer::finished, this,
-                    [this]()
-                    {
-                        if (!m_tempConcatSubsPath.isEmpty())
-                        {
-                            QFile::remove(m_tempConcatSubsPath);
-                            m_tempConcatSubsPath.clear();
-                        }
-                        m_concatRenderer = nullptr;
-                        applyChaptersIfNeeded();
-                        emit finished();
-                    });
-            m_concatRenderer->start();
-            return;
-        }
-
-        if (!m_tempConcatSubsPath.isEmpty())
-        {
-            QFile::remove(m_tempConcatSubsPath);
-            m_tempConcatSubsPath.clear();
-        }
-        emit logMessage("Concat рендер: границы ТБ не найдены, используется обычный полный рендер.", LogCategory::APP);
     }
 
     m_currentState = RenderState::VideoPass1;
@@ -432,33 +266,32 @@ bool ManualRenderer::parsePreset(const QString& commandTemplate, QStringList& ou
     bool useHardsub = m_params.value("useHardsub").toBool();
     if (useHardsub)
     {
-        QString filterValue;
-
+        QString subFilePath;
         if (m_params.value("hardsubMode").toString() == "internal")
         {
-            QFileInfo fileInfo(m_actualInputMkv);
-            m_processManager->setWorkingDirectory(fileInfo.absolutePath());
-
-            QString escapedName = fileInfo.fileName().replace("'", "\\'");
-            int trackIndex = m_params.value("subtitleTrackIndex").toInt();
-            filterValue = QString("filename='%1':si=%2").arg(escapedName).arg(trackIndex);
-
-            emit logMessage(QString("Hardsub: внутренняя дорожка #%1 (относительный путь).").arg(trackIndex),
-                            LogCategory::APP);
+            subFilePath = m_tempExtractedSubsPath;
         }
         else
         {
-            QFileInfo fileInfo(m_params.value("externalSubsPath").toString());
-            // ВОЗВРАЩАЕМ: Устанавливаем рабочую папку для внешних сабов
+            subFilePath = m_params.value("externalSubsPath").toString();
+        }
+
+        if (!subFilePath.isEmpty() && QFileInfo::exists(subFilePath))
+        {
+            QFileInfo fileInfo(subFilePath);
             m_processManager->setWorkingDirectory(fileInfo.absolutePath());
 
             QString extEscaped = fileInfo.fileName().replace("'", "\\'");
-            filterValue = QString("filename='%1'").arg(extEscaped);
+            QString filterValue = QString("filename='%1'").arg(extEscaped);
+            processedTemplate.replace("%SIGNS%", filterValue);
 
-            emit logMessage(QString("Hardsub: внешний файл %1 (относительный путь).").arg(fileInfo.fileName()),
-                            LogCategory::APP);
+            emit logMessage(QString("Hardsub: файл субтитров %1.").arg(fileInfo.fileName()), LogCategory::APP);
         }
-        processedTemplate.replace("%SIGNS%", filterValue);
+        else
+        {
+            emit logMessage("Ошибка: файл субтитров для хардсаба не найден.", LogCategory::APP, LogLevel::Error);
+            return false;
+        }
     }
     else
     {
@@ -575,9 +408,6 @@ void ManualRenderer::cancelOperation()
 
 void ManualRenderer::onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
-    if (m_concatRenderer != nullptr)
-        return;
-
     if (m_processManager != nullptr && m_processManager->wasKilled())
     {
         emit logMessage("Ручной рендер отменен пользователем.", LogCategory::APP);
@@ -603,6 +433,8 @@ void ManualRenderer::onProcessFinished(int exitCode, QProcess::ExitStatus exitSt
         else
         {
             auto* helper = new RenderHelper(m_preset, m_tempVideoMp4, m_processManager, this);
+            connect(helper, &RenderHelper::logMessage, this, &ManualRenderer::logMessage);
+            connect(helper, &RenderHelper::showDialogRequest, this, &ManualRenderer::bitrateCheckRequest);
             connect(helper, &RenderHelper::finished, this, &ManualRenderer::onBitrateCheckFinished);
             helper->startCheck();
         }
@@ -611,6 +443,8 @@ void ManualRenderer::onProcessFinished(int exitCode, QProcess::ExitStatus exitSt
     case RenderState::VideoPass2:
     {
         auto* helper = new RenderHelper(m_preset, m_tempVideoMp4, m_processManager, this);
+        connect(helper, &RenderHelper::logMessage, this, &ManualRenderer::logMessage);
+        connect(helper, &RenderHelper::showDialogRequest, this, &ManualRenderer::bitrateCheckRequest);
         connect(helper, &RenderHelper::finished, this, &ManualRenderer::onBitrateCheckFinished);
         helper->startCheck();
         break;
@@ -664,17 +498,15 @@ void ManualRenderer::onProcessText(const QString& output)
 
 void ManualRenderer::cleanupTempFiles()
 {
-    QString originalMkv = QFileInfo(m_params["inputMkv"].toString()).absoluteFilePath();
-    if (!originalMkv.isEmpty() && m_actualInputMkv != originalMkv && QFile::exists(m_actualInputMkv))
-    {
-        QFile::rename(m_actualInputMkv, originalMkv);
-        m_actualInputMkv = originalMkv;
-    }
-
     QFile::remove(m_tempVideoMp4);
     QFile::remove(m_tempAudioM4a);
     QFile::remove(m_tempChaptersTxt);
-    QFile::remove(QDir(QFileInfo(originalMkv).absolutePath()).filePath("manual_chapters_extract.xml"));
+    if (!m_tempExtractedSubsPath.isEmpty())
+    {
+        QFile::remove(m_tempExtractedSubsPath);
+        m_tempExtractedSubsPath.clear();
+    }
+    QFile::remove(QDir(QFileInfo(m_actualInputMkv).absolutePath()).filePath("manual_chapters_extract.xml"));
 }
 
 ProcessManager* ManualRenderer::getProcessManager() const
@@ -695,54 +527,5 @@ void ManualRenderer::onBitrateCheckFinished(RerenderDecision decision, const Ren
     {
         m_currentState = RenderState::AudioPass;
         runStep();
-    }
-}
-
-void ManualRenderer::applyChaptersIfNeeded()
-{
-    // Метод больше не вызывается из основного пайплайна (MP4Box вшивает главы на лету),
-    // но оставлен для ConcatTbRenderer, если вы используете его.
-    const QString ext = m_params.value(QStringLiteral("chaptersExternalPath")).toString().trimmed();
-    const QString inputMkv = m_params.value(QStringLiteral("inputMkv")).toString();
-    const bool transferEmbedded = m_params.value(QStringLiteral("transferEmbeddedChapters"), true).toBool();
-    const QString outMp4 = m_params.value(QStringLiteral("outputMp4")).toString();
-    if (outMp4.isEmpty())
-    {
-        return;
-    }
-
-    QList<ChapterMarker> markers;
-    if (!ext.isEmpty() && QFileInfo::exists(ext))
-    {
-        markers = ChapterHelper::loadChaptersFromFile(ext);
-    }
-    else if (transferEmbedded && !inputMkv.isEmpty())
-    {
-        const QString embPath =
-            QDir(QFileInfo(inputMkv).absolutePath()).filePath(QStringLiteral("manual_chapters_extract.xml"));
-        if (ChapterHelper::extractEmbeddedChaptersToFile(AppSettings::instance().mkvextractPath(), inputMkv, embPath,
-                                                         m_processManager))
-        {
-            markers = ChapterHelper::loadChaptersFromFile(embPath);
-        }
-    }
-
-    if (markers.isEmpty() || !QFileInfo::exists(outMp4))
-    {
-        return;
-    }
-
-    const qint64 durNs = m_sourceDurationS > 0 ? static_cast<qint64>(static_cast<double>(m_sourceDurationS) * 1e9) : 0;
-    QString err;
-    emit logMessage(QStringLiteral("Запись глав в MP4..."), LogCategory::APP);
-    if (ChapterHelper::applyChaptersToMp4(outMp4, markers, durNs, AppSettings::instance().ffmpegPath(),
-                                          m_processManager, &err))
-    {
-        emit logMessage(QStringLiteral("Главы записаны в MP4."), LogCategory::APP);
-    }
-    else
-    {
-        emit logMessage(QStringLiteral("ПРЕДУПРЕЖДЕНИЕ: не удалось записать главы в MP4: %1").arg(err),
-                        LogCategory::APP, LogLevel::Warning);
     }
 }

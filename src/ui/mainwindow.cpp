@@ -28,8 +28,8 @@
 #include <QMessageBox>
 #include <QMetaObject>
 #include <QProcess>
-#include <QRegularExpression>
 #include <QPushButton>
+#include <QRegularExpression>
 #include <QScrollBar>
 #include <QSettings>
 #include <QStandardPaths>
@@ -235,6 +235,68 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWi
     ui->mainTabWidget->addTab(m_publicationWidget, "Публикация");
     ui->mainTabWidget->setTabEnabled(ui->mainTabWidget->count() - 1, false);
 
+    // Меню «Вид» для скрытия/показа вкладок
+    QMenu* viewMenu = ui->menubar->addMenu("Вид");
+    QAction* showAutoAction = viewMenu->addAction("Показать «Автоматический режим»");
+    showAutoAction->setCheckable(true);
+    const bool showAuto = settings.value("ui/showAutoModeTab", false).toBool();
+    showAutoAction->setChecked(showAuto);
+
+    QAction* showPubAction = viewMenu->addAction("Показать «Публикация»");
+    showPubAction->setCheckable(true);
+    const bool showPub = settings.value("ui/showPublicationTab", false).toBool();
+    showPubAction->setChecked(showPub);
+
+    auto updateTabsVisibility = [this](bool autoVis, bool pubVis)
+    {
+        int autoIdx = ui->mainTabWidget->indexOf(ui->autoModeTab);
+        if (autoIdx >= 0)
+        {
+            ui->mainTabWidget->setTabVisible(autoIdx, autoVis);
+        }
+        int pubIdx = ui->mainTabWidget->indexOf(m_publicationWidget);
+        if (pubIdx >= 0)
+        {
+            ui->mainTabWidget->setTabVisible(pubIdx, pubVis);
+        }
+    };
+
+    updateTabsVisibility(showAuto, showPub);
+
+    connect(showAutoAction, &QAction::toggled, this,
+            [updateTabsVisibility, showPubAction](bool checked)
+            {
+                QSettings s("MyCompany", "DubbingTool");
+                s.setValue("ui/showAutoModeTab", checked);
+                updateTabsVisibility(checked, showPubAction->isChecked());
+            });
+
+    connect(showPubAction, &QAction::toggled, this,
+            [updateTabsVisibility, showAutoAction](bool checked)
+            {
+                QSettings s("MyCompany", "DubbingTool");
+                s.setValue("ui/showPublicationTab", checked);
+                updateTabsVisibility(showAutoAction->isChecked(), checked);
+            });
+
+    if (!showAuto)
+    {
+        ui->mainTabWidget->setCurrentWidget(ui->assemblyTab);
+    }
+
+    ui->mainSplitter->setStretchFactor(0, 3);
+    ui->mainSplitter->setStretchFactor(1, 1);
+    if (settings.contains("ui/mainSplitterState"))
+    {
+        ui->mainSplitter->restoreState(settings.value("ui/mainSplitterState").toByteArray());
+    }
+    else
+    {
+        ui->mainSplitter->setSizes({520, 180});
+    }
+
+    connect(ui->clearLogButton, &QPushButton::clicked, ui->logOutput, &QPlainTextEdit::clear);
+
     QAction* settingsAction = new QAction("Настройки", this);
     ui->menubar->addAction(settingsAction);
     connect(settingsAction, &QAction::triggered, this, &MainWindow::on_actionSettings_triggered);
@@ -249,8 +311,15 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWi
             });
 
     connect(m_manualExtractionWidget, &ManualExtractionWidget::logMessage, this, &MainWindow::logMessage);
-    connect(m_manualAssemblyWidget, &ManualAssemblyWidget::templateDataRequested, this,
-            &MainWindow::onRequestTemplateData);
+    connect(m_manualExtractionWidget, &ManualExtractionWidget::progressUpdated, this, &MainWindow::updateProgress);
+    connect(m_manualExtractionWidget, &ManualExtractionWidget::extractionStarted, this,
+            [this]()
+            {
+                switchToCancelMode();
+                setUiEnabled(false);
+            });
+    connect(m_manualExtractionWidget, &ManualExtractionWidget::extractionFinished, this,
+            [this](bool /*success*/) { restoreUiAfterFinish(); });
 
     connect(m_manualAssemblyWidget, &ManualAssemblyWidget::assemblyRequested, this, &MainWindow::startManualAssembly);
     connect(m_manualAssemblyWidget, &ManualAssemblyWidget::chapterTimingsRequested, this,
@@ -459,15 +528,6 @@ void MainWindow::loadTemplates()
 
     ui->templateComboBox->addItems(m_templates.keys());
 
-    if (m_manualAssemblyWidget)
-    {
-        m_manualAssemblyWidget->updateTemplateList(m_templates.keys());
-        const QString sel = ui->templateComboBox->currentText();
-        if (!sel.isEmpty() && m_templates.contains(sel))
-        {
-            m_manualAssemblyWidget->onTemplateDataReceived(m_templates.value(sel));
-        }
-    }
     updateChaptersAutoVisibility();
 }
 
@@ -620,6 +680,10 @@ void MainWindow::on_cancelButton_clicked()
         logMessage("Отправка запроса на отмену...", LogCategory::APP);
         QMetaObject::invokeMethod(m_currentWorker, "cancelOperation", Qt::QueuedConnection);
     }
+    if (m_manualExtractionWidget)
+    {
+        m_manualExtractionWidget->cancel();
+    }
 }
 
 void MainWindow::on_startButton_clicked()
@@ -720,7 +784,8 @@ void MainWindow::on_startButton_clicked()
     connect(thread, &QThread::finished, workflowManager, &WorkflowManager::deleteLater);
     connect(workflowManager, &WorkflowManager::destroyed, thread, &QThread::deleteLater);
     connect(workflowManager, &WorkflowManager::logMessage, this, &MainWindow::logMessage);
-    connect(workflowManager, &WorkflowManager::progressUpdated, this, &MainWindow::updateProgress, Qt::QueuedConnection);
+    connect(workflowManager, &WorkflowManager::progressUpdated, this, &MainWindow::updateProgress,
+            Qt::QueuedConnection);
 
     thread->start();
 }
@@ -881,14 +946,6 @@ QString MainWindow::getManualMkvPath() const
     return ui->mkvPathLineEdit->text();
 }
 
-void MainWindow::onRequestTemplateData(const QString& templateName)
-{
-    if (m_templates.contains(templateName))
-    {
-        m_manualAssemblyWidget->onTemplateDataReceived(m_templates.value(templateName));
-    }
-}
-
 void MainWindow::startManualAssembly()
 {
     if (m_currentWorker)
@@ -900,7 +957,6 @@ void MainWindow::startManualAssembly()
 
     switchToCancelMode();
     setUiEnabled(false);
-    ui->mainTabWidget->setCurrentIndex(0); // Переходим на главный таб
 
     QThread* thread = new QThread(this);
     ManualAssembler* worker = new ManualAssembler(m_manualAssemblyWidget->getParameters(), nullptr);
@@ -939,7 +995,6 @@ void MainWindow::startManualRender()
 
     switchToCancelMode();
     setUiEnabled(false);
-    ui->mainTabWidget->setCurrentIndex(0);
 
     QThread* thread = new QThread(this);
     ManualRenderer* worker = new ManualRenderer(m_manualRenderWidget->getParameters(), nullptr);
@@ -1012,6 +1067,7 @@ void MainWindow::closeEvent(QCloseEvent* event)
     QSettings settings("MyCompany", "DubbingTool");
     settings.setValue("ui/mainWindowGeometry", saveGeometry());
     settings.setValue("ui/mainWindowState", saveState());
+    settings.setValue("ui/mainSplitterState", ui->mainSplitter->saveState());
 
     AppSettings::instance().save();
     settings.setValue("manualRender/lastUsedPreset", m_manualRenderWidget->getCurrentPresetName());
@@ -1139,43 +1195,6 @@ void MainWindow::onUserInputRequired(const UserInputRequest& request)
 
         dialog.setMissingFonts(request.missingFonts);
 
-        QList<ChapterTimingSeconds> tbChapterPickerRows = request.tbChapterPickerRows;
-        if (tbChapterPickerRows.isEmpty())
-        {
-            if (auto* workflowManager = qobject_cast<WorkflowManager*>(m_currentWorker.data()))
-            {
-                QList<ChapterTimingSeconds> fromWorker;
-                const bool invokedOk = QMetaObject::invokeMethod(
-                    workflowManager,
-                    "tbChapterPickerRowsForDialog",
-                    Qt::BlockingQueuedConnection,
-                    Q_RETURN_ARG(QList<ChapterTimingSeconds>, fromWorker));
-                if (invokedOk)
-                {
-                    tbChapterPickerRows = fromWorker;
-                }
-            }
-        }
-
-        const bool chapterRowsForPicker = !tbChapterPickerRows.isEmpty();
-        const bool showTimeAndPreview = request.tbTimeRequired || chapterRowsForPicker;
-
-        dialog.setTimeInputVisible(showTimeAndPreview);
-        if (showTimeAndPreview)
-        {
-            if (request.tbTimeRequired)
-            {
-                dialog.setTimePrompt(request.tbTimeReason);
-            }
-            else
-            {
-                dialog.setTimePrompt(QStringLiteral(
-                    "Главы для перемотки превью; время ТБ для этого шага уже определено или не запрашивается."));
-            }
-            dialog.setVideoFile(request.videoFilePath, request.videoDurationS);
-            dialog.setTbChapterPickerData(tbChapterPickerRows);
-        }
-
         dialog.setChaptersInputVisible(request.chaptersRequired);
         if (request.chaptersRequired && !request.chaptersReason.isEmpty())
         {
@@ -1192,11 +1211,8 @@ void MainWindow::onUserInputRequired(const UserInputRequest& request)
         UserInputResponse response;
         response.audioPath = dialog.getAudioPath();
         response.resolvedFonts = dialog.getResolvedFonts();
-        response.time = dialog.getTime();
         response.chaptersXmlPath = dialog.getChaptersXmlPath();
         response.buildWithoutChapters = dialog.getBuildWithoutChapters();
-        response.persistTbTemplateFields = dialog.wantsTbTemplatePersistence();
-        response.tbPersistEndingChapterName = dialog.tbPersistChapterTitleIfClean();
 
         if (request.chaptersRequired && !response.buildWithoutChapters && response.chaptersXmlPath.isEmpty())
         {
@@ -1210,24 +1226,6 @@ void MainWindow::onUserInputRequired(const UserInputRequest& request)
             QMessageBox::critical(this, "Ошибка", "Аудиодорожка является обязательной. Сборка прервана.");
             emit userInputProvided({});
             return;
-        }
-        if (request.tbTimeRequired && response.time == "0:00:00.000")
-        {
-            QMessageBox::critical(this, "Ошибка", "Время эндинга является обязательным. Сборка прервана.");
-            emit userInputProvided({});
-            return;
-        }
-
-        if (response.persistTbTemplateFields && request.tbTimeRequired && !response.tbPersistEndingChapterName.isEmpty())
-        {
-            const QString templateName = ui->templateComboBox->currentText().trimmed();
-            if (!templateName.isEmpty() && m_templates.contains(templateName))
-            {
-                ReleaseTemplate t = m_templates.value(templateName);
-                t.endingChapterName = response.tbPersistEndingChapterName.trimmed();
-                t.useManualTime = false;
-                saveTemplate(t);
-            }
         }
 
         logMessage("Данные от пользователя получены, возобновление процесса...", LogCategory::APP);
@@ -1276,9 +1274,23 @@ void MainWindow::setUiEnabled(bool enabled)
     ui->deleteTemplateButton->setEnabled(enabled);
 
     if (m_manualAssemblyWidget)
-        m_manualAssemblyWidget->findChild<QPushButton*>("assembleButton")->setEnabled(enabled);
+    {
+        auto* btn = m_manualAssemblyWidget->findChild<QPushButton*>("assembleButton");
+        if (btn)
+            btn->setEnabled(enabled);
+    }
     if (m_manualRenderWidget)
-        m_manualRenderWidget->findChild<QPushButton*>("renderButton")->setEnabled(enabled);
+    {
+        auto* btn = m_manualRenderWidget->findChild<QPushButton*>("renderButton");
+        if (btn)
+            btn->setEnabled(enabled);
+    }
+    if (m_manualExtractionWidget)
+    {
+        auto* btn = m_manualExtractionWidget->findChild<QPushButton*>("extractButton");
+        if (btn)
+            btn->setEnabled(enabled);
+    }
 }
 
 void MainWindow::finishWorkerProcess()
@@ -1307,18 +1319,17 @@ void MainWindow::finishWorkerProcess()
 
 void MainWindow::switchToCancelMode()
 {
-    ui->startButton->setText("ОТМЕНА");
-    ui->startButton->setStyleSheet("background-color: #d9534f; color: white;");
-    disconnect(ui->startButton, &QPushButton::clicked, this, &MainWindow::on_startButton_clicked);
-    connect(ui->startButton, &QPushButton::clicked, this, &MainWindow::on_cancelButton_clicked);
+    ui->cancelButton->setVisible(true);
+    ui->cancelButton->setEnabled(true);
+    ui->startButton->setEnabled(false);
 }
 
 void MainWindow::restoreUiAfterFinish()
 {
+    ui->cancelButton->setVisible(false);
+    ui->startButton->setEnabled(true);
     ui->startButton->setText("СТАРТ");
     ui->startButton->setStyleSheet("");
-    disconnect(ui->startButton, &QPushButton::clicked, this, &MainWindow::on_cancelButton_clicked);
-    connect(ui->startButton, &QPushButton::clicked, this, &MainWindow::on_startButton_clicked);
 
     setUiEnabled(true);
 

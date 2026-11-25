@@ -163,16 +163,7 @@
        </item>
       </layout>
      </item>
-     <item>
-      <widget class="QCheckBox" name="concatTbCheckBox">
-       <property name="toolTip">
-        <string>Перекодировать только фрагмент с титрами благодарности, остальное видео склеить без перекодирования (concat).</string>
-       </property>
-       <property name="text">
-        <string>Умный рендер (concat) — перекодировать только ТБ</string>
-       </property>
-      </widget>
-     </item>
+     
      <item>
       <widget class="QCheckBox" name="reencodeAudioAac256CheckBox">
        <property name="toolTip">

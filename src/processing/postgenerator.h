@@ -42,6 +42,6 @@ public:
      * @brief VK post body from parse result and original source text (poster author as plain text, not a placeholder).
      */
     [[nodiscard]] static QString buildVkPostTemplateFromParseResult(const PostParseResult& parseResult,
-                                                                  const QString& sourcePostText);
+                                                                    const QString& sourcePostText);
 };
 #endif // POSTGENERATOR_H

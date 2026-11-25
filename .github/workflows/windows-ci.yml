@@ -41,7 +41,6 @@ jobs:
         with:
           version: '6.10.2'
           arch: 'win64_msvc2022_64'
-          modules: 'qtmultimedia'
           cache: true
 
       - name: Setup MSVC
@@ -89,7 +88,6 @@ jobs:
         with:
           version: '6.10.2'
           arch: 'win64_msvc2022_64'
-          modules: 'qtmultimedia'
           cache: true
 
       - name: Install LLVM
@@ -124,7 +122,6 @@ jobs:
         with:
           version: '6.10.2'
           arch: 'win64_msvc2022_64'
-          modules: 'qtmultimedia'
           cache: true
 
       - name: Setup MSVC

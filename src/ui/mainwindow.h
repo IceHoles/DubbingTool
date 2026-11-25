@@ -51,7 +51,6 @@ public:
 public slots:
     void logMessage(const QString& message, LogCategory category = LogCategory::APP, LogLevel level = LogLevel::Info);
     void onMultipleTorrentsFound(const QList<TorrentInfo>& candidates);
-    void onRequestTemplateData(const QString& templateName);
     void onWorkflowAborted();
     void onUserInputRequired(const UserInputRequest& request);
     void onPostsReady(const ReleaseTemplate& t, const EpisodeData& data);

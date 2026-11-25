@@ -16,10 +16,8 @@ ReleaseTemplate ReleaseTemplate::newTemplateDefaults()
     t.seriesTitleForPost = QStringLiteral("Как в постах, без кавычек");
     t.rssUrl = QUrl(QStringLiteral("https://example.com/rss.xml"));
     t.animationStudio = QStringLiteral("STUDIO (с шикимори или MAL)");
-    t.subAuthor =
-        QStringLiteral("Crunchyroll (или Имя Фамилия, если перевод свой + галочка внизу \"Свой перевод\")");
+    t.subAuthor = QStringLiteral("Crunchyroll (или Имя Фамилия, если перевод свой + галочка внизу \"Свой перевод\")");
     t.originalLanguage = QStringLiteral("ja");
-    t.endingChapterName = QStringLiteral("Ending Start");
     t.totalEpisodes = 12;
 
     t.director = QStringLiteral("Режиссер Дубляжа");
@@ -28,46 +26,42 @@ ReleaseTemplate ReleaseTemplate::newTemplateDefaults()
     t.releaseBuilder = QStringLiteral("Сборщик Релиза");
     t.cast << QStringLiteral("Актер 1") << QStringLiteral("Актер 2") << QStringLiteral("Актер 3");
 
-    t.postTemplates[QStringLiteral("tg_mp4")] =
-        QStringLiteral(
-            "▶️Серия: %EPISODE_NUMBER%/%TOTAL_EPISODES%\n\n"
-            "📌«%SERIES_TITLE%» в дубляже от ТО Дубляжная\n\n"
-            "🎁Сериал озвучен при поддержке [онлайн-кинотеатра TVOЁ](https://tvoe.live/), если вы хотите поддержать "
-            "Дубляжную, то смотрите нашу озвучку именно там, ведь TVOЁ дарит скидку нашим подписчикам по промокоду - "
-            "`Dublyazhnaya`, где 1 месяц 99 рублей вместо 299 руб\n\n"
-            "Помимо ТГ сериал можно посмотреть здесь:\n\n"
-            "[TVOЁ](https://tvoe.live/p/) (~~299~~ 99 руб. по промокоду: `Dublyazhnaya`)\n\n"
-            "[Архив MKV](https://t.me/+CVpSSg33UwI4MzYy)\n\n"
-            "🎙Роли дублировали:\n%CAST_LIST%\n\n"
-            "📝Режиссёр дубляжа:\n%DIRECTOR%\n\n"
-            "🪄Звукорежиссёр:\n%SOUND_ENGINEER%\n\n"
-            "📚Перевод:\n%SUB_AUTHOR%\n\n"
-            "✏️Разметка:\n%TIMING_AUTHOR%\n\n"
-            "✨Локализация постера:\nКирилл Хоримиев\n\n"
-            "📦Сборка релиза:\n%RELEASE_BUILDER%\n\n"
-            "#Дубрелиз@dublyajnaya #Хештег@dublyajnaya #Дубляж@dublyajnaya");
-    t.postTemplates[QStringLiteral("tg_mkv")] =
-        QStringLiteral("%SERIES_TITLE%\n"
-                       "Серия %EPISODE_NUMBER%/%TOTAL_EPISODES%\n"
-                       "#Хештег");
-    t.postTemplates[QStringLiteral("vk")] =
-        QStringLiteral("«%SERIES_TITLE%» в дубляже от ТО Дубляжная\n\n"
-                       "Серия: %EPISODE_NUMBER%/%TOTAL_EPISODES%\n\n"
-                       "Роли дублировали:\n%CAST_LIST%\n\n"
-                       "Режиссёр дубляжа:\n%DIRECTOR%\n\n"
-                       "Звукорежиссёр:\n%SOUND_ENGINEER%\n\n"
-                       "Перевод:\n%SUB_AUTHOR%\n\n"
-                       "Локализация видеоряда:\n%VIDEO_LOCALIZATION_AUTHOR%\n\n"
-                       "Локализация надписей:\n%SIGNS_AUTHOR%\n\n"
-                       "Локализация постера:\n\n"
-                       "Сборка релиза:\n%RELEASE_BUILDER%\n\n"
-                       "#Хештег@dublyajnaya");
+    t.postTemplates[QStringLiteral("tg_mp4")] = QStringLiteral(
+        "▶️Серия: %EPISODE_NUMBER%/%TOTAL_EPISODES%\n\n"
+        "📌«%SERIES_TITLE%» в дубляже от ТО Дубляжная\n\n"
+        "🎁Сериал озвучен при поддержке [онлайн-кинотеатра TVOЁ](https://tvoe.live/), если вы хотите поддержать "
+        "Дубляжную, то смотрите нашу озвучку именно там, ведь TVOЁ дарит скидку нашим подписчикам по промокоду - "
+        "`Dublyazhnaya`, где 1 месяц 99 рублей вместо 299 руб\n\n"
+        "Помимо ТГ сериал можно посмотреть здесь:\n\n"
+        "[TVOЁ](https://tvoe.live/p/) (~~299~~ 99 руб. по промокоду: `Dublyazhnaya`)\n\n"
+        "[Архив MKV](https://t.me/+CVpSSg33UwI4MzYy)\n\n"
+        "🎙Роли дублировали:\n%CAST_LIST%\n\n"
+        "📝Режиссёр дубляжа:\n%DIRECTOR%\n\n"
+        "🪄Звукорежиссёр:\n%SOUND_ENGINEER%\n\n"
+        "📚Перевод:\n%SUB_AUTHOR%\n\n"
+        "✏️Разметка:\n%TIMING_AUTHOR%\n\n"
+        "✨Локализация постера:\nКирилл Хоримиев\n\n"
+        "📦Сборка релиза:\n%RELEASE_BUILDER%\n\n"
+        "#Дубрелиз@dublyajnaya #Хештег@dublyajnaya #Дубляж@dublyajnaya");
+    t.postTemplates[QStringLiteral("tg_mkv")] = QStringLiteral("%SERIES_TITLE%\n"
+                                                               "Серия %EPISODE_NUMBER%/%TOTAL_EPISODES%\n"
+                                                               "#Хештег");
+    t.postTemplates[QStringLiteral("vk")] = QStringLiteral("«%SERIES_TITLE%» в дубляже от ТО Дубляжная\n\n"
+                                                           "Серия: %EPISODE_NUMBER%/%TOTAL_EPISODES%\n\n"
+                                                           "Роли дублировали:\n%CAST_LIST%\n\n"
+                                                           "Режиссёр дубляжа:\n%DIRECTOR%\n\n"
+                                                           "Звукорежиссёр:\n%SOUND_ENGINEER%\n\n"
+                                                           "Перевод:\n%SUB_AUTHOR%\n\n"
+                                                           "Локализация видеоряда:\n%VIDEO_LOCALIZATION_AUTHOR%\n\n"
+                                                           "Локализация надписей:\n%SIGNS_AUTHOR%\n\n"
+                                                           "Локализация постера:\n\n"
+                                                           "Сборка релиза:\n%RELEASE_BUILDER%\n\n"
+                                                           "#Хештег@dublyajnaya");
     t.postTemplates[QStringLiteral("vk_comment")] =
-        QStringLiteral(
-            "А также вы можете поддержать наш коллектив на бусти: "
-            "https://boosty.to/dubl/single-payment/donation/634652\n\n"
-            "ТГ: https://t.me/dublyajnaya\n\n"
-            "TVOЁ (99 руб. по промокоду: Dublyazhnaya): https://tvoe.live/p/");
+        QStringLiteral("А также вы можете поддержать наш коллектив на бусти: "
+                       "https://boosty.to/dubl/single-payment/donation/634652\n\n"
+                       "ТГ: https://t.me/dublyajnaya\n\n"
+                       "TVOЁ (99 руб. по промокоду: Dublyazhnaya): https://tvoe.live/p/");
 
     PostTemplateMeta tgMp4Meta;
     tgMp4Meta.title = QStringLiteral("Telegram (Канал)");
@@ -99,7 +93,8 @@ ReleaseTemplate ReleaseTemplate::newTemplateDefaults()
     vkCommentMeta.sortOrder = 40;
     t.postTemplateMeta.insert(QStringLiteral("vk_comment"), vkCommentMeta);
 
-    t.uploadUrls << QStringLiteral("https://vk.com/dublyajnaya") << QStringLiteral("https://converter.kodikres.com/media-files")
+    t.uploadUrls << QStringLiteral("https://vk.com/dublyajnaya")
+                 << QStringLiteral("https://converter.kodikres.com/media-files")
                  << QStringLiteral("https://smotret-anime.app/") << QStringLiteral("https://v5.animelib.org/ru");
 
     return t;
@@ -121,8 +116,6 @@ void ReleaseTemplate::read(const QJsonObject& json)
     animationStudio = json["animationStudio"].toString();
     subAuthor = json["subAuthor"].toString();
     originalLanguage = json["originalLanguage"].toString("jpn");
-    endingChapterName = json["endingChapterName"].toString().trimmed();
-    endingStartTime = json["endingStartTime"].toString();
     if (json.contains(QStringLiteral("chaptersEnabled")))
     {
         chaptersEnabled = json[QStringLiteral("chaptersEnabled")].toBool(true);
@@ -133,9 +126,7 @@ void ReleaseTemplate::read(const QJsonObject& json)
         chaptersEnabled =
             json.contains(QStringLiteral("expectsChapters")) ? json[QStringLiteral("expectsChapters")].toBool() : true;
     }
-    useManualTime = json["useManualTime"].toBool(false);
     useOriginalAudio = json["useOriginalAudio"].toBool(true);
-    generateTb = json["generateTb"].toBool(true);
     createSrtMaster = json["createSrtMaster"].toBool(false);
     isCustomTranslation = json["isCustomTranslation"].toBool(false);
     director = json["director"].toString();
@@ -152,12 +143,10 @@ void ReleaseTemplate::read(const QJsonObject& json)
     targetAudioFormat = json["targetAudioFormat"].toString("aac");
     forceSignStyleRequest = json["forceSignStyleRequest"].toBool(false);
     pauseForSubEdit = json["pauseForSubEdit"].toBool(false);
-    useConcatRender = json["useConcatRender"].toBool(false);
 
     QString typeStr = json["voiceoverType"].toString("Dubbing");
     voiceoverType = (typeStr == "Voiceover") ? VoiceoverType::Voiceover : VoiceoverType::Dubbing;
 
-    defaultTbStyleName = json["defaultTbStyleName"].toString("default_1080p");
     renderPresetName = json["renderPresetName"].toString("NVIDIA (HEVC NVENC)");
     sourceHasSubtitles = json["sourceHasSubtitles"].toBool(true);
     seriesTitleForPost = json["seriesTitleForPost"].toString();
@@ -242,12 +231,8 @@ void ReleaseTemplate::write(QJsonObject& json) const
     json["animationStudio"] = animationStudio;
     json["subAuthor"] = subAuthor;
     json["originalLanguage"] = originalLanguage;
-    json["endingChapterName"] = endingChapterName;
-    json["endingStartTime"] = endingStartTime;
     json[QStringLiteral("chaptersEnabled")] = chaptersEnabled;
-    json["useManualTime"] = useManualTime;
     json["useOriginalAudio"] = useOriginalAudio;
-    json["generateTb"] = generateTb;
     json["createSrtMaster"] = createSrtMaster;
     json["isCustomTranslation"] = isCustomTranslation;
     json["director"] = director;
@@ -266,11 +251,9 @@ void ReleaseTemplate::write(QJsonObject& json) const
     json["targetAudioFormat"] = targetAudioFormat;
     json["forceSignStyleRequest"] = forceSignStyleRequest;
     json["pauseForSubEdit"] = pauseForSubEdit;
-    json["useConcatRender"] = useConcatRender;
 
     json["voiceoverType"] = (voiceoverType == VoiceoverType::Voiceover) ? "Voiceover" : "Dubbing";
 
-    json["defaultTbStyleName"] = defaultTbStyleName;
     json["renderPresetName"] = renderPresetName;
     json["sourceHasSubtitles"] = sourceHasSubtitles;
     json["isCustomTranslation"] = isCustomTranslation;
@@ -310,17 +293,6 @@ void ReleaseTemplate::write(QJsonObject& json) const
     json["uploadUrls"] = QJsonArray::fromStringList(uploadUrls);
 }
 
-void TbStyleInfo::read(const QJsonObject& json)
-{
-    name = json["name"].toString("default_1080p");
-    resolutionX = json["resolutionX"].toInt();
-    tags = json["tags"].toString("{\\fad(500,500)\\b1\\an3\\fnTahoma\\fs50\\shad3\\bord1.3\\4c&H000000&\\4a&H00&}");
-    marginLeft = json["marginLeft"].toInt(10);
-    marginRight = json["marginRight"].toInt(30);
-    marginV = json["marginV"].toInt(10);
-    styleName = json["styleName"].toString("Основной");
-}
-
 void PostTemplateMeta::read(const QJsonObject& json)
 {
     title = json["title"].toString();
@@ -344,15 +316,4 @@ void PostTemplateMeta::write(QJsonObject& json) const
     json["sortOrder"] = sortOrder;
     json["builtin"] = builtin;
     json["tags"] = QJsonArray::fromStringList(tags);
-}
-
-void TbStyleInfo::write(QJsonObject& json) const
-{
-    json["name"] = name;
-    json["resolutionX"] = resolutionX;
-    json["tags"] = tags;
-    json["marginLeft"] = marginLeft;
-    json["marginRight"] = marginRight;
-    json["marginV"] = marginV;
-    json["styleName"] = styleName;
 }

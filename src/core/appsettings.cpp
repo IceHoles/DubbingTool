@@ -78,17 +78,6 @@ void AppSettings::load()
         settings.value("general/userFileAction", static_cast<int>(UserFileAction::UseOriginalPath)).toInt());
     m_projectDirectory = settings.value("general/projectDirectory", "").toString();
 
-    m_tbStyles.clear();
-    int tbStylesCount = settings.beginReadArray("tbStyles");
-    for (int i = 0; i < tbStylesCount; ++i)
-    {
-        settings.setArrayIndex(i);
-        TbStyleInfo style;
-        style.read(settings.value("style").toJsonObject());
-        m_tbStyles.append(style);
-    }
-    settings.endArray();
-
     m_renderPresets.clear();
     int renderPresetsCount = settings.beginReadArray("renderPresets");
     for (int i = 0; i < renderPresetsCount; ++i)
@@ -103,7 +92,7 @@ void AppSettings::load()
     }
     settings.endArray();
 
-    if (m_tbStyles.isEmpty() || m_renderPresets.isEmpty())
+    if (m_renderPresets.isEmpty())
     {
         loadDefaults();
         save();
@@ -142,16 +131,6 @@ void AppSettings::save()
     settings.setValue("general/userFileAction", static_cast<int>(m_userFileAction));
     settings.setValue("general/projectDirectory", m_projectDirectory);
 
-    settings.beginWriteArray("tbStyles");
-    for (int i = 0; i < m_tbStyles.size(); ++i)
-    {
-        settings.setArrayIndex(i);
-        QJsonObject styleObj;
-        m_tbStyles[i].write(styleObj);
-        settings.setValue("style", styleObj);
-    }
-    settings.endArray();
-
     settings.beginWriteArray("renderPresets");
     for (int i = 0; i < m_renderPresets.size(); ++i)
     {
@@ -173,21 +152,6 @@ void AppSettings::save()
 
 void AppSettings::loadDefaults()
 {
-    if (m_tbStyles.isEmpty())
-    {
-        m_tbStyles.append({"1080p (По умолчанию)", 1920,
-                           "{\\fad(500,500)\\b1\\an3\\fnTahoma\\fs50\\shad3\\bord1.3\\4c&H000000&\\4a&H00&}", 10, 30,
-                           10, "Основной"});
-        m_tbStyles.append({"720p", 1280,
-                           "{\\fad(500,500)\\b1\\an3\\fnTahoma\\fs33\\shad2\\bord1\\4c&H000000&\\4a&H00&}", 10, 20, 10,
-                           "Основной"});
-        m_tbStyles.append({"360p (Crunchyroll)", 640,
-                           "{\\fad(500,500)\\b1\\an3\\fnTahoma\\fs16.667\\shad1\\bord0.433\\4c&H000000&\\4a&H00&}", 3,
-                           10, 3, "Основной"});
-        m_tbStyles.append({"360p (Повелитель тайн)", 832,
-                           "{\\fad(500,500)\\b1\\an3\\fnTahoma\\fs22.222\\shad1.333\\bord0.578\\4c&H000000&\\4a&H00&}",
-                           4, 6, 4, "Main"});
-    }
     if (m_renderPresets.isEmpty())
     {
         RenderPreset nvenc, cpu_2pass, intel;
@@ -224,16 +188,6 @@ void AppSettings::loadDefaults()
         m_renderPresets.append(cpu_2pass);
         m_renderPresets.append(intel);
     }
-}
-
-TbStyleInfo AppSettings::findTbStyle(const QString& name) const
-{
-    for (const auto& style : m_tbStyles)
-    {
-        if (style.name == name)
-            return style;
-    }
-    return m_tbStyles.isEmpty() ? TbStyleInfo() : m_tbStyles.first();
 }
 
 RenderPreset AppSettings::findRenderPreset(const QString& name) const
@@ -398,14 +352,6 @@ void AppSettings::setProjectDirectory(const QString& directory)
 QString AppSettings::effectiveProjectDirectory() const
 {
     return m_projectDirectory.isEmpty() ? QStringLiteral("downloads") : m_projectDirectory;
-}
-QList<TbStyleInfo> AppSettings::tbStyles() const
-{
-    return m_tbStyles;
-}
-void AppSettings::setTbStyles(const QList<TbStyleInfo>& styles)
-{
-    m_tbStyles = styles;
 }
 bool AppSettings::isNugenAmbAvailable() const
 {

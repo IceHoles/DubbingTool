@@ -80,8 +80,8 @@ void SetupWizardDialog::buildToolsPage()
     auto* mkvtoolnixLink =
         new QLabel("<a href=\"https://mkvtoolnix.download/downloads.html\">Скачать MKVToolNix</a>", page);
     mkvtoolnixLink->setOpenExternalLinks(true);
-    auto* gpacLink = new QLabel("<a href=\"https://gpac.io/downloads/gpac-nightly-builds/\">Скачать GPAC (MP4Box)</a>",
-                                page);
+    auto* gpacLink =
+        new QLabel("<a href=\"https://gpac.io/downloads/gpac-nightly-builds/\">Скачать GPAC (MP4Box)</a>", page);
     gpacLink->setOpenExternalLinks(true);
     linksLayout->addWidget(ffmpegLink);
     linksLayout->addWidget(mkvtoolnixLink);
@@ -105,7 +105,7 @@ void SetupWizardDialog::buildToolsPage()
         {   "ffprobe.exe",    "FFprobe", true},
         {  "mkvmerge.exe",   "MKVmerge", true},
         {"mkvextract.exe", "MKVextract", true},
-        {   "mp4box.exe",     "MP4Box", true},
+        {    "mp4box.exe",     "MP4Box", true},
     };
 
     for (int32_t i = 0; i < kToolDefs.size(); ++i)

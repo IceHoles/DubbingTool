@@ -91,10 +91,7 @@ public:
     QString projectDirectory() const;
     void setProjectDirectory(const QString& directory);
     [[nodiscard]] QString effectiveProjectDirectory() const;
-    QList<TbStyleInfo> tbStyles() const;
-    void setTbStyles(const QList<TbStyleInfo>& styles);
     [[nodiscard]] bool isNugenAmbAvailable() const;
-    TbStyleInfo findTbStyle(const QString& name) const;
     QList<RenderPreset> renderPresets() const;
     void setRenderPresets(const QList<RenderPreset>& presets);
     RenderPreset findRenderPreset(const QString& name) const;
@@ -124,7 +121,6 @@ private:
     bool m_deleteTempFiles;
     UserFileAction m_userFileAction;
     QString m_projectDirectory;
-    QList<TbStyleInfo> m_tbStyles;
     QList<RenderPreset> m_renderPresets;
 };
 

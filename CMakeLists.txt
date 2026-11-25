@@ -32,7 +32,7 @@ endif()
 # Tell AUTOUIC where to find .ui files
 set(CMAKE_AUTOUIC_SEARCH_PATHS ${CMAKE_SOURCE_DIR}/ui)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network Xml Multimedia MultimediaWidgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network Xml)
 
 # Source files organized by module
 set(SOURCES_CORE
@@ -45,7 +45,6 @@ set(SOURCES_CORE
 
 set(SOURCES_PROCESSING
     src/processing/assprocessor.cpp
-    src/processing/concattbrenderer.cpp
     src/processing/fontfinder.cpp
     src/processing/manualassembler.cpp
     src/processing/manualrenderer.cpp
@@ -87,7 +86,6 @@ set(HEADERS_CORE
 
 set(HEADERS_PROCESSING
     src/processing/assprocessor.h
-    src/processing/concattbrenderer.h
     src/processing/fontfinder.h
     src/processing/manualassembler.h
     src/processing/manualrenderer.h
@@ -193,8 +191,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt6::Widgets
     Qt6::Network
     Qt6::Xml
-    Qt6::Multimedia
-    Qt6::MultimediaWidgets
 )
 
 # Enable warnings
@@ -365,7 +361,7 @@ if(BUILD_TESTING)
         get_filename_component(_qt_bin_for_tests "${Qt6_DIR}/../../../bin" ABSOLUTE)
         set(_ctest_path "${_qt_bin_for_tests};$ENV{PATH}")
         string(REPLACE ";" "\\;" _ctest_path_esc "${_ctest_path}")
-        set_tests_properties(FontFinderTest ChapterHelperTest TelegramFormatterTest ManualRendererTest FfmpegSmokeTest PROPERTIES
+        set_tests_properties(FontFinderTest ChapterHelperTest TelegramFormatterTest PostGeneratorTest ManualRendererTest FfmpegSmokeTest PROPERTIES
             ENVIRONMENT "PATH=${_ctest_path_esc}")
     endif()
 endif()
