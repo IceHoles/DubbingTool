@@ -29,6 +29,7 @@ signals:
     void progressUpdated(int value, const QString& status);
     void extractionStarted();
     void extractionFinished(bool success);
+    void chapterTimingsRequested(const QString& sourcePath);
 
 protected:
     // Драг-н-дроп
@@ -40,6 +41,7 @@ private slots:
     void onProcessStdErr(const QString& output);
     void onBrowseClicked();
     void onExtractClicked();
+    void on_chapterTimingsButton_clicked();
     void onProcessFinished(int exitCode);
 
 private:
@@ -47,6 +49,8 @@ private:
     ProcessManager* m_processManager;
     QString m_currentFile;
     double m_durationSec = 0.0;
+    bool m_isExtracting = false;
+    bool m_currentTaskIsMkvextract = false;
 
     struct ExtractionTask
     {

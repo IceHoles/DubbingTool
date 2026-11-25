@@ -1223,11 +1223,11 @@ void WorkflowManager::onProcessFinished(int exitCode, QProcess::ExitStatus exitS
             args << "-y" << "-i" << m_mainRuAudioPath;
             if (AppSettings::instance().hasAacAtCodec())
             {
-                args << "-c:a" << "aac_at" << "-b:a" << "256k";
+                args << "-c:a" << "aac_at" << "-b:a" << AppSettings::defaultAudioBitrateArg();
             }
             else
             {
-                args << "-c:a" << "aac" << "-b:a" << "256k";
+                args << "-c:a" << "aac" << "-b:a" << AppSettings::defaultAudioBitrateArg();
             }
             args << "-progress" << QDir::toNativeSeparators(m_ffmpegProgressFile) << m_audioConversionCurrentOutputPath;
 
@@ -1542,11 +1542,11 @@ void WorkflowManager::convertAudioIfNeeded()
     {
         if (AppSettings::instance().hasAacAtCodec())
         {
-            args << "-c:a" << "aac_at" << "-b:a" << "256k";
+            args << "-c:a" << "aac_at" << "-b:a" << AppSettings::defaultAudioBitrateArg();
         }
         else
         {
-            args << "-c:a" << "aac" << "-b:a" << "256k";
+            args << "-c:a" << "aac" << "-b:a" << AppSettings::defaultAudioBitrateArg();
         }
     }
     else if (targetFormat == "flac")

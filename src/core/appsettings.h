@@ -57,6 +57,13 @@ private:
     AppSettings& operator=(const AppSettings&) = delete;
 
 public:
+    static constexpr int kDefaultAudioBitrateKbps = 320;
+    static QString defaultAudioBitrateArg()
+    {
+        return QStringLiteral("320k");
+    }
+    static QList<RenderPreset> defaultRenderPresets();
+
     static AppSettings& instance();
     void load();
     void save();

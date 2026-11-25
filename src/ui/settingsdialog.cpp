@@ -256,3 +256,47 @@ void SettingsDialog::on_deleteRenderPresetButton_clicked()
         AppSettings::instance().save();
     }
 }
+
+void SettingsDialog::on_resetRenderPresetsButton_clicked()
+{
+    auto reply = QMessageBox::question(
+        this, "Восстановление пресетов",
+        "Восстановить стандартные пресеты рендера? Пользовательские пресеты с другими именами будут сохранены.",
+        QMessageBox::Yes | QMessageBox::No);
+    if (reply != QMessageBox::Yes)
+    {
+        return;
+    }
+
+    const QList<RenderPreset> defaults = AppSettings::defaultRenderPresets();
+    for (const auto& defPreset : defaults)
+    {
+        bool found = false;
+        for (auto& existing : m_renderPresets)
+        {
+            if (existing.name == defPreset.name)
+            {
+                existing = defPreset;
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+        {
+            m_renderPresets.append(defPreset);
+        }
+    }
+
+    AppSettings::instance().setRenderPresets(m_renderPresets);
+    AppSettings::instance().save();
+
+    ui->renderPresetsList->clear();
+    for (const auto& preset : m_renderPresets)
+    {
+        ui->renderPresetsList->addItem(preset.name);
+    }
+    if (ui->renderPresetsList->count() > 0)
+    {
+        ui->renderPresetsList->setCurrentRow(0);
+    }
+}

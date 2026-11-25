@@ -55,6 +55,19 @@
       </widget>
      </item>
      <item>
+      <widget class="QPushButton" name="chapterTimingsButton">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="toolTip">
+        <string>Показать тайминги глав (интро, аутро, главы) для копирования на DUBTV.PRO</string>
+       </property>
+       <property name="text">
+        <string>Тайминг глав</string>
+       </property>
+      </widget>
+     </item>
+     <item>
       <spacer name="horizontalSpacer">
        <property name="orientation"><enum>Qt::Horizontal</enum></property>
       </spacer>

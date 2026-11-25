@@ -24,6 +24,10 @@ public slots:
     void updateRenderPresets();
     void setRendering(bool rendering);
 
+protected:
+    void dragEnterEvent(QDragEnterEvent* event) override;
+    void dropEvent(QDropEvent* event) override;
+
 private slots:
     void on_browseInputButton_clicked();
     void on_browseOutputButton_clicked();
@@ -36,6 +40,8 @@ signals:
     void chapterTimingsRequested(const QString& sourcePath);
 
 private:
+    void setInputVideoPath(const QString& path);
+
     Ui::ManualRenderWidget* ui;
 };
 

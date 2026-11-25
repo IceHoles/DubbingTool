@@ -61,6 +61,11 @@ ManualExtractionWidget::~ManualExtractionWidget()
 
 void ManualExtractionWidget::dragEnterEvent(QDragEnterEvent* event)
 {
+    if (m_isExtracting)
+    {
+        return;
+    }
+
     if (event->mimeData()->hasUrls())
     {
         QList<QUrl> urls = event->mimeData()->urls();
@@ -77,6 +82,11 @@ void ManualExtractionWidget::dragEnterEvent(QDragEnterEvent* event)
 
 void ManualExtractionWidget::dropEvent(QDropEvent* event)
 {
+    if (m_isExtracting)
+    {
+        return;
+    }
+
     const QUrl url = event->mimeData()->urls().first();
     scanFile(url.toLocalFile());
 }
@@ -85,6 +95,11 @@ void ManualExtractionWidget::dropEvent(QDropEvent* event)
 
 void ManualExtractionWidget::onBrowseClicked()
 {
+    if (m_isExtracting)
+    {
+        return;
+    }
+
     QSettings settings("MyCompany", "DubbingTool");
     QString lastDir = settings.value("ui/lastBrowseDir").toString();
     if (lastDir.isEmpty() && !ui->inputPathEdit->text().isEmpty())
@@ -102,12 +117,18 @@ void ManualExtractionWidget::onBrowseClicked()
 
 void ManualExtractionWidget::scanFile(const QString& path)
 {
+    if (m_isExtracting)
+    {
+        return;
+    }
+
     m_currentFile = path;
     ui->inputPathEdit->setText(path);
     ui->tracksTree->clear();
 
     // Блокируем интерфейс на время сканирования
     ui->extractButton->setEnabled(false);
+    ui->chapterTimingsButton->setEnabled(false);
 
     emit logMessage("Сканирование структуры файла...", LogCategory::APP);
     QString mkvmergeExe = AppSettings::instance().mkvmergePath();
@@ -125,10 +146,12 @@ void ManualExtractionWidget::scanFile(const QString& path)
     {
         parseMkvJson(output);
         ui->extractButton->setEnabled(true);
+        ui->chapterTimingsButton->setEnabled(true);
         emit logMessage("Сканирование завершено. Выберите дорожки для извлечения.", LogCategory::APP);
     }
     else
     {
+        ui->chapterTimingsButton->setEnabled(false);
         emit logMessage("Ошибка: не удалось просканировать файл", LogCategory::APP, LogLevel::Error);
     }
 }
@@ -458,6 +481,8 @@ void ManualExtractionWidget::onExtractClicked()
     }
 
     ui->extractButton->setEnabled(false);
+    ui->chapterTimingsButton->setEnabled(false);
+    m_isExtracting = true;
     emit extractionStarted();
 
     emit progressUpdated(0, "Начало извлечения...");
@@ -470,7 +495,9 @@ void ManualExtractionWidget::runNextTask()
 {
     if (m_taskQueue.isEmpty())
     {
+        m_isExtracting = false;
         ui->extractButton->setEnabled(true);
+        ui->chapterTimingsButton->setEnabled(!m_currentFile.isEmpty());
         emit logMessage("Извлечение завершено успешно.", LogCategory::APP);
         emit progressUpdated(100, "Готово");
         emit extractionFinished(true);
@@ -478,6 +505,7 @@ void ManualExtractionWidget::runNextTask()
     }
 
     ExtractionTask task = m_taskQueue.dequeue();
+    m_currentTaskIsMkvextract = task.program.contains(QLatin1String("mkvextract"), Qt::CaseInsensitive);
     emit logMessage(task.description, LogCategory::APP);
     m_processManager->startProcess(task.program, task.args);
 }
@@ -485,9 +513,18 @@ void ManualExtractionWidget::runNextTask()
 void ManualExtractionWidget::cancel()
 {
     m_taskQueue.clear();
+    m_isExtracting = false;
     if (m_processManager)
     {
         m_processManager->killProcess();
+    }
+}
+
+void ManualExtractionWidget::on_chapterTimingsButton_clicked()
+{
+    if (!m_currentFile.isEmpty())
+    {
+        emit chapterTimingsRequested(m_currentFile);
     }
 }
 
@@ -496,17 +533,29 @@ void ManualExtractionWidget::onProcessFinished(int exitCode)
     if (m_processManager != nullptr && m_processManager->wasKilled())
     {
         m_taskQueue.clear();
+        m_isExtracting = false;
         ui->extractButton->setEnabled(true);
+        ui->chapterTimingsButton->setEnabled(!m_currentFile.isEmpty());
         emit logMessage("Извлечение отменено пользователем.", LogCategory::APP);
         emit progressUpdated(0, "Отменено");
         emit extractionFinished(false);
         return;
     }
 
+    if (m_currentTaskIsMkvextract && exitCode == 1)
+    {
+        emit logMessage(QStringLiteral("mkvextract завершился с предупреждением (код 1)."), LogCategory::MKVTOOLNIX,
+                        LogLevel::Warning);
+        runNextTask();
+        return;
+    }
+
     if (exitCode != 0)
     {
         m_taskQueue.clear();
+        m_isExtracting = false;
         ui->extractButton->setEnabled(true);
+        ui->chapterTimingsButton->setEnabled(!m_currentFile.isEmpty());
         emit logMessage(QString("Ошибка извлечения (код %1).").arg(exitCode), LogCategory::APP, LogLevel::Error);
         emit progressUpdated(0, "Ошибка");
         emit extractionFinished(false);

@@ -6,6 +6,8 @@
 
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QDragEnterEvent>
+#include <QDropEvent>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QJsonArray>
@@ -15,9 +17,12 @@
 #include <QListWidget>
 #include <QListWidgetItem>
 #include <QMessageBox>
+#include <QMimeData>
 #include <QProcess>
 #include <QPushButton>
 #include <QSettings>
+#include <QTimer>
+#include <QUrl>
 #include <QVBoxLayout>
 #include <QVariantMap>
 
@@ -25,6 +30,13 @@ ManualAssemblyWidget::ManualAssemblyWidget(QWidget* parent)
     : QWidget(parent), m_fontFinder(new FontFinder(this)), ui(new Ui::ManualAssemblyWidget)
 {
     ui->setupUi(this);
+
+    setAcceptDrops(true);
+    const auto lineEdits = findChildren<QLineEdit*>();
+    for (auto* le : lineEdits)
+    {
+        le->setAcceptDrops(false);
+    }
 
     connect(m_fontFinder, &FontFinder::finished, this, &ManualAssemblyWidget::onFontFinderFinished);
 
@@ -291,6 +303,164 @@ bool ManualAssemblyWidget::browseForFile(QLineEdit* lineEdit, const QString& cap
     return false;
 }
 
+void ManualAssemblyWidget::updateAutoOutputName(const QString& videoPath)
+{
+    if (videoPath.isEmpty())
+    {
+        return;
+    }
+    const QString base = QFileInfo(videoPath).completeBaseName();
+    if (base.isEmpty())
+    {
+        return;
+    }
+    const QString suggested = QStringLiteral("[DUB] %1.mkv").arg(base);
+    const QString current = ui->outputFileNameEdit->text().trimmed();
+    if (current.isEmpty() || current == m_lastAutoOutputName)
+    {
+        ui->outputFileNameEdit->setText(suggested);
+        m_lastAutoOutputName = suggested;
+    }
+}
+
+void ManualAssemblyWidget::dragEnterEvent(QDragEnterEvent* event)
+{
+    if (event->mimeData()->hasUrls())
+    {
+        static const QSet<QString> supportedExts = {
+            QStringLiteral("mp4"),  QStringLiteral("mkv"),  QStringLiteral("m4v"),  QStringLiteral("mov"),
+            QStringLiteral("ts"),   QStringLiteral("h264"), QStringLiteral("h265"), QStringLiteral("avc"),
+            QStringLiteral("hevc"), QStringLiteral("wav"),  QStringLiteral("flac"), QStringLiteral("aac"),
+            QStringLiteral("m4a"),  QStringLiteral("mka"),  QStringLiteral("ac3"),  QStringLiteral("eac3"),
+            QStringLiteral("opus"), QStringLiteral("ass"),  QStringLiteral("srt"),  QStringLiteral("xml"),
+            QStringLiteral("ttf"),  QStringLiteral("otf"),  QStringLiteral("ttc")};
+
+        for (const QUrl& url : event->mimeData()->urls())
+        {
+            if (url.isLocalFile())
+            {
+                const QString ext = QFileInfo(url.toLocalFile()).suffix().toLower();
+                if (supportedExts.contains(ext))
+                {
+                    event->acceptProposedAction();
+                    return;
+                }
+            }
+        }
+    }
+}
+
+void ManualAssemblyWidget::dropEvent(QDropEvent* event)
+{
+    const QList<QUrl> urls = event->mimeData()->urls();
+    if (urls.isEmpty())
+    {
+        return;
+    }
+
+    const QSet<QString> videoExts = {QStringLiteral("mp4"),  QStringLiteral("mkv"), QStringLiteral("m4v"),
+                                     QStringLiteral("mov"),  QStringLiteral("ts"),  QStringLiteral("h264"),
+                                     QStringLiteral("h265"), QStringLiteral("avc"), QStringLiteral("hevc")};
+    const QSet<QString> audioExts = {QStringLiteral("wav"),  QStringLiteral("flac"), QStringLiteral("aac"),
+                                     QStringLiteral("m4a"),  QStringLiteral("mka"),  QStringLiteral("ac3"),
+                                     QStringLiteral("eac3"), QStringLiteral("opus")};
+    const QSet<QString> subExts = {QStringLiteral("ass"), QStringLiteral("srt")};
+    const QSet<QString> fontExts = {QStringLiteral("ttf"), QStringLiteral("otf"), QStringLiteral("ttc")};
+
+    QString droppedVideoPath;
+
+    for (const QUrl& url : urls)
+    {
+        const QString path = url.toLocalFile();
+        if (path.isEmpty() || !QFileInfo::exists(path))
+        {
+            continue;
+        }
+
+        const QFileInfo fi(path);
+        const QString ext = fi.suffix().toLower();
+
+        if (videoExts.contains(ext))
+        {
+            ui->videoPathEdit->setText(path);
+            ui->includeVideoCheckBox->setChecked(true);
+            updateAutoOutputName(path);
+            droppedVideoPath = path;
+        }
+        else if (audioExts.contains(ext))
+        {
+            if (ext == QLatin1String("wav"))
+            {
+                ui->russianAudioPathEdit->setText(path);
+                ui->includeRussianAudioCheckBox->setChecked(true);
+            }
+            else if (ui->russianAudioPathEdit->text().trimmed().isEmpty())
+            {
+                ui->russianAudioPathEdit->setText(path);
+                ui->includeRussianAudioCheckBox->setChecked(true);
+            }
+            else
+            {
+                ui->originalAudioPathEdit->setText(path);
+                ui->includeOriginalAudioCheckBox->setChecked(true);
+            }
+        }
+        else if (subExts.contains(ext))
+        {
+            const QString fileNameLower = fi.fileName().toLower();
+            if (fileNameLower.contains(QLatin1String("sign")) || fileNameLower.contains(QString::fromUtf8("надпис")))
+            {
+                ui->signsPathEdit->setText(path);
+                ui->includeSignsCheckBox->setChecked(true);
+            }
+            else if (ui->subtitlesPathEdit->text().trimmed().isEmpty())
+            {
+                ui->subtitlesPathEdit->setText(path);
+                ui->includeSubtitlesCheckBox->setChecked(true);
+            }
+            else
+            {
+                ui->signsPathEdit->setText(path);
+                ui->includeSignsCheckBox->setChecked(true);
+            }
+        }
+        else if (ext == QLatin1String("xml"))
+        {
+            ui->chaptersXmlPathManualAssemblyEdit->setText(path);
+            ui->manualChaptersCustomCheckBox->setChecked(true);
+            updateChaptersUiVisibility();
+        }
+        else if (fontExts.contains(ext))
+        {
+            bool alreadyExists = false;
+            for (int i = 0; i < ui->fontsListWidget->count(); ++i)
+            {
+                if (ui->fontsListWidget->item(i)->data(Qt::UserRole).toString() == path)
+                {
+                    alreadyExists = true;
+                    break;
+                }
+            }
+            if (!alreadyExists)
+            {
+                auto* item = new QListWidgetItem(fi.fileName() + tr(" - добавлен вручную"), ui->fontsListWidget);
+                item->setForeground(Qt::magenta);
+                item->setData(Qt::UserRole, path);
+                item->setToolTip(path);
+            }
+        }
+    }
+
+    event->acceptProposedAction();
+
+    if (!droppedVideoPath.isEmpty())
+    {
+        QTimer::singleShot(
+            0, this, [this, droppedVideoPath]()
+            { probeVideoAudioTracks(droppedVideoPath, ui->originalAudioPathEdit->text().trimmed().isEmpty()); });
+    }
+}
+
 void ManualAssemblyWidget::on_browseVideo_clicked()
 {
     if (browseForFile(ui->videoPathEdit, "Выберите видеофайл",
@@ -300,10 +470,7 @@ void ManualAssemblyWidget::on_browseVideo_clicked()
         if (!path.isEmpty())
         {
             probeVideoAudioTracks(path, true);
-            if (ui->outputFileNameEdit->text().trimmed().isEmpty())
-            {
-                ui->outputFileNameEdit->setText(QString("[DUB] %1.mkv").arg(QFileInfo(path).completeBaseName()));
-            }
+            updateAutoOutputName(path);
         }
     }
 }

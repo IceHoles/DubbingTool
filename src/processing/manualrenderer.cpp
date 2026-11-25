@@ -16,7 +16,7 @@
 
 namespace
 {
-void applyForcedAac256AudioArgs(QStringList& args)
+void applyForcedAacAudioArgs(QStringList& args, const QString& bitrate)
 {
     if (args.contains(QLatin1String("-an")))
     {
@@ -61,18 +61,18 @@ void applyForcedAac256AudioArgs(QStringList& args)
             if (afterCodec + 1 < args.size())
             {
                 bitrateSet = true;
-                args[afterCodec + 1] = QLatin1String("256k");
+                args[afterCodec + 1] = bitrate;
             }
             else
             {
                 bitrateSet = true;
-                args.append(QLatin1String("256k"));
+                args.append(bitrate);
             }
         }
         else
         {
             args.insert(afterCodec, QLatin1String("-b:a"));
-            args.insert(afterCodec + 1, QLatin1String("256k"));
+            args.insert(afterCodec + 1, bitrate);
             bitrateSet = true;
         }
     }
@@ -92,7 +92,7 @@ void applyForcedAac256AudioArgs(QStringList& args)
     }
     if (!bitrateSet && outIdx >= 0)
     {
-        args.insert(outIdx, QLatin1String("256k"));
+        args.insert(outIdx, bitrate);
         args.insert(outIdx, QLatin1String("-b:a"));
     }
 }
@@ -124,6 +124,14 @@ void ManualRenderer::start()
     if (m_actualInputMkv.isEmpty() || presetName.isEmpty() || m_finalOutputMp4.isEmpty())
     {
         emit logMessage("Ошибка: не указан входной файл, пресет или выходной файл.", LogCategory::APP, LogLevel::Error);
+        emit finished();
+        return;
+    }
+
+    if (QFileInfo(m_actualInputMkv) == QFileInfo(m_finalOutputMp4))
+    {
+        emit logMessage("Ошибка: выходной файл совпадает с входным. Перезапись исходного файла запрещена.",
+                        LogCategory::APP, LogLevel::Error);
         emit finished();
         return;
     }
@@ -295,9 +303,6 @@ bool ManualRenderer::parsePreset(const QString& commandTemplate, QStringList& ou
     }
     else
     {
-        processedTemplate.replace("subtitles=%SIGNS%", "");
-        processedTemplate.remove(QRegularExpression(R"(-vf\s+\"\s*,\s*\")"));
-        processedTemplate.remove(QRegularExpression(R"(-vf\s+\"\s*\")"));
         emit logMessage("Hardsub отключен. Фильтр субтитров удален из команды.", LogCategory::APP);
     }
 
@@ -321,7 +326,8 @@ bool ManualRenderer::parsePreset(const QString& commandTemplate, QStringList& ou
     {
         QString arg = rawArgs.at(i);
 
-        if (arg == "-c:a" || arg == "-codec:a" || arg == "-b:a" || arg == "-audio_bitrate")
+        if (arg == "-c:a" || arg == "-codec:a" || arg == "-b:a" || arg == "-audio_bitrate" || arg == "-ac" ||
+            arg == "-ar" || arg == "-af" || arg == "-profile:a")
         {
             outAudioArgs << arg;
             if (i + 1 < rawArgs.size())
@@ -335,6 +341,35 @@ bool ManualRenderer::parsePreset(const QString& commandTemplate, QStringList& ou
             outAudioArgs << arg << rawArgs.at(i + 1);
             isAudioMapFound = true;
             i++;
+        }
+        else if (arg == "-vf" || arg == "-filter:v")
+        {
+            if (i + 1 < rawArgs.size())
+            {
+                QString vfValue = rawArgs.at(i + 1);
+                if (!useHardsub)
+                {
+                    const QStringList filters = vfValue.split(QLatin1Char(','), Qt::SkipEmptyParts);
+                    QStringList cleanedFilters;
+                    for (const QString& f : filters)
+                    {
+                        const QString trimmed = f.trimmed();
+                        if (!trimmed.isEmpty() && trimmed != QLatin1String("subtitles=%SIGNS%") &&
+                            !trimmed.startsWith(QLatin1String("subtitles=%SIGNS%")))
+                        {
+                            cleanedFilters.append(trimmed);
+                        }
+                    }
+                    if (cleanedFilters.isEmpty())
+                    {
+                        i++; // Пропускаем -vf и его очищенное значение целиком
+                        continue;
+                    }
+                    vfValue = cleanedFilters.join(QLatin1Char(','));
+                }
+                outVideoArgs << arg << vfValue;
+                i++;
+            }
         }
         else if (arg == "-an")
         {
@@ -364,9 +399,9 @@ bool ManualRenderer::parsePreset(const QString& commandTemplate, QStringList& ou
         outAudioArgs << "-map" << "0:a:0";
     }
 
-    if (m_params.value("reencodeAudioAac256", true).toBool())
+    if (m_params.value(QStringLiteral("reencodeAudioAac"), true).toBool())
     {
-        applyForcedAac256AudioArgs(outAudioArgs);
+        applyForcedAacAudioArgs(outAudioArgs, AppSettings::defaultAudioBitrateArg());
     }
 
     outAudioArgs << m_tempAudioM4a;

@@ -97,6 +97,38 @@ void AppSettings::load()
         loadDefaults();
         save();
     }
+    else
+    {
+        const int schemaVersion = settings.value("renderPresets/schemaVersion", 1).toInt();
+        if (schemaVersion < 2)
+        {
+            const QSet<QString> standardNames = {QStringLiteral("NVIDIA (hevc_nvenc, 1-проход)"),
+                                                 QStringLiteral("CPU (libx265, 2-прохода)"),
+                                                 QStringLiteral("INTEL (hevc_qsv, 1-проход)")};
+            bool changed = false;
+            for (auto& preset : m_renderPresets)
+            {
+                if (standardNames.contains(preset.name))
+                {
+                    if (preset.commandPass1.contains(QLatin1String("-b:a 256k")))
+                    {
+                        preset.commandPass1.replace(QLatin1String("-b:a 256k"), QLatin1String("-b:a 320k"));
+                        changed = true;
+                    }
+                    if (preset.commandPass2.contains(QLatin1String("-b:a 256k")))
+                    {
+                        preset.commandPass2.replace(QLatin1String("-b:a 256k"), QLatin1String("-b:a 320k"));
+                        changed = true;
+                    }
+                }
+            }
+            settings.setValue("renderPresets/schemaVersion", 2);
+            if (changed)
+            {
+                save();
+            }
+        }
+    }
 
     m_enabledLogCategories.clear();
     QVariantList enabledCategoriesInts = settings.value("logging/enabledCategories").toList();
@@ -141,6 +173,7 @@ void AppSettings::save()
         settings.setValue("targetBitrateKbps", m_renderPresets[i].targetBitrateKbps);
     }
     settings.endArray();
+    settings.setValue("renderPresets/schemaVersion", 2);
 
     QVariantList enabledCategoriesInts;
     for (const auto& category : m_enabledLogCategories)
@@ -150,43 +183,47 @@ void AppSettings::save()
     settings.setValue("logging/enabledCategories", enabledCategoriesInts);
 }
 
+QList<RenderPreset> AppSettings::defaultRenderPresets()
+{
+    RenderPreset nvenc, cpu_2pass, intel;
+
+    // Команды содержат универсальный плейсхолдер %SIGNS%
+    // WorkflowManager подставит туда свой _signs.ass
+    // ManualRenderer подставит туда %INPUT% с нужным номером дорожки субтитров/субтитры указанные вручную или
+    // удалит фильтр %INPUT% - входной файл в кавычках %OUTPUT% - выходной файл в кавычках %SIGNS% - экранированный
+    // путь к файлу с надписями для фильтра subtitles
+
+    nvenc.name = "NVIDIA (hevc_nvenc, 1-проход)";
+    nvenc.commandPass1 =
+        "ffmpeg -y -hide_banner -i \"%INPUT%\" -vf \"subtitles=%SIGNS%\" -c:v hevc_nvenc -preset p7 -tune hq "
+        "-profile:v main -rc vbr -b:v 4M -minrate 4M -maxrate 8M -bufsize 16M -rc-lookahead 32 -spatial-aq 1 "
+        "-aq-strength 15 -multipass 2 -2pass 1 -c:a aac -b:a 320k -map 0:v:0 -map 0:a:m:language:rus -tag:v hvc1 "
+        "-map_metadata -1 -movflags +faststart \"%OUTPUT%\"";
+    nvenc.targetBitrateKbps = 4000;
+    cpu_2pass.name = "CPU (libx265, 2-прохода)";
+    cpu_2pass.commandPass1 =
+        "ffmpeg -y -hide_banner -i \"%INPUT%\" -vf \"subtitles=%SIGNS%\" -c:v libx265 -b:v 4000k -preset medium "
+        "-x265-params pass=1 -an -f mp4 NUL"; // Для Windows, для Linux /dev/null
+    cpu_2pass.commandPass2 = "ffmpeg -y -hide_banner -i \"%INPUT%\" -vf \"subtitles=%SIGNS%\" -c:v libx265 -b:v "
+                             "4000k -preset medium -x265-params pass=2 -c:a aac -b:a 320k -map 0:v:0 -map "
+                             "0:a:m:language:rus -tag:v hvc1 -map_metadata -1 -movflags +faststart \"%OUTPUT%\"";
+    cpu_2pass.targetBitrateKbps = 4000;
+    intel.name = "INTEL (hevc_qsv, 1-проход)";
+    intel.commandPass1 =
+        "ffmpeg -y -hide_banner -i \"%INPUT%\" -vf \"subtitles=%SIGNS%\" -c:v hevc_qsv -rate_control VBR -b:v "
+        "4150k -minrate 4100k -maxrate 8000k -bufsize 8000k -g 48 -look_ahead 1 -look_ahead_depth 32 -preset slow "
+        "-profile:v main -low_power 0 -c:a aac -b:a 320k -map 0:v:0 -map 0:a:m:language:rus -tag:v hvc1 "
+        "-map_metadata -1 -movflags +faststart \"%OUTPUT%\"";
+    intel.targetBitrateKbps = 4000;
+
+    return {nvenc, cpu_2pass, intel};
+}
+
 void AppSettings::loadDefaults()
 {
     if (m_renderPresets.isEmpty())
     {
-        RenderPreset nvenc, cpu_2pass, intel;
-
-        // Команды содержат универсальный плейсхолдер %SIGNS%
-        // WorkflowManager подставит туда свой _signs.ass
-        // ManualRenderer подставит туда %INPUT% с нужным номером дорожки субтитров/субтитры указанные вручную или
-        // удалит фильтр %INPUT% - входной файл в кавычках %OUTPUT% - выходной файл в кавычках %SIGNS% - экранированный
-        // путь к файлу с надписями для фильтра subtitles
-
-        nvenc.name = "NVIDIA (hevc_nvenc, 1-проход)";
-        nvenc.commandPass1 =
-            "ffmpeg -y -hide_banner -i \"%INPUT%\" -vf \"subtitles=%SIGNS%\" -c:v hevc_nvenc -preset p7 -tune hq "
-            "-profile:v main -rc vbr -b:v 4M -minrate 4M -maxrate 8M -bufsize 16M -rc-lookahead 32 -spatial-aq 1 "
-            "-aq-strength 15 -multipass 2 -2pass 1 -c:a aac -b:a 256k -map 0:v:0 -map 0:a:m:language:rus -tag:v hvc1 "
-            "-map_metadata -1 -movflags +faststart \"%OUTPUT%\"";
-        nvenc.targetBitrateKbps = 4000;
-        cpu_2pass.name = "CPU (libx265, 2-прохода)";
-        cpu_2pass.commandPass1 =
-            "ffmpeg -y -hide_banner -i \"%INPUT%\" -vf \"subtitles=%SIGNS%\" -c:v libx265 -b:v 4000k -preset medium "
-            "-x265-params pass=1 -an -f mp4 NUL"; // Для Windows, для Linux /dev/null
-        cpu_2pass.commandPass2 = "ffmpeg -y -hide_banner -i \"%INPUT%\" -vf \"subtitles=%SIGNS%\" -c:v libx265 -b:v "
-                                 "4000k -preset medium -x265-params pass=2 -c:a aac -b:a 256k -map 0:v:0 -map "
-                                 "0:a:m:language:rus -tag:v hvc1 -map_metadata -1 -movflags +faststart \"%OUTPUT%\"";
-        cpu_2pass.targetBitrateKbps = 4000;
-        intel.name = "INTEL (hevc_qsv, 1-проход)";
-        intel.commandPass1 =
-            "ffmpeg -y -hide_banner -i \"%INPUT%\" -vf \"subtitles=%SIGNS%\" -c:v hevc_qsv -rate_control VBR -b:v "
-            "4150k -minrate 4100k -maxrate 8000k -bufsize 8000k -g 48 -look_ahead 1 -look_ahead_depth 32 -preset slow "
-            "-profile:v main -low_power 0 -c:a aac -b:a 256k -map 0:v:0 -map 0:a:m:language:rus -tag:v hvc1 "
-            "-map_metadata -1 -movflags +faststart \"%OUTPUT%\"";
-        intel.targetBitrateKbps = 4000;
-        m_renderPresets.append(nvenc);
-        m_renderPresets.append(cpu_2pass);
-        m_renderPresets.append(intel);
+        m_renderPresets = defaultRenderPresets();
     }
 }
 

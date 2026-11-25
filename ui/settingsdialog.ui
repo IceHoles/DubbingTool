@@ -394,6 +394,16 @@
              </property>
             </widget>
            </item>
+           <item>
+            <widget class="QPushButton" name="resetRenderPresetsButton">
+             <property name="toolTip">
+              <string>Восстановить стандартные пресеты (NVIDIA, CPU, INTEL) с сохранением пользовательских пресетов.</string>
+             </property>
+             <property name="text">
+              <string>Сбросить стандартные</string>
+             </property>
+            </widget>
+           </item>
           </layout>
          </item>
         </layout>

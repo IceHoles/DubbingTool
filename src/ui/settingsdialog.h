@@ -31,6 +31,7 @@ private slots:
     void on_newRenderPresetButton_clicked();
     void on_saveRenderPresetButton_clicked();
     void on_deleteRenderPresetButton_clicked();
+    void on_resetRenderPresetsButton_clicked();
 
 private:
     void loadSettings();

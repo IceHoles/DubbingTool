@@ -320,6 +320,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWi
             });
     connect(m_manualExtractionWidget, &ManualExtractionWidget::extractionFinished, this,
             [this](bool /*success*/) { restoreUiAfterFinish(); });
+    connect(m_manualExtractionWidget, &ManualExtractionWidget::chapterTimingsRequested, this,
+            &MainWindow::onManualChapterTimingsRequested);
 
     connect(m_manualAssemblyWidget, &ManualAssemblyWidget::assemblyRequested, this, &MainWindow::startManualAssembly);
     connect(m_manualAssemblyWidget, &ManualAssemblyWidget::chapterTimingsRequested, this,

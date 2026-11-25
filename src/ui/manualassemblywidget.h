@@ -35,6 +35,10 @@ public:
     /// Clears the font attachment list (e.g. after a successful MKV build for the next episode).
     void clearFontsList();
 
+protected:
+    void dragEnterEvent(QDragEnterEvent* event) override;
+    void dropEvent(QDropEvent* event) override;
+
 private slots:
     void on_browseVideo_clicked();
     void on_browseOriginalAudio_clicked();
@@ -53,11 +57,13 @@ private slots:
 private:
     bool browseForFile(QLineEdit* lineEdit, const QString& caption, const QString& filter);
     void updateChaptersUiVisibility();
+    void updateAutoOutputName(const QString& videoPath);
     void probeVideoAudioTracks(const QString& videoPath, bool autoPrompt = false);
     bool promptUserForAudioTrack(const QList<ContainerAudioTrack>& tracks);
 
     FontFinder* m_fontFinder;
 
+    QString m_lastAutoOutputName;
     QString m_lastProbedVideoPath;
     QList<ContainerAudioTrack> m_videoAudioTracks;
     int m_selectedVideoTrackId = -1;

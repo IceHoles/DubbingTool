@@ -3,18 +3,30 @@
 #include "appsettings.h"
 #include "ui_manualrenderwidget.h"
 
+#include <QDragEnterEvent>
+#include <QDropEvent>
 #include <QFileDialog>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMessageBox>
+#include <QMimeData>
 #include <QProcess>
 #include <QSettings>
+#include <QUrl>
 #include <QVariantMap>
 
 ManualRenderWidget::ManualRenderWidget(QWidget* parent) : QWidget(parent), ui(new Ui::ManualRenderWidget)
 {
     ui->setupUi(this);
+
+    setAcceptDrops(true);
+    const auto lineEdits = findChildren<QLineEdit*>();
+    for (auto* le : lineEdits)
+    {
+        le->setAcceptDrops(false);
+    }
+
     updateRenderPresets();
 
     QSettings settings("MyCompany", "DubbingTool");
@@ -23,11 +35,11 @@ ManualRenderWidget::ManualRenderWidget(QWidget* parent) : QWidget(parent), ui(ne
     {
         ui->renderPresetComboBox->setCurrentText(lastPreset);
     }
-    if (settings.contains(QStringLiteral("manualRender/reencodeAudioAac256")))
-    {
-        ui->reencodeAudioAac256CheckBox->setChecked(
-            settings.value(QStringLiteral("manualRender/reencodeAudioAac256"), true).toBool());
-    }
+    const bool reencodeAudio = settings
+                                   .value(QStringLiteral("manualRender/reencodeAudioAac"),
+                                          settings.value(QStringLiteral("manualRender/reencodeAudioAac256"), true))
+                                   .toBool();
+    ui->reencodeAudioAac256CheckBox->setChecked(reencodeAudio);
     connect(ui->hardsubCheckBox, &QCheckBox::toggled, this, &ManualRenderWidget::updateHardsubOptions);
     connect(ui->internalSubsRadio, &QRadioButton::toggled, this, &ManualRenderWidget::updateHardsubOptions);
     connect(ui->externalSubsRadio, &QRadioButton::toggled, this, &ManualRenderWidget::updateHardsubOptions);
@@ -80,16 +92,90 @@ void ManualRenderWidget::updateRenderPresets()
     }
 }
 
+void ManualRenderWidget::setInputVideoPath(const QString& path)
+{
+    if (path.isEmpty())
+    {
+        return;
+    }
+    ui->inputMkvPathEdit->setText(path);
+    analyzeMkvForSubtitles(path);
+
+    const QFileInfo fi(path);
+    const QString suffix = fi.suffix().toLower();
+    const QString outFileName = (suffix == QLatin1String("mp4"))
+                                    ? fi.completeBaseName() + QStringLiteral("_rendered.mp4")
+                                    : fi.completeBaseName() + QStringLiteral(".mp4");
+    ui->outputMp4PathEdit->setText(QDir::toNativeSeparators(fi.absolutePath() + QLatin1Char('/') + outFileName));
+}
+
+void ManualRenderWidget::dragEnterEvent(QDragEnterEvent* event)
+{
+    if (event->mimeData()->hasUrls())
+    {
+        static const QSet<QString> supportedExts = {QStringLiteral("mkv"), QStringLiteral("mp4"), QStringLiteral("ass"),
+                                                    QStringLiteral("srt"), QStringLiteral("xml")};
+        for (const QUrl& url : event->mimeData()->urls())
+        {
+            if (url.isLocalFile())
+            {
+                const QString ext = QFileInfo(url.toLocalFile()).suffix().toLower();
+                if (supportedExts.contains(ext))
+                {
+                    event->acceptProposedAction();
+                    return;
+                }
+            }
+        }
+    }
+}
+
+void ManualRenderWidget::dropEvent(QDropEvent* event)
+{
+    const QList<QUrl> urls = event->mimeData()->urls();
+    for (const QUrl& url : urls)
+    {
+        const QString path = url.toLocalFile();
+        if (path.isEmpty() || !QFileInfo::exists(path))
+        {
+            continue;
+        }
+
+        const QString ext = QFileInfo(path).suffix().toLower();
+        if (ext == QLatin1String("mkv") || ext == QLatin1String("mp4"))
+        {
+            setInputVideoPath(path);
+        }
+        else if (ext == QLatin1String("ass"))
+        {
+            ui->externalSubsPathEdit->setText(path);
+            ui->hardsubCheckBox->setChecked(true);
+            ui->externalSubsRadio->setChecked(true);
+            updateHardsubOptions();
+        }
+        else if (ext == QLatin1String("xml"))
+        {
+            ui->chaptersExternalPathManualEdit->setText(path);
+        }
+    }
+    event->acceptProposedAction();
+}
+
 void ManualRenderWidget::on_browseInputButton_clicked()
 {
-    QString path = QFileDialog::getOpenFileName(this, "Выберите входной MKV", "", "Matroska Video (*.mkv)");
+    QSettings settings("MyCompany", "DubbingTool");
+    QString lastDir = settings.value("ui/lastBrowseDir").toString();
+    if (lastDir.isEmpty() && !ui->inputMkvPathEdit->text().isEmpty())
+    {
+        lastDir = QFileInfo(ui->inputMkvPathEdit->text()).absolutePath();
+    }
+
+    QString path = QFileDialog::getOpenFileName(this, "Выберите входное видео", lastDir,
+                                                "Видеофайлы (*.mkv *.mp4);;Все файлы (*)");
     if (!path.isEmpty())
     {
-        ui->inputMkvPathEdit->setText(path);
-        analyzeMkvForSubtitles(path);
-        QFileInfo fi(path);
-        ui->outputMp4PathEdit->setText(
-            QDir::toNativeSeparators(fi.absolutePath() + "/" + fi.completeBaseName() + ".mp4"));
+        settings.setValue("ui/lastBrowseDir", QFileInfo(path).absolutePath());
+        setInputVideoPath(path);
     }
 }
 
@@ -118,7 +204,7 @@ void ManualRenderWidget::on_renderButton_clicked()
 
     QSettings settings("MyCompany", "DubbingTool");
     settings.setValue("manualRender/lastUsedPreset", ui->renderPresetComboBox->currentText());
-    settings.setValue(QStringLiteral("manualRender/reencodeAudioAac256"), ui->reencodeAudioAac256CheckBox->isChecked());
+    settings.setValue(QStringLiteral("manualRender/reencodeAudioAac"), ui->reencodeAudioAac256CheckBox->isChecked());
 
     emit renderRequested();
 }
@@ -135,11 +221,16 @@ QString ManualRenderWidget::getCurrentPresetName() const
 
 QString ManualRenderWidget::chapterTimingSourcePath() const
 {
+    const QString externalPath = ui->chaptersExternalPathManualEdit->text().trimmed();
+    if (!externalPath.isEmpty())
+    {
+        return externalPath;
+    }
     if (ui->transferEmbeddedChaptersCheckBox->isChecked())
     {
         return ui->inputMkvPathEdit->text().trimmed();
     }
-    return ui->chaptersExternalPathManualEdit->text().trimmed();
+    return QString();
 }
 
 void ManualRenderWidget::analyzeMkvForSubtitles(const QString& path)
@@ -236,7 +327,7 @@ QVariantMap ManualRenderWidget::getParameters() const
     params["useHardsub"] = useHardsub;
     params["chaptersExternalPath"] = ui->chaptersExternalPathManualEdit->text().trimmed();
     params["transferEmbeddedChapters"] = ui->transferEmbeddedChaptersCheckBox->isChecked();
-    params[QStringLiteral("reencodeAudioAac256")] = ui->reencodeAudioAac256CheckBox->isChecked();
+    params[QStringLiteral("reencodeAudioAac")] = ui->reencodeAudioAac256CheckBox->isChecked();
 
     if (useHardsub)
     {
